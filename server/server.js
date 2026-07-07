@@ -1,8 +1,13 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT || 3000);
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const GAME_INDEX = path.join(HERE, 'index.html');
 const ROOM_IDLE_MS = 20 * 60 * 1000;
 const CLIENT_IDLE_MS = 45 * 1000;
 const MAX_ROOMS = 32;
@@ -129,12 +134,31 @@ function writeJson(res, status, payload) {
   res.end(JSON.stringify(payload, null, 2));
 }
 
+async function serveGame(res) {
+  try {
+    const html = await readFile(GAME_INDEX, 'utf8');
+    res.writeHead(200, {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+    });
+    res.end(html);
+  } catch (err) {
+    writeJson(res, 500, {
+      error: 'Game page missing from deployment.',
+      expected: 'server/index.html',
+      detail: err.message,
+    });
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return writeJson(res, 204, {});
-  if (req.url === '/' || req.url === '/health') {
+  if (req.url === '/' || req.url === '/index.html') return serveGame(res);
+  if (req.url === '/health') {
     return writeJson(res, 200, {
       ok: true,
       service: 'iron-tide-relay',
+      game: '/',
       rooms: rooms.size,
       players: [...rooms.values()].reduce((n, r) => n + r.clients.size, 0),
       websocket: '/play',
