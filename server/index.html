@@ -2095,6 +2095,8 @@ let manning=null;          // currently controlled turret (placed obj) or null
 let piloting=null;         // currently flown plane {plane, pos, speed, gunCd, bombCd, roll}
 let driving=false;         // steering the ship from the bridge
 let onFoot=false; let footPos=new THREE.Vector3(); let footLand=null;  // ashore on an island/harbor
+let landCampaignMode=false; // ground theaters hide the ship and start with an airborne command-center insertion
+let playerShipLost=false;  // true when your ship was sunk while you survived ashore/away from it
 let drivingTank=null; let footGunCd=0;          // piloted tank + handheld weapon
 const playerTanks=[];      // friendly drivable tanks {group, pos, heading, island, fireCd, turret, barrelLen}
 const planes=[];           // bought planes {def, group, spot, parked, bombsLeft}
@@ -2391,6 +2393,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyH') toggleHarbor(); if(e.code==='KeyM') sfxToggle(); if(e.code==='KeyC') toggleDive();
   if(e.code==='KeyB') toggleBuild();
   if(e.code==='KeyN'&&!e.repeat) toggleTacticalMap();
+  if(e.code==='KeyP'&&!e.repeat) bailoutOrBoard();
   if(e.code==='KeyR'&&!e.repeat) sonarPing();
   if(e.code==='Backslash'&&!e.repeat)backslashMoneyCode();
   if(e.code==='KeyV'&&!e.repeat) deployPlayerMine();
@@ -2518,7 +2521,7 @@ function makePlayerShip(shipId){
   // tear down old ship (and everything attached to it) on respawn
   if(player && player.build) destroyObject3D(player.build.group);
   placed.length=0; planes.length=0; crew.length=0; planeSpots.length=0;
-  manning=null; piloting=null; driving=false; onFoot=false; drivingTank=null; mouseDownFire=false;
+  manning=null; piloting=null; driving=false; onFoot=false; drivingTank=null; mouseDownFire=false; playerShipLost=false;
   const build=buildShip(def,false);
   player={ build, hp:def.hp, maxhp:def.hp, def, submerged:false, air:100, diveY:0 };
   const spawnZ = friendlyHarbor ? friendlyHarbor.pos.z-240 : 0;
@@ -2551,6 +2554,39 @@ function makePlayerShip(shipId){
   if(def.boss)installBossStarterGuns(build);
   walkPos.set(0, deckEyeY(), def.len*0.28); camYaw.v=player.heading; camPitch.v=0.04;
 }
+function friendlyCommandIsland(){
+  let best=null, bz=-Infinity;
+  islands.forEach(i=>{ if(i.owner===0&&islandStructures(i,0,'command').length&&i.pos.z>bz){best=i;bz=i.pos.z;} });
+  return best || islands.find(i=>i.owner===0) || (friendlyHarbor?{pos:friendlyHarbor.pos,r:friendlyHarbor.r,rx:friendlyHarbor.r,rz:friendlyHarbor.r,angle:0,top:2,harbor:friendlyHarbor,name:'Command Center'}:null);
+}
+function spawnInsertionPlane(pos,team=0){
+  const g=new THREE.Group(), body=mkBox(34,3.2,7,SILVER(team===0?0x7fa0a8:0x9a7770));
+  body.position.y=0;g.add(body);
+  const wing=mkBox(9,1,48,SILVER(0x5e7078));wing.position.y=.2;g.add(wing);
+  const tail=mkBox(8,7,2,SILVER(0x53646c));tail.position.set(-15,4,0);g.add(tail);
+  const nose=new THREE.Mesh(new THREE.ConeGeometry(3.8,7,10),SILVER(0x7f8f96));nose.rotation.z=-Math.PI/2;nose.position.x=19;g.add(nose);
+  const mkParatrooper=(off)=>{ const p=buildSailor('crew'); p.scale.setScalar(1.15); p.position.set(pos.x+off,pos.y+75+Math.random()*25,pos.z-12-Math.random()*22); scene.add(p);
+    fx.push({mesh:p,life:4.5,max:4.5,vel:new THREE.Vector3((Math.random()-.5)*2,-18-Math.random()*3,(Math.random()-.5)*2),drag:.05,fade:true,op:1}); };
+  g.position.set(pos.x-520,pos.y+125,pos.z-260);g.rotation.y=Math.PI/2;scene.add(g);
+  fx.push({mesh:g,life:7,max:7,vel:new THREE.Vector3(135,0,24),fade:true,op:1});
+  for(let i=0;i<7;i++)mkParatrooper((i-3)*6);
+}
+function deployLandCampaignStart(){
+  landCampaignMode=true;
+  if(player&&player.build&&player.build.group){ player.build.group.visible=false; player.build.group.position.set(0,-5000,0); }
+  player.hp=player.maxhp; player.speed=0; player.throttle=0; player.submerged=false;
+  driving=false;manning=null;piloting=null;drivingTank=null;onFoot=true;mouseDownFire=false;
+  const isl=friendlyCommandIsland(); if(!isl)return;
+  footLand=isl.island||isl; const cmds=islandStructures(footLand,0,'command');
+  const c=(cmds[0]?cmds[0].pos:footLand.pos).clone();
+  footPos.copy(c).add(new THREE.Vector3(18,0,24)); clampToIsland(footPos,footLand,0.72); footPos.y=(footLand.top||2.1)+EYE;
+  player.pos.copy(footPos).setY(0); player.heading=0; camYaw.v=0; camPitch.v=0.02;
+  const army=mapArmyProfile(0), soldiers=Math.max(5,Math.round(5*army.soldiers)), tanks=Math.max(1,Math.round(1.5*army.tanks));
+  for(let i=0;i<soldiers;i++){ const a=i/soldiers*6.28, p=islandPoint(footLand,a,0.18+Math.random()*0.24,2); buildAndPushLand('soldier',0,p,2,footLand); }
+  for(let i=0;i<tanks;i++){ const a=i/tanks*6.28+0.4, p=islandPoint(footLand,a,0.30+Math.random()*0.18,2); buildAndPushLand('tank',0,p,2,footLand); }
+  spawnInsertionPlane(footPos,0);
+  flashPrompt('🪂 AIRBORNE ASSAULT — landed at '+(footLand.name||'the command center')+'. Secure every island.');
+}
 function startGame(shipId){
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
@@ -2560,11 +2596,15 @@ function startGame(shipId){
   buildTheater();
   makePlayerShip(shipId);
   buildShopUI();
-  for(let i=0;i<M.enemies;i++) spawnEnemy();
-  for(let i=0;i<M.allies;i++) spawnAlly();   // NPC starting fleets per map
-  if(M.boss) spawnBoss(1);
-  if(shipId==='boss')friendlyBossUsed=true;else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
-  flashPrompt('⚔ '+M.name.toUpperCase()+' — '+M.theme);
+  if(M.ground) deployLandCampaignStart();
+  else {
+    landCampaignMode=false;
+    for(let i=0;i<M.enemies;i++) spawnEnemy();
+    for(let i=0;i<M.allies;i++) spawnAlly();   // NPC starting fleets per map
+    if(M.boss) spawnBoss(1);
+    if(shipId==='boss')friendlyBossUsed=true;else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
+    flashPrompt('⚔ '+M.name.toUpperCase()+' — '+M.theme);
+  }
   const cv=document.getElementById('c');
   cv.addEventListener('click',()=>{ sfxResume(); if(phase==='play' && !shopOpen && !harborOpen) cv.requestPointerLock(); });
   document.addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv){
@@ -2585,14 +2625,29 @@ function respawnPlayer(shipId){
   document.getElementById('menu').style.display='none';
   phase='play';
   makePlayerShip(shipId);           // money carries over; new ship has no guns yet
+  if(window._MAP&&window._MAP.ground) deployLandCampaignStart();
   buildShopUI(); refreshShop(); updateHUD(); updateMode();
 }
-function playerSunk(){
-  if(phase!=='play') return; phase='respawn';
+function showRespawnMenu(msg){
+  if(phase!=='play'&&phase!=='respawn') return;
+  phase='respawn';
+  mouseDownFire=false;
   if(document.pointerLockElement) document.exitPointerLock();
   const sub=document.querySelector('#menu .sub');
-  if(sub) sub.textContent='Your ship was sunk — pick a replacement. It redeploys from your harbor. (The war isn’t over until a harbor falls.)';
+  if(sub) sub.textContent=msg||'Pick a replacement. It redeploys from your harbor.';
   document.getElementById('menu').style.display='flex';
+  updateMode();
+}
+function playerSunk(){
+  if(phase!=='play') return;
+  const survivedAway=(onFoot||drivingTank||piloting)&&!landCampaignMode;
+  if(survivedAway){
+    playerShipLost=true; driving=false; manning=null;
+    if(player&&player.build&&player.build.group) player.build.group.visible=false;
+    flashPrompt('⚓ Your ship was sunk while you were away. Return to your harbor and press P for a replacement.');
+    updateMode(); return;
+  }
+  showRespawnMenu('You were lost with your ship — pick a replacement. It redeploys from your harbor. (The war isn’t over until a harbor falls.)');
 }
 
 // Far-apart harbors (south = yours, north = enemy) across an authored, asymmetric archipelago.
@@ -2817,6 +2872,8 @@ function tankLandToggle(){
     tk.group.position.copy(tk.pos); tk.group.rotation.y=tk.heading;
     flashPrompt('🪖 Tank ashore'+(isl.name?' on '+isl.name:'')+' — clear the garrison to capture · G to re-embark'); updateMode();
   } else {
+    if(landCampaignMode){ flashPrompt('No extraction ship in this theater — keep the tank ashore and push the assault.'); return; }
+    if(playerShipLost){ flashPrompt('Your ship is gone — drive or dismount back to harbor for a replacement.'); return; }
     if(Math.hypot(tk.pos.x-player.pos.x, tk.pos.z-player.pos.z) < player.build.halfLen+18){
       player.build.group.attach(tk.group); tk.onDeck=true; tk.island=null;                // world → ship deck
       const dTop=player.def.deckY+(player.def.kind==='carrier'?0.5:0)-0.4;
@@ -2859,11 +2916,10 @@ function hurtPlayerTank(tk,dmg,fromPos,top){
 }
 function destroyPlayerTank(tk,msg){
   const wp=tankWP(tk); blastAll(wp.clone().setY(wp.y+1),60,10);
+  const wasDriving=drivingTank===tk;
   if(tk.group&&tk.group.parent) tk.group.parent.remove(tk.group);
   const i=playerTanks.indexOf(tk); if(i>=0) playerTanks.splice(i,1);
-  if(drivingTank===tk){ drivingTank=null;
-    if(tk.onDeck){ onFoot=false; walkPos.set(0,deckEyeY(),0); } else { onFoot=true; footLand=tk.island; footPos.set(wp.x+4,2.1+EYE,wp.z); }
-    updateMode(); }
+  if(wasDriving){ drivingTank=null; onFoot=false; showRespawnMenu((msg||'Tank destroyed!')+' Your crew was lost — pick a replacement from harbor.'); return; }
   flashPrompt('💥 '+(msg||'Tank destroyed!'));
 }
 function tankFireTick(tk,dt){
@@ -2930,6 +2986,7 @@ function updateTank(dt){
     spawnShell({dmg:tk.dmg||34,spd:130,splash:6,kind:'cannon',col:0xffd060}, muz, dir, 0, null);
     muzzleFlash(muz);
   }
+  if(playerShipLost) player.pos.copy(wp).setY(0);
 }
 
 // ---- AI ship arsenal: ships start with a main battery and BUY varied weapons over time ----
@@ -3487,6 +3544,7 @@ function refreshBuild(){
 function toggleBuild(){
   if(phase!=='play') return;
   if(!onFoot){ if(phase==='play') flashPrompt('Go ashore on an island (G) to build defenses'); return; }
+  if(!footLand){ flashPrompt('Swim to dry land before building defenses'); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('Capture this position before building defenses'); return; }
   if(shopOpen) toggleShop(); if(harborOpen) toggleHarbor();
   buildOpen=!buildOpen;
@@ -3496,6 +3554,7 @@ function toggleBuild(){
 }
 function buildStructure(k){
   if(!onFoot){ flashPrompt('Go ashore on an island (G) to emplace '+STRUCTS[k].name); return; }
+  if(!footLand){ flashPrompt('Swim to dry land before building '+STRUCTS[k].name); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('This position is not under friendly control'); return; }
   const s=STRUCTS[k], cost=priceOf(s.cost);
   if(money<cost){ flashPrompt('Not enough funds'); return; }
@@ -3596,8 +3655,9 @@ function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot 
 function toggleMan(){
   if(phase!=='play'||shopOpen||harborOpen) return;
   if(drivingTank){ dismountTank(); return; }
-  if(onFoot){ flashPrompt('Press G to re-board your ship.'); return; }
-  if(piloting){ if(piloting.phase==='fly') startLanding(); else if(piloting.phase==='landing'){ piloting.phase='fly'; flashPrompt('Landing aborted — climb away.'); updateMode(); } return; }
+  if(onFoot){ flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
+  if(piloting){ if(playerShipLost&&piloting.phase==='fly'){ flashPrompt('No deck left to land on — press P to parachute, then reach harbor.'); return; }
+    if(piloting.phase==='fly') startLanding(); else if(piloting.phase==='landing'){ piloting.phase='fly'; flashPrompt('Landing aborted — climb away.'); updateMode(); } return; }
   if(driving){ stopDrive(); return; }
   if(manning){ manning=null; updateMode(); return; }
   if(nearestHelm()){ startDrive(); return; }
@@ -3745,7 +3805,8 @@ function crashPlane(msg){ // destroyed (ocean ditch / hit the sea / kamikaze)
   blastAll(piloting.pos.clone().setY(1.5), 40, 13); splashAt(piloting.pos.clone().setY(0.5),2.5);
   destroyObject3D(pa.group); pa.spot.taken=false;
   const i=planes.indexOf(pa); if(i>=0) planes.splice(i,1);
-  piloting=null; walkPos.set(0,deckEyeY(),0); flashPrompt(msg||'Aircraft lost in the sea!'); updateMode();
+  piloting=null;
+  showRespawnMenu((msg||'Aircraft lost!')+' You did not bail out — choose another ship or restart from harbor.');
 }
 function startDrive(){
   driving=true; camYaw.v=player.heading||0; camPitch.v=0.05;
@@ -4194,7 +4255,7 @@ function update(dt,t){
   shipCollisions(dt);   // hulls repel, rams detonate
   for(let i=allies.length-1;i>=0;i--){ if(allies[i].dead){ destroyShipVisual(allies[i]); allies.splice(i,1); } }
   const allyReinforceRate=(0.18/2.25)*(1+hU(0,'fastBuild')*0.6+hU(0,'slots')*0.35);
-  if(Math.random()<dt*allyReinforceRate) spawnAlly();
+  if(!(window._MAP&&window._MAP.ground) && Math.random()<dt*allyReinforceRate) spawnAlly();
   updateIslandControl(dt);
   // --- passive income ('Resource Storage' upgrade) ---
   if(fU('income')>0){ incomeAcc+=fU('income')*5*dt; if(incomeAcc>=1){ const g=Math.floor(incomeAcc); money+=g; incomeAcc-=g; updateHUD(); refreshShop(); } }
@@ -4237,8 +4298,45 @@ function deckEyeY(){ return player.def.deckY + (player.def.kind==='carrier'?0.5:
 function landSpots(){ const o=islands.map(i=>({pos:i.pos,r:i.r,rx:i.rx,rz:i.rz,angle:i.angle,top:i.top,name:i.name,island:i}));
   if(enemyHarbor) o.push({pos:enemyHarbor.pos,r:enemyHarbor.r,top:2.0,harbor:enemyHarbor});
   if(friendlyHarbor) o.push({pos:friendlyHarbor.pos,r:friendlyHarbor.r,top:2.0,harbor:friendlyHarbor}); return o; }
+function landIdentity(o){ return o ? (o.island||o.harbor||o) : null; }
+function landTop(o){ return o&&o.top!=null?o.top:2.0; }
+function footSurfaceAt(pos,pad=0){
+  let best=null,bn=1e9;
+  landSpots().forEach(o=>{ const n=islandNorm(pos,o,pad); if(n<1&&n<bn){bn=n;best=o;} });
+  return best;
+}
+function nearFriendlyHarborForReplacement(){
+  return !!(friendlyHarbor&&onFoot&&playerShipLost&&footPos.distanceTo(friendlyHarbor.pos)<friendlyHarbor.r+90);
+}
+function parachuteFromAircraft(){
+  if(!piloting) return false;
+  const P=piloting, pa=P.plane, drop=P.pos.clone();
+  destroyObject3D(pa.group); pa.spot.taken=false;
+  const i=planes.indexOf(pa); if(i>=0) planes.splice(i,1);
+  piloting=null; onFoot=true; driving=false; manning=null; drivingTank=null;
+  const surf=footSurfaceAt(drop,20); footLand=landIdentity(surf);
+  footPos.copy(drop);
+  footPos.y=footLand?(landTop(surf||footLand)+EYE):(0.45+EYE);
+  player.pos.copy(footPos).setY(0);
+  const chute=new THREE.Mesh(new THREE.SphereGeometry(5,16,8,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0xf2f2e8,transparent:true,opacity:.82,side:THREE.DoubleSide}));
+  chute.position.copy(footPos).add(new THREE.Vector3(0,8,0));scene.add(chute);
+  fx.push({mesh:chute,life:2.8,max:2.8,fade:true,op:.82,vel:new THREE.Vector3(0,-1.3,0)});
+  flashPrompt(footLand?'🪂 Parachute deployed — landed safely.':'🪂 Parachute deployed — splashdown! Swim to land or harbor.');
+  updateMode(); return true;
+}
+function bailoutOrBoard(){
+  if(piloting){ parachuteFromAircraft(); return; }
+  if(nearFriendlyHarborForReplacement()){
+    showRespawnMenu('Back at harbor — choose your replacement ship. Your last ship is gone for good.');
+    return;
+  }
+  if(playerShipLost) flashPrompt('Return to your friendly harbor, then press P to request a replacement ship.');
+  else flashPrompt('P = parachute from aircraft, or request a replacement ship at harbor after yours is sunk.');
+}
 function toggleFoot(){
   if(phase!=='play'||shopOpen||harborOpen||manning||driving||piloting) return;
+  if(landCampaignMode){ flashPrompt('No ship on this theater — this is an airborne ground assault. Capture the command posts.'); return; }
+  if(playerShipLost){ flashPrompt('Your ship is gone — return to friendly harbor and press P for a replacement.'); return; }
   if(onFoot){ // re-board if standing near the ship
     if(Math.hypot(footPos.x-player.pos.x, footPos.z-player.pos.z) < player.build.halfLen+14){
       onFoot=false; walkPos.set(0,deckEyeY(), player.build.halfLen*0.55); flashPrompt('Back aboard.'); updateMode();
@@ -4269,7 +4367,7 @@ function footWalkBlocked(x,z){
   if(harborWalkBlocked(x,z,harbor))return true;
   return landUnits.some(u=>{
     if(u.dead||!STRUCTS[u.kind]||WALKABLE_STRUCTURE_KINDS.has(u.kind))return false;
-    if(!harbor&&footLand&&u.island&&u.island!==footLand)return false;
+    if(!harbor&&(!footLand||(u.island&&u.island!==footLand)))return false;
     const radius=Math.max(2.2,(u.footprint||8)*.46);
     return Math.hypot(x-u.pos.x,z-u.pos.z)<radius;
   });
@@ -4283,14 +4381,18 @@ function updateFoot(dt){
   let mf=0,ms=0; if(keys['KeyW'])mf+=1; if(keys['KeyS'])mf-=1; if(keys['KeyA'])ms-=1; if(keys['KeyD'])ms+=1;
   const f=new THREE.Vector3(Math.sin(camYaw.v),0,Math.cos(camYaw.v)), r=new THREE.Vector3(-f.z,0,f.x);
   const mv=f.multiplyScalar(mf).add(r.multiplyScalar(ms));
-  if(mv.lengthSq()>0){mv.normalize().multiplyScalar(WALK*dt);
+  const surfaceNow=footSurfaceAt(footPos,0);
+  footLand=landIdentity(surfaceNow);
+  const swim=!footLand;
+  if(mv.lengthSq()>0){mv.normalize().multiplyScalar(WALK*(swim?0.42:1)*dt);
     const nx=footPos.x+mv.x,nz=footPos.z+mv.z;
     if(!footWalkBlocked(nx,footPos.z))footPos.x=nx;
     if(!footWalkBlocked(footPos.x,nz))footPos.z=nz;
   }
-  // stay on the island (don't walk into the sea)
-  const o=footLand; clampToIsland(footPos,o,0.92);
-  footPos.y=o.top+EYE;
+  const surfaceAfter=footSurfaceAt(footPos,0);
+  footLand=landIdentity(surfaceAfter);
+  footPos.y=footLand?(landTop(surfaceAfter||footLand)+EYE):(0.45+EYE);
+  if(landCampaignMode||playerShipLost) player.pos.copy(footPos).setY(0);  // minimap, sky and objectives follow the soldier, not the hidden anchor
   // handheld weapon — fire the currently equipped small arm
   if(footGunCd>0) footGunCd-=dt;
   const W=HANDHELD[equippedGun]||HANDHELD.pistol;
@@ -4923,9 +5025,10 @@ function updatePrompt(){
   if(promptT>0){ promptT-=0.016; msg=promptMsg; }
   else if(capIsl){ msg=capIsl.contested?'🏝 '+capIsl.name.toUpperCase()+' CONTESTED — clear enemy ships and defenders':
       capIsl.captureTeam===0?'🏝 SECURING '+capIsl.name.toUpperCase()+' — '+Math.floor(capIsl.capture/ISLAND_CAPTURE_TIME*100)+'%':'🏝 HOLD POSITION TO CAPTURE '+capIsl.name.toUpperCase(); }
-  else if(drivingTank){ const t=drivingTank; msg='Tank '+Math.max(0,Math.ceil(t.hp/t.maxhp*100))+'% — W/S drive · Click fire · R repair · '+(t.onDeck?'G land ashore':'G re-embark')+' · T view · E dismount'+tankPartSummary(t); }
-  else if(onFoot){ const near=Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<player.build.halfLen+18;
-    msg='Ashore — WASD walk · Click: '+(HANDHELD[equippedGun]||HANDHELD.pistol).name+' · Q switch · B build' + (near?'   ·   G re-board':''); }
+  else if(drivingTank){ const t=drivingTank; msg='Tank '+Math.max(0,Math.ceil(t.hp/t.maxhp*100))+'% — W/S drive · Click fire · R repair · '+(t.onDeck?'G land ashore':(playerShipLost?'Ship lost':'G re-embark'))+' · T view · E dismount'+tankPartSummary(t); }
+  else if(onFoot){ const near=!landCampaignMode&&Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<player.build.halfLen+18;
+    if(playerShipLost) msg=(nearFriendlyHarborForReplacement()?'Harbor reached — press P for a replacement ship':'Ship lost — swim/walk back to your harbor')+' · WASD '+(footLand?'walk':'swim')+' · Click: '+(HANDHELD[equippedGun]||HANDHELD.pistol).name;
+    else msg=(landCampaignMode?'Airborne assault':(footLand?'Ashore':'Swimming'))+' — WASD '+(footLand?'walk':'swim')+' · Click: '+(HANDHELD[equippedGun]||HANDHELD.pistol).name+' · Q switch'+(footLand?' · B build':'') + (near?'   ·   G re-board':''); }
   else if(driving){ msg='Steering — W/S throttle · A/D rudder' + (player.def.kind==='sub'?'   ·   C dive/surface':'') + '   ·   T view   ·   E to step away'; }
   else if(piloting){
     if(piloting.phase==='takeoff') msg='Taking off…';
@@ -4933,7 +5036,7 @@ function updatePrompt(){
     else { const heli=piloting.plane.def.heli; const b=piloting.plane.def.bomb?`   ·   Space drop (${piloting.plane.bombsLeft})`:'';
       const ga=piloting.plane.gunAmmo==null?'':`   ·   Gun ammo ${piloting.plane.gunAmmo}`;
       const f=Math.ceil(piloting.fuel/piloting.fuelMax*100); const eng = !piloting.engineOn ? '   ·   ⚠ ENGINE OUT' : (f<25?'   ·   ⚠ LOW FUEL':'');
-      msg=(heli?'W/S fwd · A/D turn · Mouse = climb/descend':'W/S throttle · A/D turn · Mouse = pitch')+' · Click guns'+ga+b+`   ·   Fuel ${f}%`+eng+(piloting.parts?partSummary(piloting):'')+'   ·   T view · E to land'; }
+      msg=(heli?'W/S fwd · A/D turn · Mouse = climb/descend':'W/S throttle · A/D turn · Mouse = pitch')+' · Click guns'+ga+b+`   ·   Fuel ${f}%`+eng+(piloting.parts?partSummary(piloting):'')+'   ·   P parachute · T view · E to land'; }
   }
   else if(!manning && !shopOpen && !harborOpen){
     const tu=nearestTurret(), pa=nearestPlane(), hm=nearestHelm(), dtk=nearestDeckTank();
@@ -4966,7 +5069,8 @@ function critStatus(){
 function updateHUD(){
   document.getElementById('money').textContent='$'+money;
   const wg = weather.type==='storm'?'⛈️':weather.type==='fog'?'🌫️':weather.type==='overcast'?'☁️':(weather.day<0.32?'🌙':'☀️');
-  document.getElementById('score').textContent=wg+'  Sunk: '+sunk+'   ·   Fleet '+(allies.length+1)+'v'+enemies.length+
+  const forceLabel=(window._MAP&&window._MAP.ground)?('Ground '+landUnits.filter(u=>!u.dead&&u.team===0).length+'v'+landUnits.filter(u=>!u.dead&&u.team===1).length):('Fleet '+(allies.length+1)+'v'+enemies.length);
+  document.getElementById('score').textContent=wg+'  Sunk: '+sunk+'   ·   '+forceLabel+
     '   ·   Dots '+[...allies,...enemies].filter(s=>s.proxy).length+
     '   ·   Guns '+placed.filter(p=>!p.ko).length+'/'+player.def.mounts+
     '   ·   Sonar '+(sonarCooldown>0?Math.ceil(sonarCooldown)+'s':'READY')+
@@ -5074,11 +5178,13 @@ function updateMode(){
   const el=document.getElementById('mode');
   el.innerHTML = drivingTank ? '<b>TANK</b><br>W/S drive · A/D turn<br>Mouse aim · Click fire · E dismount'
     : buildOpen ? '<b>ISLAND ENGINEERS</b><br>Click a defense to build<br>B to close'
-    : onFoot ? '<b>ASHORE</b><br>WASD walk · Click = rifle · B build<br>E board tank · G re-board ship'
+    : onFoot ? (playerShipLost?'<b>SURVIVOR</b><br>Get to friendly harbor<br>P replacement ship'
+        : landCampaignMode?'<b>AIRBORNE ASSAULT</b><br>WASD walk/swim · Click = rifle · B build<br>E board tank · Capture command posts'
+        : footLand?'<b>ASHORE</b><br>WASD walk · Click = rifle · B build<br>E board tank · G re-board ship':'<b>SWIMMING</b><br>WASD swim to land or ship<br>Click = rifle')
     : driving ? '<b>AT THE HELM</b><br>W/S throttle · A/D rudder'+(player.def.kind==='sub'?' · C dive':'')+'<br>Mouse look · E to step away'
     : piloting ? (piloting.phase==='takeoff' ? '<b>TAKEOFF</b><br>Climbing out…'
         : piloting.phase==='landing' ? '<b>LANDING</b><br>Descend over the ship<br>E to abort'
-        : '<b>IN FLIGHT</b><br>Mouse + A/D steer · W/S throttle<br>Click guns · Space bombs · E to land')
+        : '<b>IN FLIGHT</b><br>Mouse + A/D steer · W/S throttle<br>Click guns · Space bombs · P parachute · E land')
     : manning ? '<b>GUNNERY</b><br>Mouse aim · Click fire · E exit'
     : shopOpen ? '<b>ARMORY OPEN</b><br>Click weapon/plane · Tab to close'
     : harborOpen ? '<b>HARBOR COMMAND</b><br>Click an upgrade to buy · H to close'
