@@ -2615,6 +2615,48 @@ const SMALL_ISLAND_SLOTS=[
   [ 4800,-1850],[ 4820,1500],[-2450,4140],[2350, 4120],[ 620, 3290],
 ];
 const SMALL_ISLAND_NAMES=['Skull Reef','Far Lantern','Lowtide','Pelican','Broken Mast'];
+function authoredTheaterIslands(M){
+  const n=M.name, hq=M.hqZ||HQ_Z;
+  const I=(x,z,r,name)=>[x,z,r,name];
+  if(n==='Training Bay')return [I(-420,-140,150,'Target Cay'),I(430,180,135,'Gunnery Sandbar')];
+  if(n==='The Landing')return [
+    I(-180,-1040,430,'Red Beach'),I(300,-640,500,'Duneside'),I(-260,-220,560,'Landing Fields'),
+    I(250,300,520,'Tank Plain'),I(-180,780,460,'South Approach'),I(420,1080,360,'Supply Bluff')];
+  if(n==='Coastal Skirmish')return [I(-980,-620,260,'Blackfin'),I(760,40,240,'Cutlass Cay'),I(-520,780,220,'Saltspire')];
+  if(n==='Iron Straits')return [I(-760,-1380,520,'West Gate'),I(760,-1180,520,'East Gate'),I(-640,420,500,'Narrows West'),I(700,650,500,'Narrows East')];
+  if(n==='Nightfall Passage')return [I(-1320,-1600,300,'Darkwater'),I(1280,-1020,260,'Lantern Reef'),I(-820,-220,330,'Moon Shoal'),I(980,680,300,'Black Sand'),I(-460,1580,260,'Dawn Point')];
+  if(n==='Fogbound Marches')return [I(-1450,-1550,340,'Blind Reef'),I(1420,-1120,300,'Echo Cay'),I(-250,-360,520,'Radar Hill'),I(1260,610,300,'Greywake'),I(-1180,1450,340,'Sonar Bank'),I(340,1760,270,'Mist Point')];
+  if(n==="Leviathan's Grave")return [I(-1560,-1600,360,'Dry Dock West'),I(1450,-1460,380,'Shipyard East'),I(-360,-520,650,'Graveyard'),I(1160,420,340,'Anchorfall'),I(-1280,1380,320,'Scrapyard'),I(540,1600,300,'Wreck Point')];
+  if(n==='The Gauntlet')return [I(-1750,-1700,320,'Left Battery'),I(1750,-1320,300,'Right Battery'),I(-1220,-300,260,'Middle Gun'),I(1380,940,260,'Last Gun')];
+  if(n==='Typhoon Run')return [I(-1900,-1600,300,'Stormwall'),I(1840,-1020,260,'Spray Rock'),I(-720,-60,360,'Breaker'),I(1040,760,320,'Whitecap'),I(-1540,1660,280,'Rain Needle')];
+  if(n==='Blackwater Ambush')return [I(-1220,-1480,340,'Tar Shoal'),I(1040,-980,300,'Ambush Cay'),I(-60,-180,620,'Blackwater'),I(1220,760,280,'Drift Trap'),I(-1180,1420,300,'Hidden Reef'),I(360,1720,240,'Fog Hook')];
+  if(n==='Island Hopping')return [I(-520,-1500,300,'Beach One'),I(520,-1080,320,'Beach Two'),I(-470,-660,340,'Hill Three'),I(470,-240,360,'Depot Four'),I(-500,230,360,'Bridge Five'),I(520,680,340,'Field Six'),I(-420,1100,320,'Seven Palms'),I(420,1480,300,'Final Cay')];
+  if(n==='Midnight Raid')return [I(-1600,-1520,280,'Searchlight Point'),I(1160,-820,300,'Black Pier'),I(-360,-80,520,'Raid Island'),I(1320,840,280,'Tracer Key'),I(-980,1550,300,'Silent Shoal')];
+  if(n==='Shattered Coast')return [I(-2100,-1750,310,'Shard One'),I(-900,-1480,230,'Shard Two'),I(1120,-1260,260,'Shard Three'),I(2050,-760,260,'Shard Four'),I(-1640,-60,300,'Broken Bay'),I(820,620,280,'Fracture'),I(-560,1540,300,'Splinter')];
+  if(n==='Frozen Straits')return [I(-850,-1460,480,'Ice Gate West'),I(820,-1180,460,'Ice Gate East'),I(-760,520,440,'Frost Channel'),I(880,840,420,'Glacier Tooth')];
+  if(n==='Ghost Fleet')return [I(-1720,-1760,250,'Ghost One'),I(1560,-1180,250,'Ghost Two'),I(-300,-360,360,'Phantom Bank'),I(1120,720,260,'Wraith Cay'),I(-1040,1600,260,'Deadlight')];
+  if(n==='Volcano Bay')return [I(-2020,-1680,360,'Ashfall'),I(1720,-1380,330,'Basalt'),I(-720,-360,760,'Volcano Bay'),I(1120,480,360,'Lava Key'),I(-1780,1240,320,'Cinder'),I(360,1600,340,'Smoke Point'),I(2020,1900,280,'Obsidian'),I(-320,2180,260,'Hot Spring')];
+  if(n==='Last Bastion')return [I(-690,-1680,300,'Outer One'),I(680,-1320,320,'Outer Two'),I(-700,-940,340,'Wall Three'),I(720,-520,360,'Wall Four'),I(-720,-80,400,'Bastion Five'),I(720,360,390,'Bastion Six'),I(-660,780,350,'Gate Seven'),I(640,1160,330,'Gate Eight'),I(-450,1500,310,'Keep Nine'),I(440,1780,330,'Final Keep')];
+  if(n==='Endless Horizon')return [I(-4700,-2600,300,'Far West'),I(4650,-2100,280,'Far East'),I(-3500,560,250,'Lonely Cay'),I(3880,940,260,'Open Reef'),I(-2200,2500,280,'Drifter'),I(2360,3100,260,'Horizon Rock'),I(0,700,220,'Compass')];
+  if(n==='Ragnarök Reef')return [I(-2100,-1840,390,'Ragnar West'),I(1900,-1600,380,'Ragnar East'),I(-1040,-720,420,'Thunder One'),I(1040,-220,400,'Thunder Two'),I(-1220,780,420,'Fire Reef'),I(1320,1280,380,'Doom Cay'),I(-380,1900,360,'Last Flame'),I(520,2300,330,'Ash Gate')];
+  if(n==='The Last Tide')return [I(-1900,-1780,420,'Final West'),I(1900,-1500,420,'Final East'),I(-820,-640,520,'Iron Teeth'),I(820,-120,520,'Tide Breaker'),I(-960,920,480,'Last Harbor'),I(960,1540,440,'Victory Reef')];
+  if(M.ground){ const out=[]; for(let i=0;i<(M.isles||6);i++){ const t=(i/(Math.max(1,(M.isles||6)-1))-.5)*2; out.push(I((i%2?1:-1)*(420+Math.random()*180),t*hq*.8,300+Math.random()*120,'Landing Zone '+(i+1))); } return out; }
+  // Remaining theaters still get different geography: open-sea maps push land to the edges,
+  // fog/night maps scatter sensor islands, storm maps form diagonal reef lanes.
+  let seed=0; for(let i=0;i<n.length;i++)seed=(seed*31+n.charCodeAt(i))>>>0;
+  const rand=()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296);
+  const count=M.isles||5, out=[], open=/Armada|Blockade|Steel|Twin|Final|Endless/.test(n);
+  for(let i=0;i<count;i++){
+    const t=count===1?0:(i/(count-1)-.5)*2, side=i%2?-1:1;
+    let x,z,r=230+rand()*170;
+    if(open){ x=side*(2500+rand()*1900); z=t*hq*.78+rand()*380-190; r*=0.9; }
+    else if(M.weather==='storm'){ x=t*2300+side*(500+rand()*550); z=t*hq*.72+(rand()-.5)*520; r*=1.05; }
+    else if(M.weather==='fog'||M.tod<0.08){ x=(rand()-.5)*3300; z=t*hq*.82+(rand()-.5)*760; r*=0.95; }
+    else { x=side*(650+rand()*1900); z=t*hq*.75+(rand()-.5)*520; }
+    out.push(I(x,z,r,SMALL_ISLAND_NAMES[i%SMALL_ISLAND_NAMES.length]));
+  }
+  return out;
+}
 function buildTheater(){
   const M=window._MAP||{}, hq=M.hqZ||HQ_Z, big=M.bigIsles!==false;
   friendlyHarbor=buildHarbor(0, new THREE.Vector3(0,0,hq));
@@ -2623,13 +2665,17 @@ function buildTheater(){
   const friendlyBaseIsland=buildIsland(new THREE.Vector3(0,0,hq+120),250,'Southhaven');
   enemyBaseIsland.capturable=false; friendlyBaseIsland.capturable=false;
   setIslandOwner(enemyBaseIsland,1,true); setIslandOwner(friendlyBaseIsland,0,true);
-  if(big) THEATER_ISLANDS.forEach(([x,z,r,name])=>buildIsland(new THREE.Vector3(x,0,z),r,name));
-  // minor islands — on shorter maps, pack them into the tighter sea between the two bases
-  const isleN=M.isles||5, spread=big?1:Math.min(1,hq/4400);
-  SMALL_ISLAND_SLOTS.map(p=>[p[0]*(big?1:0.35),p[1]*spread]).sort(()=>Math.random()-.5).slice(0,isleN).forEach((slot,i)=>{
-    const x=slot[0]+(Math.random()-.5)*260,z=slot[1]+(Math.random()-.5)*180,r=48+Math.random()*24;
-    buildIsland(new THREE.Vector3(x,0,z),r,SMALL_ISLAND_NAMES[i%SMALL_ISLAND_NAMES.length]);
-  });
+  const authored=authoredTheaterIslands(M);
+  if(authored) authored.forEach(([x,z,r,name])=>buildIsland(new THREE.Vector3(x,0,z),r,name));
+  else {
+    if(big) THEATER_ISLANDS.forEach(([x,z,r,name])=>buildIsland(new THREE.Vector3(x,0,z),r,name));
+    // minor islands — on shorter maps, pack them into the tighter sea between the two bases
+    const isleN=M.isles||5, spread=big?1:Math.min(1,hq/4400);
+    SMALL_ISLAND_SLOTS.map(p=>[p[0]*(big?1:0.35),p[1]*spread]).sort(()=>Math.random()-.5).slice(0,isleN).forEach((slot,i)=>{
+      const x=slot[0]+(Math.random()-.5)*260,z=slot[1]+(Math.random()-.5)*180,r=48+Math.random()*24;
+      buildIsland(new THREE.Vector3(x,0,z),r,SMALL_ISLAND_NAMES[i%SMALL_ISLAND_NAMES.length]);
+    });
+  }
   // islands fortified — your side (z>=0) is team 0, enemy side team 1. Both harbors too.
   garrisonHarbor(enemyHarbor.pos, 1);
   garrisonHarbor(friendlyHarbor.pos, 0);
