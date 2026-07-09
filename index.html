@@ -255,6 +255,19 @@ const pDmg=x=>x*DIFF().playerDmg;
 function setDifficulty(d){ if(!DIFFICULTY[d]||d===difficulty)return; difficulty=d;
   try{localStorage.setItem('ironTideDifficulty',d);}catch(e){} renderDiffRow(); }
 
+// ---------- player settings: volume, simple HUD, parental content filter ----------
+const SETTINGS={ volume:1, simpleHud:null, contentFilter:false };   // simpleHud null = auto (on for brand-new players)
+try{ const s=JSON.parse(localStorage.getItem('ironTideSettings')); if(s&&typeof s==='object') Object.assign(SETTINGS,s); }catch(e){}
+function saveSettings(){ try{ localStorage.setItem('ironTideSettings',JSON.stringify(SETTINGS)); }catch(e){} }
+function simpleHudOn(){ return SETTINGS.simpleHud==null ? (career.wins+career.losses===0) : !!SETTINGS.simpleHud; }
+function contentFilterOn(){ return !!SETTINGS.contentFilter; }
+const FILTERED_PLANES=new Set(['b29','tu95v','lfc5','mhkl235']);    // nuclear payloads + the dedicated kamikaze airframe
+function applyVolume(){ if(SFX.master) SFX.master.gain.value=SFX.on?0.5*SETTINGS.volume:0; }
+function applySimpleHud(){
+  const hide=simpleHudOn();
+  ['score','territory','sideob'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=hide?'none':''; });
+}
+
 // ---------- catalogs ----------
 const SHIPS = {
   scout:      { name:'Scout Corvette', cls:'Fast Picket',  len:36, beam:7,  depth:3.5, deckY:2.6, hp:150, kind:'surface', mounts:4,
@@ -653,7 +666,7 @@ function sfxInit(){
   if(SFX.ctx) return;
   try{ SFX.ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
   const ctx=SFX.ctx;
-  SFX.master=ctx.createGain(); SFX.master.gain.value=SFX.on?0.5:0; SFX.master.connect(ctx.destination);
+  SFX.master=ctx.createGain(); SFX.master.gain.value=SFX.on?0.5*SETTINGS.volume:0; SFX.master.connect(ctx.destination);
   // one shared 1s white-noise buffer, reused by every burst / loop (no per-shot allocation)
   const n=Math.floor(ctx.sampleRate); const b=ctx.createBuffer(1,n,ctx.sampleRate); const d=b.getChannelData(0);
   for(let i=0;i<n;i++) d[i]=Math.random()*2-1; SFX.noiseBuf=b;
@@ -687,7 +700,7 @@ function sfxInit(){
 }
 function _ramp(param,v){ param.setTargetAtTime(v, SFX.ctx.currentTime, 0.15); }
 function sfxResume(){ sfxInit(); if(SFX.ctx && SFX.ctx.state==='suspended') SFX.ctx.resume(); }
-function sfxToggle(){ SFX.on=!SFX.on; if(SFX.master) SFX.master.gain.value=SFX.on?0.5:0; if(typeof flashPrompt==='function') flashPrompt('🔊 Sound '+(SFX.on?'ON':'OFF')); }
+function sfxToggle(){ SFX.on=!SFX.on; applyVolume(); if(typeof flashPrompt==='function') flashPrompt('🔊 Sound '+(SFX.on?'ON':'OFF')); }
 function _dg(pos,maxD){ if(!pos||!camera) return 1; const d=camera.position.distanceTo(pos); return d>maxD?0:1-d/maxD; }
 function _voice(t){ if(SFX.voices>14) return false; SFX.voices++; setTimeout(()=>{SFX.voices=Math.max(0,SFX.voices-1);}, t*1000); return true; }
 function _noise(dur){ const s=SFX.ctx.createBufferSource(); s.buffer=SFX.noiseBuf; return s; }   // reuses the shared buffer
@@ -2275,7 +2288,7 @@ function updateWarPacing(dt){
   let el=document.getElementById('sideob');
   if(!el){ const parent=document.getElementById('objective');
     if(parent){ el=document.createElement('div'); el.id='sideob';
-      el.style.cssText='margin-top:3px;font-size:11px;color:#ffd060;letter-spacing:1px;'; parent.appendChild(el); } }
+      el.style.cssText='margin-top:3px;font-size:11px;color:#ffd060;letter-spacing:1px;'; if(simpleHudOn()) el.style.display='none'; parent.appendChild(el); } }
   if(el) el.textContent = sideOb ? ('★ '+trText(sideOb.label)+'  '+Math.min(sideOb.goal,sideObProgress())+'/'+sideOb.goal+' · '+Math.ceil(sideOb.t)+'s · $'+sideOb.pay) : '';
 }
 function sideObProgress(){ if(!sideOb) return 0;
@@ -2545,6 +2558,9 @@ function buildCampaignPicker(){
     const dr=document.createElement('div'); dr.id='diffRow';
     dr.style.cssText='width:100%;display:flex;flex-direction:column;align-items:center;gap:5px;margin:0 0 12px;';
     box.appendChild(dr);
+    const sr=document.createElement('div'); sr.id='setRow';
+    sr.style.cssText='width:100%;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:0 0 12px;';
+    box.appendChild(sr);
     ships.parentNode.insertBefore(box, ships);
     const sh=document.createElement('div'); sh.id='menuDivider'; sh.textContent=T('— CHOOSE YOUR COMMAND —','— 选择你的座舰 —');
     sh.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:12px 0 6px;';
@@ -2555,7 +2571,7 @@ function buildCampaignPicker(){
   if(!cm){ cm=document.createElement('div'); cm.id='campmap'; cm.style.cssText='width:100%;margin:0 0 14px;'; box.insertBefore(cm, box.children[1]||null); }
   cm.innerHTML=campaignMapHTML();
   cm.querySelectorAll('.cmnode').forEach(el=>{ if(el.getAttribute('data-locked')==='0'){ el.style.cursor='pointer'; el.onclick=()=>{ currentMapIdx=+el.getAttribute('data-idx'); buildCampaignPicker(); }; } });
-  renderDiffRow();
+  renderDiffRow(); renderSettingsRow();
   [...box.querySelectorAll('.mapcard')].forEach(e=>e.remove());
   CAMPAIGN.forEach((M,i)=>{ const locked=i>=mapsUnlocked(), sel=i===currentMapIdx, army=mapArmyProfile(1,M);
     const c=document.createElement('div'); c.className='mapcard';
@@ -2592,6 +2608,24 @@ function renderDiffRow(){
   dr.appendChild(row);
   const d=document.createElement('div'); d.textContent=descs[difficulty];
   d.style.cssText='font-size:11px;color:#5f7a90;'; dr.appendChild(d);
+}
+function renderSettingsRow(){
+  const sr=document.getElementById('setRow'); if(!sr) return;
+  sr.innerHTML='';
+  const vol=document.createElement('label');
+  vol.style.cssText='display:flex;align-items:center;gap:7px;font-size:12px;color:#7e93a8;';
+  const vt=document.createElement('span'); vt.textContent='🔊 '+T('Volume','音量'); vol.appendChild(vt);
+  const range=document.createElement('input'); range.type='range'; range.min='0'; range.max='100';
+  range.value=String(Math.round(SETTINGS.volume*100)); range.style.width='96px';
+  range.oninput=()=>{ SETTINGS.volume=range.value/100; sfxResume(); applyVolume(); saveSettings(); };
+  vol.appendChild(range); sr.appendChild(vol);
+  const chip=(text,on,cb)=>{ const b=document.createElement('button'); b.textContent=(on?'✓ ':'')+text;
+    b.style.cssText='padding:5px 13px;font-size:12px;border-radius:7px;cursor:pointer;transition:.12s;'+
+      'border:1px solid '+(on?'#5fd0ff':'#21384e')+';background:'+(on?'#13283a':'#0e1a26')+';color:'+(on?'#cfe6fb':'#7e93a8');
+    b.onclick=cb; sr.appendChild(b); };
+  chip(T('Simple HUD','精简界面'), simpleHudOn(), ()=>{ SETTINGS.simpleHud=!simpleHudOn(); saveSettings(); applySimpleHud(); renderSettingsRow(); });
+  chip(T('Kid-safe (no nukes)','家长模式（无核武）'), contentFilterOn(), ()=>{ SETTINGS.contentFilter=!contentFilterOn(); saveSettings();
+    if(friendlyHarbor) buildShopUI(); renderSettingsRow(); });
 }
 function buildMenu(){
   // language toggle — 中文/English switch pinned to the menu's top-right corner
@@ -2750,6 +2784,7 @@ function startGame(shipId){
     startDrive();          // spawn already at the helm: W moves the ship within seconds of clicking a card
     startTutorial();       // first-ever battle walks through W → mouse → first kill → armory (no-op once completed)
   }
+  applySimpleHud();
   const cv=document.getElementById('c');
   cv.addEventListener('click',()=>{ sfxResume(); if(phase==='play' && !gamePaused()) cv.requestPointerLock(); });
   document.addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv){
@@ -3627,6 +3662,7 @@ function buildShopUI(){
   const fillPane=(key,pane,obj,renderItem)=>{
     let hidden=0;
     recFirst(obj).forEach(k=>{
+      if(contentFilterOn()&&((obj===PLANES&&FILTERED_PLANES.has(k))||(obj===STRUCTS&&k==='nukesilo'))) return;   // kid-safe mode
       const fold=!SHOP_REC.has(k)&&(obj[k].cost||0)>SHOP_HIDE_COST[key];
       if(fold) hidden++;
       if(fold&&!SHOP_SHOW_ALL[key]) return;
@@ -3758,6 +3794,7 @@ function applyUpgrade(k, harbor){
 function buildBuildUI(){
   const list=document.getElementById('buildList'); if(!list) return; list.innerHTML='';
   Object.keys(STRUCTS).forEach(k=>{
+    if(contentFilterOn()&&k==='nukesilo') return;   // kid-safe mode
     const s=STRUCTS[k]; const d=document.createElement('div'); d.className='uitem'; d.dataset.struct=k;
     d.onclick=()=>buildStructure(k); list.appendChild(d);
   });
@@ -3782,6 +3819,7 @@ function toggleBuild(){
   updateMode();
 }
 function buildStructure(k){
+  if(contentFilterOn()&&k==='nukesilo') return;   // kid-safe mode
   if(!onFoot){ flashPrompt('Go ashore on an island (G) to emplace '+STRUCTS[k].name); return; }
   if(!footLand){ flashPrompt('Swim to dry land before building '+STRUCTS[k].name); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('This position is not under friendly control'); return; }
@@ -3817,7 +3855,7 @@ function aiIslandBuild(dt){
   if(!enemyIsles.length) return;
   const isl=enemyIsles[Math.floor(Math.random()*enemyIsles.length)];
   let kinds=['barracks','tankdepot','hospital','ammo','workshop','coastal','torpbat','aa','silo','radar','sonar','searchlight','bunker','airstrip','helipad','dock','fuel','bridge','artillery','rocket','fortress','supergun','nukesilo','tesla','wall'];
-  if(landUnits.some(u=>!u.dead&&u.team===1&&u.nukesilo))kinds=kinds.filter(k=>k!=='nukesilo');
+  if(contentFilterOn()||landUnits.some(u=>!u.dead&&u.team===1&&u.nukesilo))kinds=kinds.filter(k=>k!=='nukesilo');
   const k=!islandStructures(isl,1,'command').length?'command':!islandStructures(isl,1,'power').length?'power':kinds[Math.floor(Math.random()*kinds.length)];
   if(k==='command'&&islandStructures(isl,1,'command').length)return;
   const p=findIslandBuildPoint(isl,k);if(p)buildAndPushLand(k,1,p,2,isl);
