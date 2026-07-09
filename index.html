@@ -92,6 +92,13 @@
   .witem:hover{border-color:#3d6a90;}
   .witem.sel{border-color:#5fd0ff;background:#13283a;box-shadow:0 0 10px rgba(95,208,255,.3);}
   .witem.poor{opacity:.45;}
+  #shopTabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+  .stab{flex:1;min-width:50px;padding:6px 3px;font-size:11px;letter-spacing:.5px;border:1px solid #21384e;border-radius:7px;background:#0e1a26;color:#7e93a8;cursor:pointer;transition:.12s;}
+  .stab.on{border-color:#5fd0ff;background:#13283a;color:#cfe6fb;box-shadow:0 0 8px rgba(95,208,255,.25);}
+  .witem.rec{border-color:#8a6d2f;}
+  .witem.rec:hover{border-color:#ffd060;}
+  .showall{width:100%;padding:8px;margin:4px 0 10px;font-size:12px;border:1px dashed #2a4660;border-radius:7px;background:transparent;color:#6fa0c8;cursor:pointer;}
+  .showall:hover{border-color:#3d6a90;color:#9fc6e8;}
   .witem .wn{color:#cfe6fb;font-size:14px;font-weight:600;display:flex;justify-content:space-between;}
   .witem .wc{color:#ffe08a;font-size:13px;}
   .witem .wd{color:#7e93a8;font-size:11px;margin-top:3px;line-height:1.4;}
@@ -3595,60 +3602,86 @@ function damageAlly(a,dmg,hitPos){ if(a.sinkT>0)return; a.hp-=dmg; damageCompart
 // =====================================================================
 //  SHOP
 // =====================================================================
+// the 121-item armory is split into category tabs; the active tab and per-tab
+// "show all" state survive rebuilds (buy handlers re-enter buildShopUI)
+let shopTab='guns';
+const SHOP_SHOW_ALL={guns:false,planes:false,tanks:false,arms:false,defense:false};
+const SHOP_REC=new Set(['twin','torpedo','fighter','divebomber','ak47']);   // ⭐ starter picks, pinned first
+const SHOP_HIDE_COST={guns:1400,planes:2200,tanks:2200,arms:9999,defense:2200};   // per-tab price fold threshold
 function buildShopUI(){
-  const list=document.getElementById('shopList'); list.innerHTML='';
-  Object.keys(WEAPONS).forEach(id=>{
+  const list=document.getElementById('shopList'); if(!list) return; list.innerHTML='';
+  const TABS=[
+    { key:'guns',    label:T('🔫 Guns','🔫 火炮') },
+    { key:'planes',  label:T('✈️ Aircraft','✈️ 飞机') },
+    { key:'tanks',   label:T('🛞 Tanks','🛞 坦克') },
+    { key:'arms',    label:T('🔫 Small Arms','🔦 枪械') },
+    { key:'defense', label:T('🏗️ Defenses','🏗️ 防御') },
+  ];
+  const bar=document.createElement('div'); bar.id='shopTabs'; list.appendChild(bar);
+  TABS.forEach(tb=>{ const b=document.createElement('button'); b.className='stab'+(shopTab===tb.key?' on':'');
+    b.textContent=tb.label; b.onclick=()=>{ shopTab=tb.key; buildShopUI(); }; bar.appendChild(b); });
+  const mkPane=(key,hint)=>{ const p=document.createElement('div'); p.style.display=shopTab===key?'block':'none';
+    const h=document.createElement('div'); h.className='hint'; h.textContent=hint; p.appendChild(h); list.appendChild(p); return p; };
+  const recFirst=obj=>{ const ks=Object.keys(obj); return [...ks.filter(k=>SHOP_REC.has(k)), ...ks.filter(k=>!SHOP_REC.has(k))]; };
+  // fills one pane from a catalog: recommended first, expensive gear folded behind a "show all" toggle
+  const fillPane=(key,pane,obj,renderItem)=>{
+    let hidden=0;
+    recFirst(obj).forEach(k=>{
+      const fold=!SHOP_REC.has(k)&&(obj[k].cost||0)>SHOP_HIDE_COST[key];
+      if(fold) hidden++;
+      if(fold&&!SHOP_SHOW_ALL[key]) return;
+      const d=renderItem(k); if(SHOP_REC.has(k)){ d.classList.add('rec'); const nm=d.querySelector('.wn span'); if(nm) nm.insertAdjacentText('afterbegin','⭐ '); }
+      pane.appendChild(d);
+    });
+    if(hidden>0){ const b=document.createElement('button'); b.className='showall';
+      b.textContent=SHOP_SHOW_ALL[key]?T('▲ Hide advanced gear','▲ 收起高级装备'):T('▼ Show all (+'+hidden+' advanced)','▼ 显示全部（还有 '+hidden+' 件高级装备）');
+      b.onclick=()=>{ SHOP_SHOW_ALL[key]=!SHOP_SHOW_ALL[key]; buildShopUI(); }; pane.appendChild(b); }
+  };
+  // --- deck guns (select, then F installs) ---
+  fillPane('guns', mkPane('guns',T('Click to select, then press F to mount it — at the helm it lands on a free mount.','点选武器后按 F 安装——掌舵时自动装到空炮位。')), WEAPONS, id=>{
     const w=WEAPONS[id];
     const d=document.createElement('div'); d.className='witem'; d.dataset.id=id;
     d.innerHTML=`<div class="wn"><span>${catTr(typeof WEAPONS_ZH!=='undefined'?WEAPONS_ZH:null,id,'name',w.name)}</span><span class="wc">$${priceOf(w.cost)}</span></div>
       <div class="wd">${describe(w)}</div>`;
     d.onclick=()=>{ if(money>=priceOf(w.cost)){ selectedWeapon=id; refreshShop(); } };
-    list.appendChild(d);
+    return d;
   });
   // --- Hangar (buy instantly; parks on deck) ---
-  const hdr=document.createElement('h2'); hdr.textContent=T('HANGAR','机库'); hdr.style.marginTop='14px'; list.appendChild(hdr);
-  const sub=document.createElement('div'); sub.className='hint'; sub.textContent=T('Buys instantly and parks on deck. Walk up and press E to fly.','买了立刻停在甲板上。走过去按 E 就能开。'); list.appendChild(sub);
-  Object.keys(PLANES).forEach(id=>{
+  fillPane('planes', mkPane('planes',T('Buys instantly and parks on deck. Walk up and press E to fly.','买了立刻停在甲板上。走过去按 E 就能开。')), PLANES, id=>{
     const p=PLANES[id], zh=typeof PLANES_ZH!=='undefined'?PLANES_ZH:null;
     const d=document.createElement('div'); d.className='witem plane'; d.dataset.plane=id;
     d.innerHTML=`<div class="wn"><span>✈ ${catTr(zh,id,'name',p.name)}</span><span class="wc">$${priceOf(p.cost)}</span></div>
       <div class="wd">${p.faction?`<span style="color:#7fb4d8">${catTr(zh,id,'faction',p.faction)}${p.year?' · '+p.year:''}</span><br>`:''}${catTr(zh,id,'desc',p.desc)}</div>`;
     d.onclick=()=>buyPlane(id);
-    list.appendChild(d);
+    return d;
   });
   // --- Motor Pool (buy instantly; parks on a deck slot) ---
-  const thdr=document.createElement('h2'); thdr.textContent=T('MOTOR POOL','车库'); thdr.style.marginTop='14px'; list.appendChild(thdr);
-  const tsub=document.createElement('div'); tsub.className='hint'; tsub.textContent=T('Buys instantly onto a free deck slot. Walk up and press E to crew it.','买了立刻停在甲板空位上。走过去按 E 驾驶。'); list.appendChild(tsub);
-  Object.keys(TANKS).forEach(id=>{
+  fillPane('tanks', mkPane('tanks',T('Buys instantly onto a free deck slot. Walk up and press E to crew it.','买了立刻停在甲板空位上。走过去按 E 驾驶。')), TANKS, id=>{
     const tk=TANKS[id];
     const d=document.createElement('div'); d.className='witem tank'; d.dataset.tank=id;
     d.innerHTML=`<div class="wn"><span>🛞 ${catTr(typeof TANKS_ZH!=='undefined'?TANKS_ZH:null,id,'name',tk.name)}</span><span class="wc">$${priceOf(tk.cost)}</span></div>
       <div class="wd">${tk.hp}${T(' hp',' 血量')} · ${tk.dmg}${T(' dmg',' 伤害')} · ${tk.speed}${T(' spd',' 速度')}${tk.spg?T(' · 🎯 indirect lob',' · 🎯 曲射'):''}</div>`;
     d.onclick=()=>buyTank(id);
-    list.appendChild(d);
+    return d;
   });
   // --- Small Arms (carried ashore; press G to land, Q to switch) ---
-  const ahdr=document.createElement('h2'); ahdr.textContent=T('SMALL ARMS','随身武器'); ahdr.style.marginTop='14px'; list.appendChild(ahdr);
-  const asub=document.createElement('div'); asub.className='hint'; asub.textContent=T('Carried when you go ashore (G). Buy to equip · Q to switch in the field.','登岸（G）时随身携带。购买即装备 · 野外按 Q 切换。'); list.appendChild(asub);
-  Object.keys(HANDHELD).forEach(id=>{
+  fillPane('arms', mkPane('arms',T('Carried when you go ashore (G). Buy to equip · Q to switch in the field.','登岸（G）时随身携带。购买即装备 · 野外按 Q 切换。')), HANDHELD, id=>{
     const W=HANDHELD[id], owned=ownedGuns.has(id);
     const d=document.createElement('div'); d.className='witem gun'; d.dataset.gun=id;
     const tag = id===equippedGun ? T('EQUIPPED','已装备') : owned ? T('OWNED','已拥有') : (W.cost?('$'+priceOf(W.cost)):T('FREE','免费'));
     d.innerHTML=`<div class="wn"><span>${gunIcon(W.gfx)}${catTr(typeof HANDHELD_ZH!=='undefined'?HANDHELD_ZH:null,id,'name',W.name)}</span><span class="wc">${tag}</span></div>
       <div class="wd">${W.dmg}${T(' dmg',' 伤害')} · ${(1/W.cd).toFixed(1)}${T('/s','/秒')}${W.pellets?' · '+W.pellets+T(' pellets',' 弹丸'):''}${W.splash?T(' · splash',' · 溅射'):''}</div>`;
     d.onclick=()=>buyGun(id);
-    list.appendChild(d);
+    return d;
   });
   // --- Island Defenses (built where you stand after going ashore with G) ---
-  const ihdr=document.createElement('h2'); ihdr.textContent=T('ISLAND DEFENSES','岛屿防御'); ihdr.style.marginTop='14px'; list.appendChild(ihdr);
-  const isub=document.createElement('div'); isub.className='hint'; isub.textContent=T('Go ashore (G), then click to emplace it where you stand. Also on the B menu.','先登岸（G），再点击建在你站的位置。B 菜单里也有。'); list.appendChild(isub);
-  Object.keys(STRUCTS).forEach(k=>{
+  fillPane('defense', mkPane('defense',T('Go ashore (G), then click to emplace it where you stand. Also on the B menu.','先登岸（G），再点击建在你站的位置。B 菜单里也有。')), STRUCTS, k=>{
     const s=STRUCTS[k], zh=typeof STRUCTS_ZH!=='undefined'?STRUCTS_ZH:null;
     const d=document.createElement('div'); d.className='witem struct'; d.dataset.struct=k;
     d.innerHTML=`<div class="wn"><span>🏗️ ${catTr(zh,k,'name',s.name)}</span><span class="wc">$${priceOf(s.cost)}</span></div>
       <div class="wd">${catTr(zh,k,'desc',s.desc)}</div>`;
     d.onclick=()=>buildStructure(k);
-    list.appendChild(d);
+    return d;
   });
   refreshShop();
 }
@@ -5526,7 +5559,7 @@ function loop(){
   const dt=Math.min(0.05, clock.getDelta());
   if(phase==='play'){
     if(!gamePaused()){ t2+=dt; update(dt,t2); updateHUD(); }
-    else { sfxEngine(); updatePrompt(); }   // audio ramps down; prompt feedback (e.g. 'Not enough funds') stays live in menus
+    else { sfxEngine(); updatePrompt(); updateCamera(); updateHUD(); }   // audio ramps down; prompts/HUD/camera stay correct in menus
     updateTutorial(dt);                     // tutorial keeps ticking so menu steps can complete while paused
     if(chatOpen&&_chatOpenAt&&performance.now()-_chatOpenAt>9000){
       const ci=document.getElementById('chatinput');
