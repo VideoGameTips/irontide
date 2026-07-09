@@ -1964,6 +1964,10 @@ function commsInit(){ if(document.getElementById('comms'))return; const hud=docu
   d.style.cssText='position:absolute;left:14px;top:120px;width:300px;pointer-events:none;font-size:11px;line-height:1.55;text-shadow:0 1px 3px #000;';
   hud.appendChild(d); }
 function comms(from,msg,col){ _commsLines.push({from,msg,col:col||'#a8d4f0',t:9}); while(_commsLines.length>6)_commsLines.shift(); }
+function commsShip(s,msg,col,quiet=4){
+  if(!s)return; if((s._radioQuiet||0)>0)return;
+  comms(s.callsign||'SHIP',msg,col); s._radioQuiet=quiet;
+}
 function updateComms(dt){ if(!_commsLines.length){ const el=document.getElementById('comms'); if(el&&el.innerHTML)el.innerHTML=''; return; }
   commsInit(); const el=document.getElementById('comms'); if(!el)return; let html='';
   for(let i=_commsLines.length-1;i>=0;i--){ const L=_commsLines[i]; L.t-=dt; if(L.t<=0){ _commsLines.splice(i,1); continue; } }
@@ -1979,9 +1983,9 @@ function checkDistress(){
   if(player&&player.hp>0&&player.hp<player.maxhp*0.3) wounded.push({s:player,name:'FLAGSHIP',pos:player.pos});
   allies.forEach(a=>{ if(a.sinkT===0&&a.hp<a.maxhp*0.3) wounded.push({s:a,name:a.callsign,pos:a.pos}); });
   wounded.forEach(w=>{ if((w.s._sos||0)>0)return; w.s._sos=20;
-    comms(w.name,'⚠ Taking heavy fire — requesting assistance!','#ff9a6a'); if(w.s===player)sfxAlarm();
-    let best=null,bd=1e9; allies.forEach(a=>{ if(a.sinkT||a.def.support||a.s===w.s||a.role==='assist')return; const d=a.pos.distanceTo(w.pos); if(d<bd){bd=d;best=a;} });
-    if(best){ best.role='assist'; best.assist=w.s; comms(best.callsign,'Copy — inbound to cover '+w.name+'.','#7fd0a0'); }
+    comms(w.name,'⚠ Taking heavy fire — requesting assistance!','#ff9a6a'); w.s._radioQuiet=8; if(w.s===player)sfxAlarm();
+    let best=null,bd=1e9; allies.forEach(a=>{ if(a.sinkT||a.def.support||a===w.s||a.role==='assist'||(a.hp<a.maxhp*0.35))return; const d=a.pos.distanceTo(w.pos); if(d<bd){bd=d;best=a;} });
+    if(best){ best.role='assist'; best.assist=w.s; commsShip(best,'Copy — inbound to cover '+w.name+'.','#7fd0a0',8); }
   });
 }
 function fleetOrderCmd(){
@@ -3265,6 +3269,7 @@ function reticleAim(muzzle, range){
 function updateAlly(a,dt){
   if(a.proxy){ a.proxyAcc=(a.proxyAcc||0)+dt; if(a.proxyAcc<0.2)return; dt=a.proxyAcc; a.proxyAcc=0; }
   else a.proxyAcc=0;
+  if(a._radioQuiet>0)a._radioQuiet-=dt;
   shipEconomy(a,dt);
   if(a.sinkT>0){ a.sinkT+=dt; if(a.build){ a.build.group.position.y=-a.sinkT*2.2; a.build.group.rotation.z=Math.min(0.5,a.sinkT*0.4); }
     if(a.sinkT>3){ a.dead=true; if(a.build)splashAt(a.pos.clone(),3); }
@@ -3277,7 +3282,7 @@ function updateAlly(a,dt){
   if(a.def.support){ objective=patient?patient.pos:(friendlyHarbor?friendlyHarbor.pos:new THREE.Vector3()); stand=patient?80:0; }
   else if(a.role==='assist' && a.assist && (a.assist===player?player.hp>0:a.assist.sinkT===0)){
     objective=a.assist.pos; stand=100;
-    if((a.assist===player?player.hp:a.assist.hp) > (a.assist.maxhp||player.maxhp)*0.6){ comms(a.callsign,'Threat clear — resuming patrol.','#a8d4f0'); a.role='attack'; a.assist=null; } }
+    if((a.assist===player?player.hp:a.assist.hp) > (a.assist.maxhp||player.maxhp)*0.6){ commsShip(a,'Threat clear — resuming patrol.','#a8d4f0',6); a.role='attack'; a.assist=null; } }
   else if(a.role==='regroup' && player && player.hp>0){ objective=player.pos; stand=110; }
   else if(a.role==='capture'){ if(!a.capIsland||a.capIsland.owner===0||!a.capIsland.capturable) a.capIsland=nearestCaptureIsland(a.pos);
     if(a.capIsland){ objective=a.capIsland.pos; stand=a.capIsland.r+45; } else a.role='attack'; }
@@ -3288,8 +3293,8 @@ function updateAlly(a,dt){
   let desired = stand>0 ? (dP>stand+45?bearing:dP<stand-45?bearing+Math.PI:bearing+Math.PI/2*a.orbitDir) : bearing;
   // occasional radio chatter
   a.commsT-=dt; if(a.commsT<=0){ a.commsT=22+Math.random()*26; if(!a.def.support&&Math.random()<0.6){
-    if(a.role==='capture'&&a.capIsland&&dP<stand+30) comms(a.callsign,'Holding off '+(a.capIsland.name||'the island')+' — securing it.','#7fd0a0');
-    else if(tgtShip&&tgtShip.pos.distanceTo(a.pos)<300) comms(a.callsign,'Engaging enemy contact!','#a8d4f0'); } }
+    if(a.role==='capture'&&a.capIsland&&dP<stand+30) commsShip(a,'Holding off '+(a.capIsland.name||'the island')+' — securing it.','#7fd0a0');
+    else if(tgtShip&&tgtShip.pos.distanceTo(a.pos)<300) commsShip(a,'Engaging enemy contact!','#a8d4f0'); } }
   a.turnT-=dt; if(a.turnT<=0){ a.jink=(Math.random()-0.5)*0.4; a.turnT=2.5+Math.random()*3; } desired+=a.jink||0;
   desired=steerClearOfShips(a,a.pos,a.def,desired);   // don't sail into friendly or enemy hulls
   let dh=desired-a.heading; while(dh>Math.PI)dh-=6.283; while(dh<-Math.PI)dh+=6.283;
