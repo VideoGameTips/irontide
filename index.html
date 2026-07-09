@@ -208,12 +208,15 @@ function trName(n){ if(!isZh()||n==null) return n; const s=String(n);
   if(NAME_ZH[s]) return NAME_ZH[s];
   if(!NAME_ZH_CI){ NAME_ZH_CI={}; for(const k in NAME_ZH) NAME_ZH_CI[k.toUpperCase()]=NAME_ZH[k]; }
   return NAME_ZH_CI[s.toUpperCase()]||s; }
+let _trK=null,_trV=null;   // single-entry memo — updatePrompt re-translates the same string every frame
 function trText(s){ if(!isZh()||!s||typeof s!=='string') return s;
-  if(typeof ZH_EXACT!=='undefined'&&ZH_EXACT[s]) return ZH_EXACT[s];
-  if(typeof ZH_PATTERNS!=='undefined') for(const p of ZH_PATTERNS){ const m=s.match(p.re); if(m) return p.out(m); }
-  return s; }
+  if(s===_trK) return _trV;
+  let out=s;
+  if(typeof ZH_EXACT!=='undefined'&&ZH_EXACT[s]) out=ZH_EXACT[s];
+  else if(typeof ZH_PATTERNS!=='undefined'){ for(const p of ZH_PATTERNS){ const m=s.match(p.re); if(m){ out=p.out(m); break; } } }
+  _trK=s; _trV=out; return out; }
 function catTr(zh,id,field,en){ if(!isZh()||!zh) return en; const d=zh[id]; return (d&&d[field])||en; }
-function setLang(l){ if(l===I18N.lang)return; I18N.lang=l; NAME_ZH_CI=null;
+function setLang(l){ if(l===I18N.lang)return; I18N.lang=l; NAME_ZH_CI=null; _trK=null; _trV=null;
   try{localStorage.setItem('ironTideLang',l);}catch(e){} refreshLanguage(); }
 
 // ---------- catalogs ----------
