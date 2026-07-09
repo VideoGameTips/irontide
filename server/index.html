@@ -4398,7 +4398,7 @@ function updateFoot(dt){
   const surfaceNow=footSurfaceAt(footPos,0);
   footLand=landIdentity(surfaceNow);
   const swim=!footLand;
-  if(mv.lengthSq()>0){mv.normalize().multiplyScalar(WALK*(swim?0.42:1)*dt);
+  if(mv.lengthSq()>0){mv.normalize().multiplyScalar(WALK*(swim?0.9:1)*dt);
     const nx=footPos.x+mv.x,nz=footPos.z+mv.z;
     if(!footWalkBlocked(nx,footPos.z))footPos.x=nx;
     if(!footWalkBlocked(footPos.x,nz))footPos.z=nz;
