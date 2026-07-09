@@ -231,6 +231,23 @@ let menuSubEn=null;   // last contextual respawn/refusal message shown in #menu 
 function setLang(l){ if(l===I18N.lang)return; I18N.lang=l; NAME_ZH_CI=null; _trK=null; _trV=null;
   try{localStorage.setItem('ironTideLang',l);}catch(e){} refreshLanguage(); }
 
+// ---------- difficulty presets ----------
+// One config object so every knob lives in one place. playerDmg scales all damage the
+// PLAYER takes (ship, on foot, plane, tank — six funnel sites via pDmg); reinforce
+// scales enemy reinforcement odds; grace holds enemy reinforcements for the first
+// seconds of a battle so new captains can find their feet.
+const DIFFICULTY={
+  easy:  { playerDmg:0.5, reinforce:0.6, playerHp:1.5, funds:1.5, grace:120 },
+  normal:{ playerDmg:1.0, reinforce:1.0, playerHp:1.0, funds:1.0, grace:90  },
+  hard:  { playerDmg:1.2, reinforce:1.3, playerHp:1.0, funds:1.0, grace:0   },
+};
+let difficulty='easy';   // first run defaults to easy; persisted once the player picks
+try{ const d=localStorage.getItem('ironTideDifficulty'); if(DIFFICULTY[d]) difficulty=d; }catch(e){}
+const DIFF=()=>DIFFICULTY[difficulty]||DIFFICULTY.normal;
+const pDmg=x=>x*DIFF().playerDmg;
+function setDifficulty(d){ if(!DIFFICULTY[d]||d===difficulty)return; difficulty=d;
+  try{localStorage.setItem('ironTideDifficulty',d);}catch(e){} renderDiffRow(); }
+
 // ---------- catalogs ----------
 const SHIPS = {
   scout:      { name:'Scout Corvette', cls:'Fast Picket',  len:36, beam:7,  depth:3.5, deckY:2.6, hp:150, kind:'surface', mounts:4,
@@ -2517,7 +2534,11 @@ function buildCampaignPicker(){
     box.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:0 24px 4px;';
     const h=document.createElement('div'); h.id='mapsHeader'; h.textContent=T('CAMPAIGN VOYAGE','战役航程');
     h.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:2px 0 10px;';
-    box.appendChild(h); ships.parentNode.insertBefore(box, ships);
+    box.appendChild(h);
+    const dr=document.createElement('div'); dr.id='diffRow';
+    dr.style.cssText='width:100%;display:flex;flex-direction:column;align-items:center;gap:5px;margin:0 0 12px;';
+    box.appendChild(dr);
+    ships.parentNode.insertBefore(box, ships);
     const sh=document.createElement('div'); sh.id='menuDivider'; sh.textContent=T('— CHOOSE YOUR COMMAND —','— 选择你的座舰 —');
     sh.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:12px 0 6px;';
     ships.parentNode.insertBefore(sh, ships);
@@ -2527,6 +2548,7 @@ function buildCampaignPicker(){
   if(!cm){ cm=document.createElement('div'); cm.id='campmap'; cm.style.cssText='width:100%;margin:0 0 14px;'; box.insertBefore(cm, box.children[1]||null); }
   cm.innerHTML=campaignMapHTML();
   cm.querySelectorAll('.cmnode').forEach(el=>{ if(el.getAttribute('data-locked')==='0'){ el.style.cursor='pointer'; el.onclick=()=>{ currentMapIdx=+el.getAttribute('data-idx'); buildCampaignPicker(); }; } });
+  renderDiffRow();
   [...box.querySelectorAll('.mapcard')].forEach(e=>e.remove());
   CAMPAIGN.forEach((M,i)=>{ const locked=i>=mapsUnlocked(), sel=i===currentMapIdx, army=mapArmyProfile(1,M);
     const c=document.createElement('div'); c.className='mapcard';
@@ -2539,6 +2561,30 @@ function buildCampaignPicker(){
     if(!locked) c.onclick=()=>{ currentMapIdx=i; buildCampaignPicker(); };
     box.appendChild(c);
   });
+}
+function renderDiffRow(){
+  const dr=document.getElementById('diffRow'); if(!dr) return;
+  const names={ easy:T('🙂 Easy','🙂 简单'), normal:T('😐 Normal','😐 普通'), hard:T('😈 Hard','😈 困难') };
+  const descs={
+    easy:  T('Half damage taken · slower enemy reinforcements · +50% starting funds & hull','受到的伤害减半 · 敌方增援更慢 · 初始资金和船体 +50%'),
+    normal:T('The war as designed','原版设计的战争强度'),
+    hard:  T('Tougher hits and faster enemy reinforcements','挨打更疼 · 敌方增援更快'),
+  };
+  dr.innerHTML='';
+  const row=document.createElement('div'); row.style.cssText='display:flex;gap:8px;justify-content:center;';
+  Object.keys(DIFFICULTY).forEach(k=>{
+    const sel=k===difficulty;
+    const b=document.createElement('button');
+    b.textContent=names[k];
+    b.style.cssText='padding:7px 18px;font-size:13px;letter-spacing:1px;border-radius:8px;cursor:pointer;transition:.15s;'+
+      'border:1px solid '+(sel?'#5fd0ff':'#21384e')+';background:'+(sel?'#13283a':'#0e1a26')+';color:'+(sel?'#cfe6fb':'#7e93a8')+
+      (sel?';box-shadow:0 0 10px rgba(95,208,255,.3)':'');
+    b.onclick=()=>setDifficulty(k);
+    row.appendChild(b);
+  });
+  dr.appendChild(row);
+  const d=document.createElement('div'); d.textContent=descs[difficulty];
+  d.style.cssText='font-size:11px;color:#5f7a90;'; dr.appendChild(d);
 }
 function buildMenu(){
   // language toggle — 中文/English switch pinned to the menu's top-right corner
@@ -2600,7 +2646,8 @@ function makePlayerShip(shipId){
   placed.length=0; planes.length=0; crew.length=0; planeSpots.length=0;
   manning=null; piloting=null; driving=false; onFoot=false; drivingTank=null; mouseDownFire=false; playerShipLost=false; resetFootHealth();
   const build=buildShip(def,false);
-  player={ build, hp:def.hp, maxhp:def.hp, def, submerged:false, air:100, diveY:0 };
+  const hpMul=def.boss?1:DIFF().playerHp;   // the one-life Leviathan keeps its authored hp on every difficulty
+  player={ build, hp:def.hp*hpMul, maxhp:def.hp*hpMul, def, submerged:false, air:100, diveY:0 };
   const spawnZ = friendlyHarbor ? friendlyHarbor.pos.z-240 : 0;
   player.pos=new THREE.Vector3(0,0,spawnZ); player.heading=Math.PI; player.throttle=0; player.speed=0;
   // helm / bridge station
@@ -2680,6 +2727,7 @@ function startGame(shipId){
   document.getElementById('hud').style.display='block';
   sfxResume();   // browsers need a user gesture (this ship-card click) to start audio
   phase='play';
+  money=Math.round(8000*(1+careerRank().perk)*DIFF().funds);   // easy mode ships out with a fatter war chest
   const M=applyMap();                 // configure the chosen campaign theater
   buildTheater();
   makePlayerShip(shipId);
@@ -2734,7 +2782,7 @@ function showRespawnMenu(msg){
 function resetFootHealth(){ footHP=footMaxHP; }
 function damageFoot(dmg,from){
   if(!onFoot||phase!=='play')return;
-  footHP-=dmg;
+  footHP-=pDmg(dmg);
   if(from) hitSpark(footPos.clone().setY(footPos.y-0.2));
   if(footHP<=0){ footHP=0; onFoot=false; mouseDownFire=false;
     showRespawnMenu('You were killed ashore — choose a replacement ship or redeploy from harbor.'); }
@@ -3022,7 +3070,7 @@ function hurtPlayerTank(tk,dmg,fromPos,top){
   if(facing==='front'&&!top&&Math.random()<(tk.sloped?0.45:0.25)){ flashPrompt('💢 Ricochet!'); hitSpark(wp.clone().setY(wp.y+1.6)); return; }
   // many non-top hits just break a track without penetrating the hull
   if(!top&&Math.random()<0.22){ damageTankTrack(tk); hitSpark(wp.clone().setY(wp.y+0.6)); return; }
-  const eff=dmg*mult; tk.hp-=eff;
+  const eff=pDmg(dmg*mult); tk.hp-=eff;
   if(Math.random()<Math.min(0.95,eff/22)) damageTankPart(tk,facing,top);   // blast/penetration cripples a component
   if(tk.hp<=0){ destroyPlayerTank(tk,'Tank knocked out ['+facing+']!'); return; }
   flashPrompt('Tank hit ['+facing+'] '+Math.max(0,Math.ceil(tk.hp/tk.maxhp*100))+'%'+tankPartSummary(tk));
@@ -3037,7 +3085,7 @@ function destroyPlayerTank(tk,msg){
 }
 function tankFireTick(tk,dt){
   if(tk.cook>0){ tk.cook-=dt; if(tk.cook<=0){ destroyPlayerTank(tk,'Ammunition cook-off!'); return; } }
-  if(tk.fire>0){ tk.hp-=tk.fire*3*dt;
+  if(tk.fire>0){ tk.hp-=pDmg(tk.fire*3*dt);
     if(Math.random()<dt*9){ const wp=tankWP(tk); const c=Math.random()<0.4?0xff6a20:0x2a2a2a;
       const sm=new THREE.Mesh(new THREE.SphereGeometry(0.4+Math.random()*0.4,6,6),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:0.7}));
       sm.position.copy(wp).setY(wp.y+1.6); scene.add(sm); fx.push({mesh:sm,life:0.7,fade:true,grow:true,growRate:3,vel:new THREE.Vector3((Math.random()-0.5)*2,3,(Math.random()-0.5)*2)}); }
@@ -3977,8 +4025,8 @@ function planeSmoke(P,dt){ const pr=P.parts;applyPlaneDamageVisual(P);
 }
 function hurtPlayerPlane(dmg){ // you, flying, took flak/cannon fire
   if(!piloting||piloting.phase==='takeoff') return;
-  piloting.hp-=dmg; boom(piloting.pos.clone(),0.5);
-  if(Math.random()<0.045){ crashPlane('Cockpit hit — pilot down!'); return; }     // rare fatal pilot hit
+  piloting.hp-=pDmg(dmg); boom(piloting.pos.clone(),0.5);
+  if(Math.random()<0.045*DIFF().playerDmg){ crashPlane('Cockpit hit — pilot down!'); return; }     // rare fatal pilot hit
   if(Math.random()<Math.min(0.92,dmg/28)) damagePlanePart(piloting);              // bigger hits cripple a component
   if(!piloting) return;                                                           // a part-hit may have already crashed us
   if(piloting.hp<=0) crashPlane('Your aircraft was shot down!');
@@ -4315,7 +4363,7 @@ function critMsg(s,m){ if(s===player){ flashPrompt('⚠ '+m); sfxAlarm(); } }
 function koTurret(s){ if(s!==player) return; const live=placed.filter(p=>!p.ko); if(live.length) live[Math.floor(Math.random()*live.length)].ko=true; }
 function reviveTurret(s){ if(s!==player) return; const ko=placed.find(p=>p.ko); if(ko){ ko.ko=false; ko.pitch=0.1; } }
 function critHurt(s,d){ // DoT from fire/flood — straight HP loss, never re-rolls a crit
-  if(s===player){ player.hp-=d; if(player.hp<=0){ player.hp=0; playerSunk(); } updateHUD(); return; }
+  if(s===player){ player.hp-=pDmg(d); if(player.hp<=0){ player.hp=0; playerSunk(); } updateHUD(); return; }
   s.hp-=d; if(s.hp<=0 && s.sinkT===0){ s.hp=0; s.sinkT=0.001;
     if(s.team===1){ sunk++; warRecord('sunk'); money+=350; updateHUD(); refreshShop(); } else if(!s.proxy) explodeAt(s.pos.clone().setY(3),1,0,8,null); }
 }
@@ -4358,7 +4406,7 @@ function fireFx(s,dt){ if(Math.random()<dt*9 && fx.length<MAX_FX-20){ const base
       c0:new THREE.Color(0x141414),c1:new THREE.Color(0x606060)});
   } } }
 function damageTarget(t,dmg,owner,hitPos){
-  if(t===player){ player.hp-=dmg; damageCompartment(player,dmg,hitPos); applyCrit(player,dmg); if(player.hp<=0){ player.hp=0; playerSunk(); } updateHUD(); return; }
+  if(t===player){ const pd=pDmg(dmg); player.hp-=pd; damageCompartment(player,pd,hitPos); applyCrit(player,pd); if(player.hp<=0){ player.hp=0; playerSunk(); } updateHUD(); return; }
   t.hp-=dmg; damageCompartment(t,dmg,hitPos); applyCrit(t,dmg); if(t.hp<=0 && t.sinkT===0){ t.hp=0; t.sinkT=0.001; spawnSalvage(t.pos.clone());
     const bounty=t.def.boss?30000:t.def.hp>400?700:t.def.hp>250?500:350;
     sunk++;warRecord('sunk');money+=bounty;if(t.def.boss){warRecord('bosses');flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');}updateHUD();refreshShop(); }
@@ -4433,8 +4481,8 @@ function update(dt,t){
   updateShipModelProxies(dt);
   enemies.forEach(e=>updateEnemy(e,dt));
   for(let i=enemies.length-1;i>=0;i--){ if(enemies[i].dead){ destroyShipVisual(enemies[i]); enemies.splice(i,1); } }
-  const enemyReinforceRate=(0.18/2.25)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1); // scaled by the theater's intensity
-  if(!(window._MAP&&window._MAP.ground) && Math.random()<dt*enemyReinforceRate) spawnEnemy();
+  const enemyReinforceRate=(0.18/2.25)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1)*DIFF().reinforce; // scaled by theater intensity and difficulty
+  if(!(window._MAP&&window._MAP.ground) && t2>DIFF().grace && Math.random()<dt*enemyReinforceRate) spawnEnemy();   // grace: no reinforcements in the first minutes
   updateWarPacing(dt);   // escalating enemy offensives + rotating bonus objectives + parked-plane rearm
   // --- friendly fleet — identical NPC reinforcement and destruction rules ---
   allies.forEach(a=>updateAlly(a,dt));
