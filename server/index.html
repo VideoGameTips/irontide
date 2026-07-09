@@ -3727,8 +3727,17 @@ function recoverPlane(){ // safe landing on the ship
   const pa=piloting.plane;
   player.build.group.attach(pa.group);
   pa.group.position.copy(pa.spot.pos); pa.group.rotation.set(0,0,0);pa.parked=true;setPlaneGearVisual(pa,true);
-  walkPos.copy(pa.spot.pos); walkPos.y=deckEyeY();
-  piloting=null; flashPrompt('Recovered safely on deck.'); updateMode();
+  const exit=pa.spot.pos.clone();
+  const side=exit.x>=0?-1:1;
+  exit.x+=side*4.5; exit.z+=3.5;
+  exit.x=Math.max(-player.build.halfBeam*0.78,Math.min(player.build.halfBeam*0.78,exit.x));
+  exit.z=Math.max(-player.build.halfLen*0.78,Math.min(player.build.halfLen*0.78,exit.z));
+  walkPos.set(exit.x,deckEyeY(),exit.z);
+  ['KeyW','KeyA','KeyS','KeyD','Space'].forEach(k=>keys[k]=0);
+  mouseDownFire=false; driving=false; manning=null; drivingTank=null; onFoot=false;
+  if(cockpitHiddenPlane){ cockpitHiddenPlane.visible=true; cockpitHiddenPlane=null; }
+  if(cockpitView)cockpitView.visible=false;
+  piloting=null; camPitch.v=0.04; flashPrompt('Recovered safely on deck.'); updateMode();
 }
 function playerKamikaze(P){ // ram an enemy ship / land unit / harbor by diving into it
   const p=P.pos,kd=P.plane.def.kamikazeDamage||120;
