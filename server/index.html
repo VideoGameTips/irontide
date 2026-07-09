@@ -1934,11 +1934,21 @@ const CAMPAIGN=[
   {name:'Ragnarök Reef',      theme:'Night, storm, and the full enemy fleet. No mercy.',      enemies:12,allies:6, isles:8, reinforce:1.9, weather:'storm',    tod:0.0,  boss:true,  hqZ:4800, bigIsles:true, weatherLock:true},
   {name:'The Last Tide',      theme:'Every gun. Every ship. This is where the war ends.',     enemies:12,allies:6, isles:6, reinforce:2.0, weather:'fog',      tod:0.02, boss:true,  hqZ:5000, bigIsles:true, weatherLock:true},
 ];
-let currentMapIdx=0;
+// ===== SANDBOX MAPS — always unlocked, not part of campaign progression =====
+const SANDBOX_MAPS=[
+  {name:'Southhaven', theme:'Home harbor sandbox: balanced sea lanes, base islands, and room to test fleets.', enemies:6, allies:6, isles:6, reinforce:1.0, weather:'clear', tod:0.36, boss:false, hqZ:4200, bigIsles:true, sandbox:true, army:{soldiers:1.0,tanks:.95,prod:1.0}},
+  {name:'100% Land', theme:'Almost all battlefield, almost no navy: giant connected landmasses for tanks and infantry.', enemies:0, allies:4, isles:11, reinforce:0, weather:'clear', tod:0.42, boss:false, hqZ:1500, bigIsles:false, ground:true, sandbox:true, army:{soldiers:2.6,tanks:2.8,prod:2.1}},
+  {name:'Omaha Beach', theme:'Beach assault sandbox: one long defended shoreline, landing zones, bunkers, and tank pushes.', enemies:0, allies:4, isles:8, reinforce:0, weather:'overcast', tod:0.34, boss:false, hqZ:1700, bigIsles:false, ground:true, sandbox:true, army:{soldiers:2.9,tanks:2.35,prod:2.0}},
+  {name:'Hiroshima', theme:'Urban-island nuclear aftermath: flattened districts, ash-grey water, and brutal close fighting.', enemies:5, allies:5, isles:7, reinforce:0.9, weather:'overcast', tod:0.52, boss:false, hqZ:3600, bigIsles:true, sandbox:true, army:{soldiers:1.65,tanks:1.35,prod:1.3}},
+  {name:'Chernobyl', theme:'Abandoned reactor zone: fog, exclusion islands, radar sites, and slow armored ground combat.', enemies:4, allies:4, isles:7, reinforce:0.65, weather:'fog', tod:0.47, boss:false, hqZ:3400, bigIsles:true, sandbox:true, weatherLock:true, army:{soldiers:1.45,tanks:1.75,prod:1.15}},
+  {name:'Desert Test Range', theme:'Dry open proving ground with scattered compounds for huge tank and aircraft tests.', enemies:0, allies:3, isles:9, reinforce:0, weather:'clear', tod:0.58, boss:false, hqZ:1600, bigIsles:false, ground:true, sandbox:true, army:{soldiers:1.55,tanks:2.7,prod:1.55}},
+  {name:'Volcanic Caldera', theme:'A ring of heavy islands around a central kill zone — perfect for fortress artillery.', enemies:7, allies:5, isles:9, reinforce:1.25, weather:'overcast', tod:0.48, boss:true, hqZ:4200, bigIsles:true, sandbox:true, army:{soldiers:1.8,tanks:1.45,prod:1.4}},
+];
+let currentMapIdx=0, currentSandboxIdx=-1;
 function mapsUnlocked(){ return Math.max(1, Math.min(CAMPAIGN.length, career.mapsUnlocked||1)); }
 function unlockNextMap(idx){ const want=Math.min(CAMPAIGN.length, idx+2);
   if((career.mapsUnlocked||1)<want){ career.mapsUnlocked=want; saveCareer(); return true; } return false; }
-function applyMap(){ const M=CAMPAIGN[currentMapIdx]||CAMPAIGN[0];
+function applyMap(){ const M=currentSandboxIdx>=0?(SANDBOX_MAPS[currentSandboxIdx]||SANDBOX_MAPS[0]):(CAMPAIGN[currentMapIdx]||CAMPAIGN[0]);
   if(typeof weather==='object'){ weather.type=M.weather; weather.tod=M.tod; weather.day=null; }
   window._MAP=M; return M; }
 function mapArmyProfile(team=1,map=null){
@@ -1955,7 +1965,7 @@ function mapArmyProfile(team=1,map=null){
     'Island Hopping':{soldiers:2.45,tanks:2.10,prod:1.85},
     'Last Bastion':{soldiers:2.75,tanks:2.55,prod:2.10},
     'The Last Tide':{soldiers:3.00,tanks:3.00,prod:2.60},
-  }[M.name];
+  }[M.name]||M.army;
   const soldiers=Math.min(3,Math.max(.2,named?named.soldiers:base));
   const tanks=Math.min(3,Math.max(.2,named?named.tanks:base*(M.ground?1.08:.92)));
   const prod=Math.min(2.8,Math.max(.25,named?named.prod:base*.85));
@@ -2450,6 +2460,13 @@ function campaignMapHTML(){
     s+='</g>';
   }
   s+='</svg>';
+  if(currentSandboxIdx>=0){
+    const sm=SANDBOX_MAPS[currentSandboxIdx]||SANDBOX_MAPS[0];
+    return s+'<div style="text-align:center;margin:8px 0 2px;font-size:12px;color:#9fc6e8;letter-spacing:1px">'+
+      '<span style="color:#ffd060">⚓ SANDBOX</span> — '+sm.name+
+      ' &nbsp;·&nbsp; <span style="color:#8ff0b4">always unlocked</span> &nbsp;·&nbsp; '+
+      '<span style="color:#7e93a8">campaign progress paused</span></div>';
+  }
   const cur=CAMPAIGN[currentMapIdx]||CAMPAIGN[0];
   const cap='<div style="text-align:center;margin:8px 0 2px;font-size:12px;color:#9fc6e8;letter-spacing:1px">'+
     '<span style="color:#ffd060">⚓ THEATER '+(currentMapIdx+1)+' / '+N+'</span> — '+cur.name+
@@ -2474,17 +2491,31 @@ function buildCampaignPicker(){
   let cm=document.getElementById('campmap');
   if(!cm){ cm=document.createElement('div'); cm.id='campmap'; cm.style.cssText='width:100%;margin:0 0 14px;'; box.insertBefore(cm, box.children[1]||null); }
   cm.innerHTML=campaignMapHTML();
-  cm.querySelectorAll('.cmnode').forEach(el=>{ if(el.getAttribute('data-locked')==='0'){ el.style.cursor='pointer'; el.onclick=()=>{ currentMapIdx=+el.getAttribute('data-idx'); buildCampaignPicker(); }; } });
+  cm.querySelectorAll('.cmnode').forEach(el=>{ if(el.getAttribute('data-locked')==='0'){ el.style.cursor='pointer'; el.onclick=()=>{ currentSandboxIdx=-1; currentMapIdx=+el.getAttribute('data-idx'); buildCampaignPicker(); }; } });
   [...box.querySelectorAll('.mapcard')].forEach(e=>e.remove());
   CAMPAIGN.forEach((M,i)=>{ const locked=i>=mapsUnlocked(), sel=i===currentMapIdx, army=mapArmyProfile(1,M);
     const c=document.createElement('div'); c.className='mapcard';
     c.style.cssText='width:152px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:'+(locked?'default':'pointer')+
-      ';border:1px solid '+(sel?'#5fd0ff':locked?'#22303c':'#21384e')+';background:'+(sel?'#13283a':'#101a24')+';opacity:'+(locked?0.45:1)+';';
+      ';border:1px solid '+(sel&&currentSandboxIdx<0?'#5fd0ff':locked?'#22303c':'#21384e')+';background:'+(sel&&currentSandboxIdx<0?'#13283a':'#101a24')+';opacity:'+(locked?0.45:1)+';';
     c.innerHTML='<div style="color:'+(locked?'#5f7a90':'#cfe6fb')+';font-weight:600;font-size:13px">'+(locked?'🔒 ':'')+(i+1)+'. '+M.name+'</div>'+
       '<div style="color:#7e93a8;margin-top:4px;line-height:1.4">'+(locked?'Win the previous theater to unlock.':M.theme)+'</div>'+
       (locked?'':'<div style="color:#5f7a90;margin-top:5px">'+M.enemies+' enemy · '+M.isles+' isles · '+M.weather+(M.boss?' · ⚓ boss':'')+
         '<br>Ground army '+Math.round(army.soldiers*100)+'% infantry · '+Math.round(army.tanks*100)+'% tanks</div>');
-    if(!locked) c.onclick=()=>{ currentMapIdx=i; buildCampaignPicker(); };
+    if(!locked) c.onclick=()=>{ currentSandboxIdx=-1; currentMapIdx=i; buildCampaignPicker(); };
+    box.appendChild(c);
+  });
+  const sh=document.createElement('div'); sh.className='mapcard';
+  sh.style.cssText='width:100%;text-align:center;color:#ffd060;font-size:12px;letter-spacing:3px;margin:8px 0 2px;';
+  sh.textContent='SANDBOX BATTLEFIELDS — ALWAYS UNLOCKED';
+  box.appendChild(sh);
+  SANDBOX_MAPS.forEach((M,i)=>{ const sel=i===currentSandboxIdx, army=mapArmyProfile(1,M);
+    const c=document.createElement('div'); c.className='mapcard';
+    c.style.cssText='width:164px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:pointer;border:1px solid '+(sel?'#ffd060':'#3a3020')+';background:'+(sel?'#2a2212':'#141b22')+';';
+    c.innerHTML='<div style="color:#ffe6a0;font-weight:700;font-size:13px">☢ '+M.name+'</div>'+
+      '<div style="color:#9fb1bd;margin-top:4px;line-height:1.4">'+M.theme+'</div>'+
+      '<div style="color:#6e8795;margin-top:5px">'+(M.ground?'land assault':'naval sandbox')+' · '+M.enemies+' enemy · '+M.isles+' zones · '+M.weather+
+      '<br>Ground army '+Math.round(army.soldiers*100)+'% infantry · '+Math.round(army.tanks*100)+'% tanks</div>';
+    c.onclick=()=>{ currentSandboxIdx=i; buildCampaignPicker(); };
     box.appendChild(c);
   });
 }
@@ -2696,6 +2727,31 @@ const SMALL_ISLAND_NAMES=['Skull Reef','Far Lantern','Lowtide','Pelican','Broken
 function authoredTheaterIslands(M){
   const n=M.name, hq=M.hqZ||HQ_Z;
   const I=(x,z,r,name)=>[x,z,r,name];
+  if(n==='Southhaven')return [
+    I(-620, hq-520,320,'Southhaven Yard'),I(620,hq-720,260,'Harbor Breakwater'),I(-1260,980,420,'Home Farm'),
+    I(1180,420,360,'Gunnery Cay'),I(-1980,-520,520,'West Practice Grounds'),I(2140,-760,460,'East Practice Grounds')];
+  if(n==='100% Land')return [
+    I(0,-1020,1120,'Northern Continent'),I(-760,-240,980,'West Plain'),I(820,-120,980,'East Plain'),
+    I(0,720,1160,'Southern Continent'),I(-1450,520,720,'Left Arm'),I(1480,420,720,'Right Arm'),
+    I(-390,1450,520,'Rear Command'),I(430,-1640,520,'Forward Command'),I(-1780,-740,500,'Tank Bowl'),I(1780,-740,500,'Artillery Ridge'),I(0,0,420,'Central Crossing')];
+  if(n==='Omaha Beach')return [
+    I(-1420,-1180,700,'Dog Green'),I(-480,-1160,720,'Easy Red'),I(510,-1120,720,'Fox Green'),
+    I(1460,-1060,640,'Cliff Battery'),I(-1040,-240,520,'Shingle Line'),I(0,-140,620,'Beach Road'),
+    I(1020,-220,520,'Bunker Ridge'),I(0,820,640,'Airborne Command')];
+  if(n==='Hiroshima')return [
+    I(0,-880,760,'Hypocenter Ruins'),I(-960,-420,520,'Ash District'),I(950,-360,520,'River Ward'),
+    I(-420,360,540,'Factory Blocks'),I(610,520,460,'Bridge District'),I(-1180,1160,400,'Outer Suburb'),I(1240,1300,360,'Memorial Shore')];
+  if(n==='Chernobyl')return [
+    I(0,-980,660,'Reactor Complex'),I(-920,-420,460,'Pripyat Blocks'),I(900,-360,420,'Cooling Channel'),
+    I(-1240,500,420,'Red Forest'),I(250,540,520,'Checkpoint Delta'),I(1230,1020,390,'Radar Array'),I(-420,1440,380,'Exclusion Gate')];
+  if(n==='Desert Test Range')return [
+    I(0,-1040,760,'Impact Flats'),I(-980,-360,560,'Armor Course'),I(960,-300,540,'Drone Strip'),
+    I(-1320,620,440,'Fuel Depot'),I(0,560,660,'Proving Ground'),I(1320,760,440,'Target Village'),
+    I(-620,1420,420,'Range Control'),I(620,1420,420,'Radar Farm'),I(0,1860,360,'Extraction Pad')];
+  if(n==='Volcanic Caldera')return [
+    I(0,-1780,430,'North Rim'),I(-1280,-1180,420,'Ash Battery'),I(1280,-1100,420,'Basalt Battery'),
+    I(-1640,120,430,'West Rim'),I(1640,180,430,'East Rim'),I(-920,1280,420,'Lava Port'),I(920,1360,420,'Smoke Port'),
+    I(0,120,780,'Caldera Island'),I(0,2100,360,'South Rim')];
   if(n==='Training Bay')return [I(-420,-140,150,'Target Cay'),I(430,180,135,'Gunnery Sandbar')];
   if(n==='The Landing')return [
     I(-180,-1040,430,'Red Beach'),I(300,-640,500,'Duneside'),I(-260,-220,560,'Landing Fields'),
@@ -5338,7 +5394,7 @@ function endGame(win,msg){
   warRecord(win?'wins':'losses');
   const r=careerRank(), nx=nextRank();
   let unlockMsg='';
-  if(win){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
+  if(win&&currentSandboxIdx<0){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
       unlockMsg=`<br><br><span style="color:#7ff0a8">🗺 NEW THEATER UNLOCKED — ${nm.name}!</span>`; }
     else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); } unlockMsg='<br><br><span style="color:#ffd060">🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.</span>'; } }
   if(document.pointerLockElement)document.exitPointerLock();
