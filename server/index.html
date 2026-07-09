@@ -554,11 +554,13 @@ const _gray=new THREE.Color(0x39424c), _foggy=new THREE.Color(0x8a929a);
 const WTYPES={ clear:{dark:1,far:9000,sea:1}, overcast:{dark:0.82,far:5200,sea:1.4}, fog:{dark:0.72,far:1700,sea:1.1}, storm:{dark:0.55,far:2300,sea:2.4} };
 function weatherVis(){ const w=WTYPES[weather.type]||WTYPES.clear; return Math.max(0.4, w.dark) * (0.55+0.45*weather.day); }   // sensor/visibility multiplier
 function updateWeather(dt){
-  weather.tod=(weather.tod+dt/360)%1;                    // full day ≈ 6 minutes
-  weather.t-=dt;
-  if(weather.t<=0){ weather.t=55+Math.random()*85;
-    const r=Math.random(); weather.type = r<0.5?'clear':r<0.72?'overcast':r<0.88?'fog':'storm';
-    if(phase==='play') flashPrompt('⛅ Weather: '+weather.type.toUpperCase()); }
+  const lock=window._MAP&&window._MAP.weatherLock;       // themed theaters hold their weather & time of day
+  if(lock){ weather.type=window._MAP.weather; if(window._MAP.tod!=null) weather.tod=window._MAP.tod; }
+  else { weather.tod=(weather.tod+dt/360)%1;              // full day ≈ 6 minutes
+    weather.t-=dt;
+    if(weather.t<=0){ weather.t=55+Math.random()*85;
+      const r=Math.random(); weather.type = r<0.5?'clear':r<0.72?'overcast':r<0.88?'fog':'storm';
+      if(phase==='play') flashPrompt('⛅ Weather: '+weather.type.toUpperCase()); } }
   const W=WTYPES[weather.type]||WTYPES.clear;
   weather.sea += (W.sea-weather.sea)*Math.min(1,dt*0.4);  // sea state eases in
   const day=(Math.sin(weather.tod*6.2832-1.5708)+1)/2;    // 0 midnight … 1 noon
@@ -1889,12 +1891,40 @@ function loadCareer(){ try{ const c=JSON.parse(localStorage.getItem('ironTideCar
 function saveCareer(){ try{ localStorage.setItem('ironTideCareer', JSON.stringify(career)); }catch(e){} }
 // ===== CAMPAIGN — conquer a theater to unlock the next =====
 const CAMPAIGN=[
-  {name:'Southhaven Shoals',  theme:'Home waters — calm seas, a green fleet to blood.',      enemies:5, allies:5, isles:5, reinforce:0.8, weather:'clear',    tod:0.35, boss:false},
-  {name:'The Broken Reef',    theme:'A dense archipelago. Brutal island-by-island fighting.',enemies:6, allies:5, isles:7, reinforce:1.0, weather:'clear',    tod:0.4,  boss:false},
-  {name:'Iron Straits',       theme:'A narrow, storm-lashed channel. Nowhere to run.',       enemies:7, allies:5, isles:4, reinforce:1.2, weather:'storm',    tod:0.45, boss:true},
-  {name:'Nightfall Passage',  theme:'A running battle fought in the dark.',                  enemies:7, allies:6, isles:5, reinforce:1.3, weather:'clear',    tod:0.02, boss:true},
-  {name:'Fogbound Marches',   theme:'Blind sensors. Radar and sonar are everything.',        enemies:8, allies:6, isles:6, reinforce:1.4, weather:'fog',      tod:0.5,  boss:true},
-  {name:"Leviathan's Grave",  theme:'The enemy flagship yard. Bring the whole fleet.',       enemies:8, allies:6, isles:6, reinforce:1.6, weather:'overcast', tod:0.5,  boss:true},
+  // ---- warm-up theaters: short maps, gentle, no boss ----
+  {name:'Training Bay',       theme:'A quick shakedown in the shallows. Barely any resistance.',enemies:2, allies:4, isles:2, reinforce:0.4, weather:'clear',  tod:0.4, boss:false, hqZ:1500, bigIsles:false},
+  {name:'The Landing',        theme:'Pure land assault — no enemy fleet. Beach your tanks and take every island.', enemies:0, allies:3, isles:6, reinforce:0, weather:'clear', tod:0.42, boss:false, hqZ:1400, bigIsles:false, ground:true},
+  {name:'Coastal Skirmish',   theme:'A short, sharp fight in tight waters.',                 enemies:3, allies:4, isles:3, reinforce:0.6, weather:'clear',    tod:0.38, boss:false, hqZ:2400, bigIsles:false},
+  // ---- the main campaign ----
+  {name:'Southhaven Shoals',  theme:'Home waters — calm seas, a green fleet to blood.',      enemies:5, allies:5, isles:5, reinforce:0.8, weather:'clear',    tod:0.35, boss:false, hqZ:4400, bigIsles:true},
+  {name:'The Broken Reef',    theme:'A dense archipelago. Brutal island-by-island fighting.',enemies:6, allies:5, isles:7, reinforce:1.0, weather:'clear',    tod:0.4,  boss:false, hqZ:4400, bigIsles:true},
+  {name:'Iron Straits',       theme:'A narrow, storm-lashed channel. Nowhere to run.',       enemies:7, allies:5, isles:4, reinforce:1.2, weather:'storm',    tod:0.45, boss:true,  hqZ:4400, bigIsles:true},
+  {name:'Nightfall Passage',  theme:'A running battle fought in the dark.',                  enemies:7, allies:6, isles:5, reinforce:1.3, weather:'clear',    tod:0.02, boss:true,  hqZ:4400, bigIsles:true},
+  {name:'Fogbound Marches',   theme:'Blind sensors. Radar and sonar are everything.',        enemies:8, allies:6, isles:6, reinforce:1.4, weather:'fog',      tod:0.5,  boss:true,  hqZ:4400, bigIsles:true},
+  {name:"Leviathan's Grave",  theme:'The enemy flagship yard. Bring the whole fleet.',       enemies:8, allies:6, isles:6, reinforce:1.6, weather:'overcast', tod:0.5,  boss:true,  hqZ:4400, bigIsles:true},
+  // ---- the long war: 22 escalating theaters ----
+  {name:'Dawn Patrol',        theme:'First light over quiet water. It won’t stay quiet.',    enemies:6, allies:5, isles:5, reinforce:0.9, weather:'clear',    tod:0.24, boss:false, hqZ:3600, bigIsles:true},
+  {name:'The Gauntlet',       theme:'Badly outnumbered — nine hulls against your handful.',  enemies:9, allies:3, isles:4, reinforce:1.1, weather:'clear',    tod:0.4,  boss:false, hqZ:4400, bigIsles:true},
+  {name:'Typhoon Run',        theme:'A permanent tempest. Mountainous seas, blind guns.',     enemies:7, allies:6, isles:5, reinforce:1.1, weather:'storm',    tod:0.45, boss:false, hqZ:4000, bigIsles:true, weatherLock:true},
+  {name:'Blackwater Ambush',  theme:'Fog thick as tar hides an enemy flagship.',             enemies:8, allies:5, isles:6, reinforce:1.2, weather:'fog',      tod:0.5,  boss:true,  hqZ:4200, bigIsles:true, weatherLock:true},
+  {name:'Island Hopping',     theme:'A wider land campaign — eight islands, no enemy fleet.', enemies:0, allies:4, isles:8, reinforce:0,   weather:'clear',    tod:0.42, boss:false, hqZ:1900, bigIsles:false, ground:true},
+  {name:'Midnight Raid',      theme:'A strike under permanent dark. Searchlights and tracer.',enemies:7, allies:5, isles:5, reinforce:1.2, weather:'clear',    tod:0.0,  boss:true,  hqZ:3800, bigIsles:true, weatherLock:true},
+  {name:'The Iron Armada',    theme:'Eleven enemy warships steam over the horizon.',         enemies:11,allies:6, isles:6, reinforce:1.4, weather:'overcast', tod:0.5,  boss:true,  hqZ:4400, bigIsles:true},
+  {name:'Shattered Coast',    theme:'A sprawling reef broken into a hundred channels.',       enemies:8, allies:5, isles:7, reinforce:1.2, weather:'clear',    tod:0.35, boss:false, hqZ:4400, bigIsles:true},
+  {name:'Frozen Straits',     theme:'Grey twilight and freezing fog off the ice shelf.',      enemies:8, allies:6, isles:4, reinforce:1.3, weather:'fog',      tod:0.16, boss:true,  hqZ:4000, bigIsles:true, weatherLock:true},
+  {name:'The Reckoning',      theme:'A stand-up brawl in a rolling storm.',                   enemies:9, allies:5, isles:6, reinforce:1.4, weather:'storm',    tod:0.45, boss:true,  hqZ:4400, bigIsles:true, weatherLock:true},
+  {name:'Ghost Fleet',        theme:'Outnumbered, alone, blind in the fog and dark.',         enemies:9, allies:4, isles:5, reinforce:1.4, weather:'fog',      tod:0.04, boss:true,  hqZ:4200, bigIsles:true, weatherLock:true},
+  {name:'Volcano Bay',        theme:'Ash-choked skies over a dense volcanic chain.',          enemies:8, allies:6, isles:8, reinforce:1.3, weather:'overcast', tod:0.5,  boss:false, hqZ:4400, bigIsles:true},
+  {name:'Last Bastion',       theme:'Ten fortified islands to storm. Armour ashore, now.',    enemies:0, allies:5, isles:10,reinforce:0,   weather:'overcast', tod:0.4,  boss:false, hqZ:2100, bigIsles:false, ground:true},
+  {name:'The Long Night',     theme:'A war that never sees the sun.',                         enemies:10,allies:6, isles:5, reinforce:1.4, weather:'clear',    tod:0.0,  boss:true,  hqZ:4400, bigIsles:true, weatherLock:true},
+  {name:'Hurricane Alley',    theme:'Back-to-back storms and a heavy enemy line.',            enemies:9, allies:6, isles:5, reinforce:1.5, weather:'storm',    tod:0.4,  boss:true,  hqZ:4400, bigIsles:true, weatherLock:true},
+  {name:'Twin Leviathans',    theme:'The enemy fields its capital ships in force.',           enemies:10,allies:6, isles:6, reinforce:1.5, weather:'overcast', tod:0.5,  boss:true,  hqZ:4600, bigIsles:true},
+  {name:'The Crucible',       theme:'Everything at once — fog, fleets and flagships.',        enemies:11,allies:5, isles:6, reinforce:1.6, weather:'fog',      tod:0.45, boss:true,  hqZ:4400, bigIsles:true, weatherLock:true},
+  {name:'Steel Rain',        theme:'Twelve hulls and a sky full of falling shells.',         enemies:12,allies:6, isles:6, reinforce:1.7, weather:'storm',    tod:0.5,  boss:true,  hqZ:4600, bigIsles:true, weatherLock:true},
+  {name:'Endless Horizon',    theme:'A vast open theater — the longest sail to the guns.',    enemies:10,allies:5, isles:7, reinforce:1.5, weather:'clear',    tod:0.35, boss:true,  hqZ:5400, bigIsles:true},
+  {name:'The Final Blockade', theme:'The enemy throws its whole navy at your line.',          enemies:12,allies:6, isles:6, reinforce:1.8, weather:'overcast', tod:0.5,  boss:true,  hqZ:4800, bigIsles:true},
+  {name:'Ragnarök Reef',      theme:'Night, storm, and the full enemy fleet. No mercy.',      enemies:12,allies:6, isles:8, reinforce:1.9, weather:'storm',    tod:0.0,  boss:true,  hqZ:4800, bigIsles:true, weatherLock:true},
+  {name:'The Last Tide',      theme:'Every gun. Every ship. This is where the war ends.',     enemies:12,allies:6, isles:6, reinforce:2.0, weather:'fog',      tod:0.02, boss:true,  hqZ:5000, bigIsles:true, weatherLock:true},
 ];
 let currentMapIdx=0;
 function mapsUnlocked(){ return Math.max(1, Math.min(CAMPAIGN.length, career.mapsUnlocked||1)); }
@@ -1903,6 +1933,66 @@ function unlockNextMap(idx){ const want=Math.min(CAMPAIGN.length, idx+2);
 function applyMap(){ const M=CAMPAIGN[currentMapIdx]||CAMPAIGN[0];
   if(typeof weather==='object'){ weather.type=M.weather; weather.tod=M.tod; weather.day=null; }
   window._MAP=M; return M; }
+function mapArmyProfile(team=1,map=null){
+  const M=map||window._MAP||CAMPAIGN[currentMapIdx]||CAMPAIGN[0]||{}, N=Math.max(1,CAMPAIGN.length-1);
+  const idx=Math.max(0,CAMPAIGN.indexOf(M)>=0?CAMPAIGN.indexOf(M):currentMapIdx), progress=N?idx/N:0;
+  // Ground forces start at about 25% in Training Bay and climb toward 300% by the finale.
+  let base=0.25 + progress*2.75;
+  if(M.ground)base*=1.25;        // land-assault theaters should feel like proper invasions
+  if(M.boss)base*=1.08;          // flagship theaters also have tougher shore defenses
+  if(M.isles>=8)base*=1.10;      // wide island chains need more troops ashore
+  const named={
+    'Training Bay':{soldiers:.25,tanks:.25,prod:.35},
+    'The Landing':{soldiers:2.35,tanks:2.20,prod:1.75},
+    'Island Hopping':{soldiers:2.45,tanks:2.10,prod:1.85},
+    'Last Bastion':{soldiers:2.75,tanks:2.55,prod:2.10},
+    'The Last Tide':{soldiers:3.00,tanks:3.00,prod:2.60},
+  }[M.name];
+  const soldiers=Math.min(3,Math.max(.2,named?named.soldiers:base));
+  const tanks=Math.min(3,Math.max(.2,named?named.tanks:base*(M.ground?1.08:.92)));
+  const prod=Math.min(2.8,Math.max(.25,named?named.prod:base*.85));
+  const friendly=team===0?.82:1; // captured friendly islands grow, but do not snowball quite as hard
+  return {soldiers:soldiers*friendly,tanks:tanks*friendly,prod:prod*friendly,label:Math.round(base*100)+'%'};
+}
+// ===== FLEET COMMS & ORDERS — allies get callsigns, announce intent, coordinate, and take your orders =====
+const CALLSIGNS=['Alpha','Bravo','Charlie','Delta','Echo','Foxtrot','Golf','Hotel','India','Juliet','Kilo','Lima'];
+let _callsignN=0, fleetOrder=-1, _distressT=3;
+const _commsLines=[];
+function nextCallsign(){ const i=_callsignN++; return CALLSIGNS[i%CALLSIGNS.length]+'-'+(1+Math.floor(i/CALLSIGNS.length)); }
+function commsInit(){ if(document.getElementById('comms'))return; const hud=document.getElementById('hud'); if(!hud)return;
+  const d=document.createElement('div'); d.id='comms';
+  d.style.cssText='position:absolute;left:14px;top:120px;width:300px;pointer-events:none;font-size:11px;line-height:1.55;text-shadow:0 1px 3px #000;';
+  hud.appendChild(d); }
+function comms(from,msg,col){ _commsLines.push({from,msg,col:col||'#a8d4f0',t:9}); while(_commsLines.length>6)_commsLines.shift(); }
+function updateComms(dt){ if(!_commsLines.length){ const el=document.getElementById('comms'); if(el&&el.innerHTML)el.innerHTML=''; return; }
+  commsInit(); const el=document.getElementById('comms'); if(!el)return; let html='';
+  for(let i=_commsLines.length-1;i>=0;i--){ const L=_commsLines[i]; L.t-=dt; if(L.t<=0){ _commsLines.splice(i,1); continue; } }
+  _commsLines.forEach(L=>{ const o=Math.min(1,L.t/2.2).toFixed(2);
+    html+='<div style="opacity:'+o+';color:'+L.col+'"><span style="color:#ffd060">📻 '+L.from+':</span> '+L.msg+'</div>'; });
+  el.innerHTML=html; }
+function nearestCaptureIsland(pos){ let b=null,bd=1e9; islands.forEach(i=>{ if(!i.capturable||i.owner===0||i.r<70)return; const d=i.pos.distanceTo(pos); if(d<bd){bd=d;b=i;} }); return b; }
+function assignAllyRole(a,role){ if(a.role===role)return; a.role=role;
+  if(role==='capture'){ a.capIsland=nearestCaptureIsland(a.pos); if(a.capIsland&&Math.random()<0.5)comms(a.callsign,'Moving to secure '+(a.capIsland.name||'the island')+'.','#7fd0a0'); }
+}
+function checkDistress(){
+  const wounded=[];
+  if(player&&player.hp>0&&player.hp<player.maxhp*0.3) wounded.push({s:player,name:'FLAGSHIP',pos:player.pos});
+  allies.forEach(a=>{ if(a.sinkT===0&&a.hp<a.maxhp*0.3) wounded.push({s:a,name:a.callsign,pos:a.pos}); });
+  wounded.forEach(w=>{ if((w.s._sos||0)>0)return; w.s._sos=20;
+    comms(w.name,'⚠ Taking heavy fire — requesting assistance!','#ff9a6a'); if(w.s===player)sfxAlarm();
+    let best=null,bd=1e9; allies.forEach(a=>{ if(a.sinkT||a.def.support||a.s===w.s||a.role==='assist')return; const d=a.pos.distanceTo(w.pos); if(d<bd){bd=d;best=a;} });
+    if(best){ best.role='assist'; best.assist=w.s; comms(best.callsign,'Copy — inbound to cover '+w.name+'.','#7fd0a0'); }
+  });
+}
+function fleetOrderCmd(){
+  if(phase!=='play'){ return; }
+  const combat=allies.filter(a=>a.sinkT===0&&!a.def.support); if(!combat.length){ flashPrompt('No warships to command.'); return; }
+  fleetOrder=(fleetOrder+1)%3;
+  if(fleetOrder===0){ combat.forEach(a=>{a.role='attack';a.assist=null;}); comms('FLAGSHIP','All ships — press the attack!','#ffd060'); flashPrompt('📻 ORDER: ALL SHIPS ATTACK'); }
+  else if(fleetOrder===1){ combat.forEach(a=>assignAllyRole(a,'capture')); comms('FLAGSHIP','All ships — take the islands!','#ffd060'); flashPrompt('📻 ORDER: CAPTURE ISLANDS'); }
+  else { combat.forEach(a=>{a.role='regroup';a.assist=null;}); comms('FLAGSHIP','All ships — form on me!','#ffd060'); flashPrompt('📻 ORDER: REGROUP ON FLAGSHIP'); }
+  sfxClick();
+}
 function careerScore(){ return career.sunk*2 + career.planes + career.islands*5 + career.wins*40 + career.bosses*25; }
 function careerRank(){ const s=careerScore(); let r=RANKS[0]; for(const k of RANKS){ if(s>=k.score) r=k; } return r; }
 function nextRank(){ const s=careerScore(); for(const k of RANKS){ if(s<k.score) return k; } return null; }
@@ -2080,12 +2170,15 @@ function controlledIslandCount(team){ return islands.reduce((n,i)=>n+(i.capturab
 let offensiveT=160+Math.random()*80, offensiveN=0, sessPlanes=0;
 let sideOb=null, sideObT=25;
 function updateWarPacing(dt){
+  const ground=window._MAP&&window._MAP.ground;
+  // land victory: on an all-ground theater, seizing every island wins the war
+  if(ground){ const cap=islands.filter(i=>i.capturable); if(cap.length&&cap.every(i=>i.owner===0)){ endGame(true,'All islands secured — the archipelago is yours!'); return; } }
   // parked aircraft slowly rearm from the ship's magazine (strategic bombs excluded — no free nukes)
   planes.forEach(p=>{ if(p.parked&&p.def.bombs&&!p.def.strategicBomb&&p.bombsLeft<p.def.bombs){
       p.deckRearmT=(p.deckRearmT||0)+dt; if(p.deckRearmT>=5){ p.deckRearmT=0; p.bombsLeft++; } } else p.deckRearmT=0; });
-  // escalating offensives — announced surges that grow as the war drags on
+  // escalating offensives — announced surges that grow as the war drags on (never on a land theater)
   offensiveT-=dt;
-  if(offensiveT<=0){ offensiveN++; offensiveT=170+Math.random()*80;
+  if(offensiveT<=0 && !ground){ offensiveN++; offensiveT=170+Math.random()*80;
     const n=Math.min(3+Math.floor(offensiveN/2),6);
     if(enemies.length<12){ for(let i=0;i<n;i++) spawnEnemy();
       flashPrompt('⚠ ENEMY OFFENSIVE — '+n+' warships inbound!'); sfxAlarm(); } }
@@ -2305,6 +2398,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyY' && !e.repeat) tryDispatchPlane();   // Y next to a parked plane → AI pilot (was A, which strafing on deck kept triggering by accident)
   if(e.code==='KeyQ') cycleGun();                        // Q cycles your owned small arms while ashore
   if(e.code==='KeyX') deleteTurret();                    // X scraps the deck gun you're standing next to
+  if(e.code==='KeyO'&&!e.repeat) fleetOrderCmd();         // O cycles a fleet order (attack / capture / regroup)
   if(e.code==='KeyT'){ fpv=!fpv;   // T toggles first-person / cockpit view (V is taken by mines)
     if(piloting||drivingTank||manning||driving) flashPrompt(driving?(fpv?'External chase view':'Bridge view'):(fpv?'First-person view':'Chase view')); } });
 addEventListener('keyup',e=>{ keys[e.code]=0; });
@@ -2312,27 +2406,68 @@ addEventListener('keyup',e=>{ keys[e.code]=0; });
 // =====================================================================
 //  MENU
 // =====================================================================
+// Serpentine "voyage map" of the whole campaign — shows the route, what's secured, and where the fleet is now.
+function campaignMapHTML(){
+  const N=CAMPAIGN.length, per=8, sp=111, px=54, py=50, rh=92, R=15, W=880;
+  const rows=Math.ceil(N/per), H=py*2+(rows-1)*rh;
+  const unlocked=mapsUnlocked(), beaten=career.completed?N:Math.max(0,unlocked-1);
+  const pos=i=>{ const row=Math.floor(i/per); let col=i%per; if(row%2) col=per-1-col; return {x:px+col*sp,y:py+row*rh}; };
+  const pt=i=>{ const p=pos(i); return p.x.toFixed(1)+','+p.y.toFixed(1); };
+  const full='M'+Array.from({length:N},(_,i)=>pt(i)).join(' L');
+  const travN=Math.min(N-1,currentMapIdx);
+  const trav=travN>0 ? 'M'+Array.from({length:travN+1},(_,i)=>pt(i)).join(' L') : '';
+  let s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;max-width:900px;display:block;margin:0 auto">';
+  s+='<path d="'+full+'" fill="none" stroke="#22394d" stroke-width="4" stroke-dasharray="2 9" stroke-linecap="round"/>';
+  if(trav) s+='<path d="'+trav+'" fill="none" stroke="#3f88c8" stroke-width="4" stroke-linecap="round" opacity="0.92"/>';
+  for(let i=0;i<N;i++){ const p=pos(i), M=CAMPAIGN[i];
+    const locked=i>=unlocked, done=i<beaten, cur=i===currentMapIdx;
+    let fill='#123048',stroke='#3579a8',txtc='#cfe6fb',label=String(i+1);
+    if(locked){ fill='#16222e';stroke='#2a3d4e';txtc='#51697d';label='🔒'; }
+    else if(done){ fill='#123726';stroke='#3fae78';txtc='#8ff0b4';label='✓'; }
+    if(cur){ stroke='#ffd060';txtc='#ffe9a8';label=String(i+1); }
+    s+='<g>';
+    if(cur) s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="'+(R+5)+'" fill="none" stroke="#ffd060" stroke-width="2"><animate attributeName="r" values="'+(R+4)+';'+(R+10)+';'+(R+4)+'" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.6s" repeatCount="indefinite"/></circle>';
+    s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="'+R+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(cur?3:2)+'"/>';
+    s+='<text x="'+p.x+'" y="'+p.y+'" text-anchor="middle" dominant-baseline="central" font-size="'+(label.length>1?12:14)+'" font-weight="700" fill="'+txtc+'" style="font-family:inherit">'+label+'</text>';
+    if(cur) s+='<text x="'+p.x+'" y="'+(p.y-R-7)+'" text-anchor="middle" font-size="15">⚓</text>';
+    s+='<circle class="cmnode" data-idx="'+i+'" data-locked="'+(locked?1:0)+'" cx="'+p.x+'" cy="'+p.y+'" r="'+(R+7)+'" fill="transparent"><title>'+(i+1)+'. '+M.name+(locked?' — locked':' — '+M.theme)+'</title></circle>';
+    s+='</g>';
+  }
+  s+='</svg>';
+  const cur=CAMPAIGN[currentMapIdx]||CAMPAIGN[0];
+  const cap='<div style="text-align:center;margin:8px 0 2px;font-size:12px;color:#9fc6e8;letter-spacing:1px">'+
+    '<span style="color:#ffd060">⚓ THEATER '+(currentMapIdx+1)+' / '+N+'</span> — '+cur.name+
+    ' &nbsp;·&nbsp; <span style="color:#8ff0b4">✓ '+beaten+' secured</span> &nbsp;·&nbsp; '+
+    (unlocked<N?'<span style="color:#7e93a8">'+(N-unlocked)+' locked</span>':'<span style="color:#7e93a8">all theaters unlocked</span>')+'</div>';
+  return s+cap;
+}
 function buildCampaignPicker(){
   const ships=document.getElementById('ships'); if(!ships) return;
   if(currentMapIdx>=mapsUnlocked()) currentMapIdx=mapsUnlocked()-1; if(currentMapIdx<0) currentMapIdx=0;
   let box=document.getElementById('maps');
   if(!box){ box=document.createElement('div'); box.id='maps';
     box.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:0 24px 4px;';
-    const h=document.createElement('div'); h.textContent='SELECT THEATER';
+    const h=document.createElement('div'); h.textContent='CAMPAIGN VOYAGE';
     h.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:2px 0 10px;';
     box.appendChild(h); ships.parentNode.insertBefore(box, ships);
     const sh=document.createElement('div'); sh.textContent='— CHOOSE YOUR COMMAND —';
     sh.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:12px 0 6px;';
     ships.parentNode.insertBefore(sh, ships);
   }
+  // (re)draw the voyage map at the top of the box, then the theater detail cards below it
+  let cm=document.getElementById('campmap');
+  if(!cm){ cm=document.createElement('div'); cm.id='campmap'; cm.style.cssText='width:100%;margin:0 0 14px;'; box.insertBefore(cm, box.children[1]||null); }
+  cm.innerHTML=campaignMapHTML();
+  cm.querySelectorAll('.cmnode').forEach(el=>{ if(el.getAttribute('data-locked')==='0'){ el.style.cursor='pointer'; el.onclick=()=>{ currentMapIdx=+el.getAttribute('data-idx'); buildCampaignPicker(); }; } });
   [...box.querySelectorAll('.mapcard')].forEach(e=>e.remove());
-  CAMPAIGN.forEach((M,i)=>{ const locked=i>=mapsUnlocked(), sel=i===currentMapIdx;
+  CAMPAIGN.forEach((M,i)=>{ const locked=i>=mapsUnlocked(), sel=i===currentMapIdx, army=mapArmyProfile(1,M);
     const c=document.createElement('div'); c.className='mapcard';
     c.style.cssText='width:152px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:'+(locked?'default':'pointer')+
       ';border:1px solid '+(sel?'#5fd0ff':locked?'#22303c':'#21384e')+';background:'+(sel?'#13283a':'#101a24')+';opacity:'+(locked?0.45:1)+';';
     c.innerHTML='<div style="color:'+(locked?'#5f7a90':'#cfe6fb')+';font-weight:600;font-size:13px">'+(locked?'🔒 ':'')+(i+1)+'. '+M.name+'</div>'+
       '<div style="color:#7e93a8;margin-top:4px;line-height:1.4">'+(locked?'Win the previous theater to unlock.':M.theme)+'</div>'+
-      (locked?'':'<div style="color:#5f7a90;margin-top:5px">'+M.enemies+' enemy · '+M.isles+' isles · '+M.weather+(M.boss?' · ⚓ boss':'')+'</div>');
+      (locked?'':'<div style="color:#5f7a90;margin-top:5px">'+M.enemies+' enemy · '+M.isles+' isles · '+M.weather+(M.boss?' · ⚓ boss':'')+
+        '<br>Ground army '+Math.round(army.soldiers*100)+'% infantry · '+Math.round(army.tanks*100)+'% tanks</div>');
     if(!locked) c.onclick=()=>{ currentMapIdx=i; buildCampaignPicker(); };
     box.appendChild(c);
   });
@@ -2481,18 +2616,19 @@ const SMALL_ISLAND_SLOTS=[
 ];
 const SMALL_ISLAND_NAMES=['Skull Reef','Far Lantern','Lowtide','Pelican','Broken Mast'];
 function buildTheater(){
-  friendlyHarbor=buildHarbor(0, new THREE.Vector3(0,0,HQ_Z));
-  enemyHarbor   =buildHarbor(1, new THREE.Vector3(0,0,-HQ_Z));
-  const enemyBaseIsland=buildIsland(new THREE.Vector3(0,0,-HQ_Z-120),260,'Northwatch');
-  const friendlyBaseIsland=buildIsland(new THREE.Vector3(0,0,HQ_Z+120),250,'Southhaven');
+  const M=window._MAP||{}, hq=M.hqZ||HQ_Z, big=M.bigIsles!==false;
+  friendlyHarbor=buildHarbor(0, new THREE.Vector3(0,0,hq));
+  enemyHarbor   =buildHarbor(1, new THREE.Vector3(0,0,-hq));
+  const enemyBaseIsland=buildIsland(new THREE.Vector3(0,0,-hq-120),260,'Northwatch');
+  const friendlyBaseIsland=buildIsland(new THREE.Vector3(0,0,hq+120),250,'Southhaven');
   enemyBaseIsland.capturable=false; friendlyBaseIsland.capturable=false;
   setIslandOwner(enemyBaseIsland,1,true); setIslandOwner(friendlyBaseIsland,0,true);
-  THEATER_ISLANDS.forEach(([x,z,r,name])=>buildIsland(new THREE.Vector3(x,0,z),r,name));
-  // Exactly five minor islands: choose safe peripheral pockets, then add a little positional jitter.
-  // The slots keep randomness from sealing the crooked central passage or the open eastern fleet sea.
-  SMALL_ISLAND_SLOTS.map(p=>p.slice()).sort(()=>Math.random()-.5).slice(0,(window._MAP&&window._MAP.isles)||5).forEach((slot,i)=>{
-    const x=slot[0]+(Math.random()-.5)*260,z=slot[1]+(Math.random()-.5)*260,r=48+Math.random()*24;
-    buildIsland(new THREE.Vector3(x,0,z),r,SMALL_ISLAND_NAMES[i]);
+  if(big) THEATER_ISLANDS.forEach(([x,z,r,name])=>buildIsland(new THREE.Vector3(x,0,z),r,name));
+  // minor islands — on shorter maps, pack them into the tighter sea between the two bases
+  const isleN=M.isles||5, spread=big?1:Math.min(1,hq/4400);
+  SMALL_ISLAND_SLOTS.map(p=>[p[0]*(big?1:0.35),p[1]*spread]).sort(()=>Math.random()-.5).slice(0,isleN).forEach((slot,i)=>{
+    const x=slot[0]+(Math.random()-.5)*260,z=slot[1]+(Math.random()-.5)*180,r=48+Math.random()*24;
+    buildIsland(new THREE.Vector3(x,0,z),r,SMALL_ISLAND_NAMES[i%SMALL_ISLAND_NAMES.length]);
   });
   // islands fortified — your side (z>=0) is team 0, enemy side team 1. Both harbors too.
   garrisonHarbor(enemyHarbor.pos, 1);
@@ -2572,25 +2708,29 @@ function updateIslandAirService(dt){
 }
 function garrisonIsland(isl, team){
   const r=isl.r;
+  const army=mapArmyProfile(team);
   if(r>=90){
     if(!islandStructures(isl,team,'command').length)buildAndPushLand('command',team,islandPoint(isl,0.4,0.16,2),2,isl);
     buildAndPushLand('power',team,islandPoint(isl,2.7,0.22,2),2,isl);
     buildAndPushLand('barracks',team,islandPoint(isl,4.6,0.26,2),2,isl);
+    if(army.tanks>=1.2)buildAndPushLand('tankdepot',team,islandPoint(isl,5.55,0.30,2),2,isl);
   }
   const nC=Math.min(8,Math.max(4,Math.floor(r/45)));
   for(let i=0;i<nC;i++){ const a=i/nC*6.28+Math.random()*0.3; buildAndPushLand('coastal',team,islandPoint(isl,a,0.82,0)); }
   const nAA=Math.min(7,Math.max(3,Math.floor(r/55)));
   for(let i=0;i<nAA;i++){ const a=i/nAA*6.28+1.1,rr=0.42+Math.random()*0.32; buildAndPushLand('aa',team,islandPoint(isl,a,rr,1.4)); }
-  const nT=r>=150?4:r>=90?2:1;
+  const baseT=r>=150?4:r>=90?2:1, nT=Math.max(0,Math.round(baseT*army.tanks));
   for(let i=0;i<nT;i++) buildAndPushLand('tank',team,islandPoint(isl,Math.random()*6.28,0.28+Math.random()*0.22,1.4));
-  const nS=Math.min(10,Math.max(4,Math.floor(r/45)));
+  const baseS=Math.min(10,Math.max(4,Math.floor(r/45))), nS=Math.max(1,Math.round(baseS*army.soldiers));
   for(let i=0;i<nS;i++) buildAndPushLand('soldier',team,islandPoint(isl,Math.random()*6.28,0.35+Math.random()*0.48,1.4));
 }
 function garrisonHarbor(c, team){
+  const army=mapArmyProfile(team);
   for(let i=0;i<9;i++){ const a=i/9*6.28; buildAndPushLand('coastal',team, c.clone().add(new THREE.Vector3(Math.cos(a)*44,0,Math.sin(a)*44))); }
   for(let i=0;i<7;i++){ const a=i/7*6.28+0.3; buildAndPushLand('aa',team, c.clone().add(new THREE.Vector3(Math.cos(a)*30,1.4,Math.sin(a)*30))); }   // ring of flak
-  for(let i=0;i<3;i++){ const a=i*2.09+0.4; buildAndPushLand('tank',team, c.clone().add(new THREE.Vector3(Math.cos(a)*60,1.4,Math.sin(a)*60))); }
-  for(let i=0;i<6;i++){ const a=i/6*6.28; buildAndPushLand('soldier',team, c.clone().add(new THREE.Vector3(Math.cos(a)*72,1.4,Math.sin(a)*72))); }
+  const nT=Math.max(1,Math.round(3*army.tanks)), nS=Math.max(2,Math.round(6*army.soldiers));
+  for(let i=0;i<nT;i++){ const a=i/nT*6.28+0.4; buildAndPushLand('tank',team, c.clone().add(new THREE.Vector3(Math.cos(a)*60,1.4,Math.sin(a)*60))); }
+  for(let i=0;i<nS;i++){ const a=i/nS*6.28; buildAndPushLand('soldier',team, c.clone().add(new THREE.Vector3(Math.cos(a)*72,1.4,Math.sin(a)*72))); }
 }
 const STRUCT_KINDS=Object.keys(STRUCTS);
 function buildAndPushLand(kind,team,pos,yOverride,islOverride){
@@ -2819,6 +2959,10 @@ function spawnAlly(near){
     fireT:1+Math.random()*3, sinkT:0, turnT:0, standoff:(t==='scout'?110:t==='battleship'?190:150)+(Math.random()-0.5)*40, orbitDir:Math.random()<0.5?1:-1,
     loadout:[], upgT:7+Math.random()*7, planeT:12+Math.random()*16 };
   def.support?a.loadout.push(AI_WEAPS[3]):growLoadout(a);
+  a.callsign=def.support?'Medic-'+(_callsignN+1):nextCallsign();
+  a.role=def.support?'support':(Math.random()<0.35?'capture':'attack');
+  a._sos=0; a.commsT=8+Math.random()*22;
+  if(typeof comms==='function'&&!def.support&&Math.random()<0.6) comms(a.callsign,a.role==='capture'?'On station — moving to take an island.':'Reporting for duty — weapons hot.','#a8d4f0');
   allies.push(a);
 }
 function spawnBoss(team){
@@ -3023,16 +3167,26 @@ function updateAlly(a,dt){
     if(a.sinkT>3){ a.dead=true; if(a.build)splashAt(a.pos.clone(),3); }
     return; }
   tickCrit(a,dt);
-  // pick a target: nearest enemy ship, else push the enemy harbor
+  // objective by role: support heals, roles coordinate, else hunt the enemy
   const tgtShip=nearestEnemyShipTo(a.pos),patient=a.def.support?nearestDamagedShip(0,a.pos,a):null;
-  const objective = a.def.support?(patient?patient.pos:(friendlyHarbor?friendlyHarbor.pos:new THREE.Vector3())):
-    ((tgtShip&&tgtShip.pos.distanceTo(a.pos)<340+fleetRange())?tgtShip.pos:(enemyHarbor?enemyHarbor.pos:new THREE.Vector3()));
+  if(a._sos>0)a._sos-=dt;
+  let objective, stand=0;
+  if(a.def.support){ objective=patient?patient.pos:(friendlyHarbor?friendlyHarbor.pos:new THREE.Vector3()); stand=patient?80:0; }
+  else if(a.role==='assist' && a.assist && (a.assist===player?player.hp>0:a.assist.sinkT===0)){
+    objective=a.assist.pos; stand=100;
+    if((a.assist===player?player.hp:a.assist.hp) > (a.assist.maxhp||player.maxhp)*0.6){ comms(a.callsign,'Threat clear — resuming patrol.','#a8d4f0'); a.role='attack'; a.assist=null; } }
+  else if(a.role==='regroup' && player && player.hp>0){ objective=player.pos; stand=110; }
+  else if(a.role==='capture'){ if(!a.capIsland||a.capIsland.owner===0||!a.capIsland.capturable) a.capIsland=nearestCaptureIsland(a.pos);
+    if(a.capIsland){ objective=a.capIsland.pos; stand=a.capIsland.r+45; } else a.role='attack'; }
+  if(!objective){ if(a.role==='assist'){a.assist=null;a.role='attack';} if(a.role==='regroup')a.role='attack';
+    objective=(tgtShip&&tgtShip.pos.distanceTo(a.pos)<340+fleetRange())?tgtShip.pos:(enemyHarbor?enemyHarbor.pos:new THREE.Vector3());
+    stand=(tgtShip&&objective===tgtShip.pos)?a.standoff:0; }
   const to=objective.clone().sub(a.pos); const dP=Math.hypot(to.x,to.z); const bearing=Math.atan2(to.x,to.z);
-  let desired;
-  if(patient){const stand=80;desired=dP>stand+25?bearing:dP<stand-25?bearing+Math.PI:bearing+Math.PI/2*a.orbitDir;}
-  else if(tgtShip && objective===tgtShip.pos){ const stand=a.standoff;
-    desired = dP>stand+45?bearing : dP<stand-45?bearing+Math.PI : bearing+Math.PI/2*a.orbitDir; }
-  else desired=bearing; // steam toward the enemy harbor
+  let desired = stand>0 ? (dP>stand+45?bearing:dP<stand-45?bearing+Math.PI:bearing+Math.PI/2*a.orbitDir) : bearing;
+  // occasional radio chatter
+  a.commsT-=dt; if(a.commsT<=0){ a.commsT=22+Math.random()*26; if(!a.def.support&&Math.random()<0.6){
+    if(a.role==='capture'&&a.capIsland&&dP<stand+30) comms(a.callsign,'Holding off '+(a.capIsland.name||'the island')+' — securing it.','#7fd0a0');
+    else if(tgtShip&&tgtShip.pos.distanceTo(a.pos)<300) comms(a.callsign,'Engaging enemy contact!','#a8d4f0'); } }
   a.turnT-=dt; if(a.turnT<=0){ a.jink=(Math.random()-0.5)*0.4; a.turnT=2.5+Math.random()*3; } desired+=a.jink||0;
   desired=steerClearOfShips(a,a.pos,a.def,desired);   // don't sail into friendly or enemy hulls
   let dh=desired-a.heading; while(dh>Math.PI)dh-=6.283; while(dh<-Math.PI)dh+=6.283;
@@ -3986,8 +4140,8 @@ function update(dt,t){
   updateShipModelProxies(dt);
   enemies.forEach(e=>updateEnemy(e,dt));
   for(let i=enemies.length-1;i>=0;i--){ if(enemies[i].dead){ destroyShipVisual(enemies[i]); enemies.splice(i,1); } }
-  const enemyReinforceRate=(0.18/2.25)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35); // another 1.5× slower with bosses in the theater
-  if(Math.random()<dt*enemyReinforceRate) spawnEnemy();
+  const enemyReinforceRate=(0.18/2.25)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1); // scaled by the theater's intensity
+  if(!(window._MAP&&window._MAP.ground) && Math.random()<dt*enemyReinforceRate) spawnEnemy();
   updateWarPacing(dt);   // escalating enemy offensives + rotating bonus objectives + parked-plane rearm
   // --- friendly fleet — identical NPC reinforcement and destruction rules ---
   allies.forEach(a=>updateAlly(a,dt));
@@ -4026,6 +4180,8 @@ function update(dt,t){
     if(f.life<=0) removeFxAt(i); }
   updatePrompt();
   updateClaude(dt);
+  updateComms(dt);
+  _distressT-=dt; if(_distressT<=0){ _distressT=4; checkDistress(); }
   updateCamera();
   updateAircraftAimAssist(dt);
 }
@@ -4394,8 +4550,9 @@ function updateSupportBuilding(u,dt){
   if(u.power){u.group.rotation.y+=Math.sin(t2*.5+u.pos.x)*dt*.002;return true;}
   if(u.command||u.bridge||u.sonar||u.airstrip||u.helipad||u.fuel)return true;
   if(u.barracks){
-    u.prodT=(u.prodT||8)-dt;if(u.prodT<=0&&isl){u.prodT=24;
-      const squads=islandStructures(isl,u.team,'soldier');if(squads.length<3){
+    const army=mapArmyProfile(u.team), cap=Math.max(1,Math.round(3*army.soldiers)), interval=Math.max(7,24/Math.sqrt(army.prod));
+    u.prodT=(u.prodT||Math.min(8,interval*.45))-dt;if(u.prodT<=0&&isl){u.prodT=interval;
+      const squads=islandStructures(isl,u.team,'soldier');if(squads.length<cap){
         const p=u.pos.clone().add(new THREE.Vector3((Math.random()-.5)*18,0,(Math.random()-.5)*18));p.y=2;
         buildAndPushLand('soldier',u.team,p,2,isl);}}
     return true;
@@ -4407,8 +4564,9 @@ function updateSupportBuilding(u,dt){
     if(drivingTank&&!drivingTank.onDeck&&drivingTank.island===isl&&drivingTank.pos.distanceTo(u.pos)<130){
       drivingTank.hp=Math.min(drivingTank.maxhp,drivingTank.hp+13*boost*dt);
       u.repairT=(u.repairT||0)+dt;if(u.workshop&&u.repairT>5){u.repairT=0;const damaged=Object.keys(drivingTank.parts||{}).filter(k=>drivingTank.parts[k]>0);if(damaged.length)drivingTank.parts[damaged[0]]--;}}
-    if(u.tankdepot&&isl){u.prodT=(u.prodT||20)-dt;if(u.prodT<=0){u.prodT=42;
-      if(islandStructures(isl,u.team,'tank').length<2){const p=u.pos.clone().add(new THREE.Vector3(18,0,0));p.y=2;buildAndPushLand('tank',u.team,p,2,isl);}}}
+    if(u.tankdepot&&isl){const army=mapArmyProfile(u.team), cap=Math.max(1,Math.round(2*army.tanks)), interval=Math.max(12,42/Math.sqrt(army.prod));
+      u.prodT=(u.prodT||Math.min(20,interval*.5))-dt;if(u.prodT<=0){u.prodT=interval;
+      if(islandStructures(isl,u.team,'tank').length<cap){const p=u.pos.clone().add(new THREE.Vector3(18,0,0));p.y=2;buildAndPushLand('tank',u.team,p,2,isl);}}}
     return true;
   }
   if(u.dock){shipsOf(u.team).forEach(s=>{if(s.pos.distanceTo(u.pos)<240){s.hp=Math.min(s.maxhp,s.hp+7*dt);if(s.compartments)repairCompartments(s,dt*2);}});return true;}
@@ -4892,7 +5050,7 @@ function endGame(win,msg){
   let unlockMsg='';
   if(win){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
       unlockMsg=`<br><br><span style="color:#7ff0a8">🗺 NEW THEATER UNLOCKED — ${nm.name}!</span>`; }
-    else if(currentMapIdx>=CAMPAIGN.length-1) unlockMsg='<br><br><span style="color:#ffd060">🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.</span>'; }
+    else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); } unlockMsg='<br><br><span style="color:#ffd060">🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.</span>'; } }
   if(document.pointerLockElement)document.exitPointerLock();
   document.getElementById('over').style.display='flex';
   const t=document.getElementById('overTitle');
