@@ -1298,20 +1298,18 @@ function buildLand(kind,team,pos,type){
     for(let i=-1;i<=1;i++){ const blk=mkBox(3.0,3.2,2.4,conc); blk.position.set(i*2.9,1.6,0); g.add(blk); }
     const cap=mkBox(9.4,0.5,2.6,SILVER(0x6a7078)); cap.position.y=3.4; g.add(cap);
     range=0; dmg=0; hp=1200; fireRate=99; g.userData.barrelLen=1; g.userData.wall=true;
-  } else { // soldier squad — visible five-man fireteam, not microscopic crumbs
+  } else { // single NPC soldier — one unit is one visible soldier
     const cloth=new THREE.MeshStandardMaterial({color:team===0?0x2f5f99:0x9b3636,roughness:0.92});
     const helmet=new THREE.MeshStandardMaterial({color:team===0?0x20394d:0x4a2525,roughness:0.9});
     const skin=new THREE.MeshStandardMaterial({color:0xc89a72,roughness:0.8}),gun=SILVER(0x22282c);
-    const pts=[[-1.25,0],[-.55,.55],[.25,-.25],[.95,.45],[1.55,-.1]];
-    pts.forEach((p,i)=>{
-      const torso=mkBox(0.46,1.0,0.34,cloth);torso.position.set(p[0],0.92,p[1]);g.add(torso);
-      const head=new THREE.Mesh(new THREE.SphereGeometry(0.18,10,7),skin);head.position.set(p[0],1.55,p[1]);g.add(head);
-      const pot=mkCyl(.19,.22,.12,helmet,10);pot.position.set(p[0],1.72,p[1]);g.add(pot);
-      const rifle=mkCyl(.035,.035,1.05,gun,6);rifle.rotation.x=Math.PI/2;rifle.rotation.z=i%2?.16:-.16;rifle.position.set(p[0]+.16,1.12,p[1]+.42);g.add(rifle);
-      const pack=mkBox(.32,.44,.14,helmet);pack.position.set(p[0],1.0,p[1]-.24);g.add(pack);
-    });
-    const mk=teamMarker(team,4.8);mk.position.set(0,3.2,0);g.add(mk);
-    range=115; dmg=7; hp=110; fireRate=0.48; g.userData.barrelLen=0.5;
+    const torso=mkBox(0.58,1.15,0.4,cloth);torso.position.set(0,0.98,0);g.add(torso);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(0.22,12,8),skin);head.position.set(0,1.72,0);g.add(head);
+    const pot=mkCyl(.24,.28,.14,helmet,12);pot.position.set(0,1.91,0);g.add(pot);
+    const rifle=mkCyl(.045,.045,1.35,gun,7);rifle.rotation.x=Math.PI/2;rifle.rotation.z=-.14;rifle.position.set(.24,1.18,.54);g.add(rifle);
+    const pack=mkBox(.42,.54,.18,helmet);pack.position.set(0,1.06,-.32);g.add(pack);
+    const l1=mkBox(.16,.65,.16,cloth),l2=mkBox(.16,.65,.16,cloth);l1.position.set(-.18,.34,0);l2.position.set(.18,.34,0);g.add(l1);g.add(l2);
+    const mk=teamMarker(team,4.8);mk.position.set(0,3.0,0);g.add(mk);
+    range=115; dmg=7; hp=55; fireRate=0.48; g.userData.barrelLen=0.5;
   }
   addIslandBuildingGraphicDetails(g,kind,team);
   scene.add(g);
@@ -2966,6 +2964,16 @@ function tankFireTick(tk,dt){
     tk.fireBurn=(tk.fireBurn||0)+dt; if(tk.fireBurn>6){ tk.fireBurn=0; tk.fire--; }
     if(tk.hp<=0){ destroyPlayerTank(tk,'Burned out!'); return; } }
 }
+function playerTankWaterTick(tk,dt){
+  if(!tk||tk.onDeck||tk.hp<=0)return;
+  const surf=footSurfaceAt(tk.pos||tk.group.position,0);
+  tk.island=surf?landIdentity(surf):null;
+  if(!surf){
+    tk.hp-=5*dt; tk.waterT=(tk.waterT||0)+dt;
+    if(tk.waterT>2){tk.waterT=0;flashPrompt('🌊 Tank taking water damage — get back to land!');}
+    if(tk.hp<=0){destroyPlayerTank(tk,'Flooded in deep water!');}
+  } else tk.waterT=0;
+}
 function updateTank(dt){
   const tk=drivingTank; const pr=tk.parts||(tk.parts=initTankParts());
   tankFireTick(tk,dt); if(drivingTank!==tk) return;          // cook-off/fire may have knocked us out
@@ -2994,11 +3002,12 @@ function updateTank(dt){
     wp=g.getWorldPosition(new THREE.Vector3());
   } else {
     tk.pos.x+=Math.sin(tk.heading)*mv*sp*dt; tk.pos.z+=Math.cos(tk.heading)*mv*sp*dt;
-    clampToIsland(tk.pos,tk.island,0.9); tk.pos.y=2.1;
+    const surf=footSurfaceAt(tk.pos,0); tk.island=surf?landIdentity(surf):null; tk.pos.y=surf?2.1:0.75;
     tk.group.position.copy(tk.pos); tk.group.rotation.y=tk.heading;
     if(tk.turret) tk.turret.rotation.y = camYaw.v - tk.heading;
     wp=tk.pos.clone();
   }
+  playerTankWaterTick(tk,dt); if(drivingTank!==tk)return;
   if(tk.fireCd>0) tk.fireCd-=dt;
   const canFire = pr.barrel<3 && pr.breech<3;                // destroyed barrel/breech = weapon dead
   if(mouseDownFire && tk.fireCd<=0 && canFire){
@@ -3039,9 +3048,10 @@ function updatePlayerTankAI(dt){
     const to=tgt.pos.clone().sub(wp), yaw=Math.atan2(to.x,to.z);
     if(tk.onDeck){ if(tk.turret)tk.turret.rotation.y=yaw-player.heading-tk.heading; }
     else{
-      if(tgt.unit&&tgt.d>110){const mv=tgt.pos.clone().sub(tk.pos);mv.y=0;if(mv.length()>1){mv.normalize();tk.heading=Math.atan2(mv.x,mv.z);tk.pos.addScaledVector(mv,(tk.speed||18)*.42*dt);if(tk.island)clampToIsland(tk.pos,tk.island,.9);tk.pos.y=2.1;tk.group.position.copy(tk.pos);tk.group.rotation.y=tk.heading;}}
+      if(tgt.unit&&tgt.d>110){const mv=tgt.pos.clone().sub(tk.pos);mv.y=0;if(mv.length()>1){mv.normalize();tk.heading=Math.atan2(mv.x,mv.z);tk.pos.addScaledVector(mv,(tk.speed||18)*.42*dt);const surf=footSurfaceAt(tk.pos,0);tk.island=surf?landIdentity(surf):null;tk.pos.y=surf?2.1:.75;tk.group.position.copy(tk.pos);tk.group.rotation.y=tk.heading;}}
       if(tk.turret)tk.turret.rotation.y=yaw-tk.heading;
     }
+    playerTankWaterTick(tk,dt); if(tk.hp<=0)return;
     if(tk.fireCd>0)tk.fireCd-=dt;
     if(tk.fireCd<=0&&tgt.d<(tk.onDeck?330:210)){
       tk.fireCd=tk.fireRate||1.2;
@@ -4855,8 +4865,17 @@ function moveLandUnitToward(u,target,dt,stop){
   if(!target||u.kind!=='tank'&&u.kind!=='soldier')return;
   const to=target.clone().sub(u.pos);to.y=0;const d=to.length();if(d<stop||d<1)return;
   const sp=u.kind==='tank'?(u.tank&&u.tank.speed?u.tank.speed*.7:10):7.2;
-  to.normalize();u.pos.addScaledVector(to,sp*dt);if(u.island)clampToIsland(u.pos,u.island,0.9);
-  u.pos.y=u.kind==='tank'?2:1.4;u.group.position.copy(u.pos);u.group.rotation.y=Math.atan2(to.x,to.z);
+  to.normalize();u.pos.addScaledVector(to,sp*dt);
+  const surf=footSurfaceAt(u.pos,0); u.island=surf?landIdentity(surf):null;
+  u.pos.y=surf?(u.kind==='tank'?2:1.4):(u.kind==='tank'?.7:.35);
+  u.group.position.copy(u.pos);u.group.rotation.y=Math.atan2(to.x,to.z)+(u.kind==='tank'?Math.PI:0);
+}
+function landTankWaterTick(u,dt){
+  if(u.kind!=='tank'||u.dead)return;
+  if(footSurfaceAt(u.pos,0)){u.waterT=0;return;}
+  u.hp-=4*dt;u.waterT=(u.waterT||0)+dt;
+  if(u.waterT>1.2){u.waterT=0;if(Math.random()<0.45)splashAt(u.pos.clone().setY(.4),.35);}
+  if(u.hp<=0)killLandUnit(u,true);
 }
 function groundAdvanceTarget(u,foe){
   const command=landUnits.find(x=>!x.dead&&x.team===foe&&x.kind==='command')||landUnits.find(x=>!x.dead&&x.team===foe);
@@ -4866,6 +4885,7 @@ function groundAdvanceTarget(u,foe){
 }
 function updateLandUnit(u,dt){
   if(u.dead) return;
+  landTankWaterTick(u,dt); if(u.dead)return;
   const foe=1-u.team;
   if(u.needsPower&&!structurePowered(u)){if(u.light)u.light.material.opacity=.08;return;}
   resupplyEmplacement(u,dt);
@@ -4952,7 +4972,7 @@ function updateLandUnit(u,dt){
   const to=target.clone().sub(u.pos); const dist=to.length();
   if(ground) moveLandUnitToward(u,target,dt,u.kind==='soldier'?38:55);
   else if((window._MAP&&window._MAP.ground)&&(u.kind==='soldier'||u.kind==='tank')){const adv=groundAdvanceTarget(u,foe);if(adv)moveLandUnitToward(u,adv,dt,90);}
-  if(u.turret){ const wantYaw=Math.atan2(to.x,to.z); u.turret.rotation.y += Math.max(-2*dt,Math.min(2*dt, ((wantYaw-u.turret.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)); }
+  if(u.turret){ const wantYaw=Math.atan2(to.x,to.z)-(u.kind==='tank'?u.group.rotation.y:0); u.turret.rotation.y += Math.max(-2*dt,Math.min(2*dt, ((wantYaw-u.turret.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)); }
   u.fireT-=dt;
   if(u.fireT<=0 && dist<u.range){ u.fireT=u.fireRate*reloadFactor(u)*(0.8+Math.random()*0.5);
     const from=u.pos.clone().add(new THREE.Vector3(0,u.kind==='coastal'?3:1.7,0));
