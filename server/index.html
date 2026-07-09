@@ -2874,8 +2874,18 @@ function buildDeckTank(localPos, type){
     spg:T.spg, splash:T.splash||6, shellSpd:T.shellSpd||130,
     hp:T.hp, maxhp:T.hp, sloped:!!T.sloped, parts:initTankParts(), fire:0, cook:0 });
 }
+function buildGroundPlayerTank(worldPos,type,isl){
+  const u=buildLand('tank',0,worldPos.clone(),type); const T=u.tank||TANKS.sherman;
+  u.group.position.copy(worldPos); u.group.rotation.y=camYaw.v;
+  playerTanks.push({ group:u.group, heading:camYaw.v, onDeck:false, pos:worldPos.clone(), island:isl||islandOfPos(worldPos), fireCd:0, turret:u.turret, barrelLen:u.barrelLen||3,
+    name:T.name, dmg:T.dmg, fireRate:T.fireRate, speed:T.speed, turn:T.turn,
+    spg:T.spg, splash:T.splash||6, shellSpd:T.shellSpd||130,
+    hp:T.hp, maxhp:T.hp, sloped:!!T.sloped, parts:initTankParts(), fire:0, cook:0 });
+}
 function nearestDeckTank(){ let b=null,bd=7; playerTanks.forEach(tk=>{ if(!tk.onDeck)return;
   const d=Math.hypot(walkPos.x-tk.group.position.x, walkPos.z-tk.group.position.z); if(d<bd){bd=d;b=tk;} }); return b; }
+function nearestFieldTank(){ let b=null,bd=8; if(!onFoot)return null;
+  playerTanks.forEach(tk=>{ if(tk.onDeck||tk.hp<=0)return; const p=tk.pos||tk.group.position, d=Math.hypot(footPos.x-p.x,footPos.z-p.z); if(d<bd){bd=d;b=tk;} }); return b; }
 function mountTank(tk){ drivingTank=tk; onFoot=false;
   camYaw.v = tk.onDeck ? (player.heading + tk.heading) : tk.heading; camPitch.v=0.08;
   flashPrompt('Crewing the '+(tk.name||'tank')+' — WASD drive · Mouse aim · Click fire · E to dismount.'); updateMode(); }
@@ -3708,7 +3718,8 @@ function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot 
 function toggleMan(){
   if(phase!=='play'||shopOpen||harborOpen) return;
   if(drivingTank){ dismountTank(); return; }
-  if(onFoot){ flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
+  if(onFoot){ const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
+    flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
   if(piloting){ if(playerShipLost&&piloting.phase==='fly'){ flashPrompt('No deck left to land on — press P to parachute, then reach harbor.'); return; }
     if(piloting.phase==='fly') startLanding(); else if(piloting.phase==='landing'){ piloting.phase='fly'; flashPrompt('Landing aborted — climb away.'); updateMode(); } return; }
   if(driving){ stopDrive(); return; }
@@ -3738,6 +3749,17 @@ function buyPlane(id){
 function buyTank(id){
   const T=TANKS[id]; const cost=priceOf(T.cost);
   if(money<cost){ flashPrompt('Not enough funds'); return; }
+  if(landCampaignMode){
+    const surf=footSurfaceAt(footPos,0), isl=landIdentity(surf)||footLand;
+    if(!onFoot||!isl){ flashPrompt('Stand on dry friendly ground to call in a tank'); return; }
+    const side=new THREE.Vector3(Math.cos(camYaw.v),0,-Math.sin(camYaw.v));
+    const p=footPos.clone().add(side.multiplyScalar(8)).add(new THREE.Vector3(0,0,Math.random()*4-2));
+    clampToIsland(p,isl,0.82); p.y=2.1;
+    if(playerTanks.some(tk=>!tk.onDeck&&tk.hp>0&&(tk.pos||tk.group.position).distanceTo(p)<7)){ flashPrompt('Too crowded for a tank drop — move a few steps'); return; }
+    money-=cost; buildGroundPlayerTank(p,id,isl);
+    refreshShop(); updateHUD(); sfxClick(); flashPrompt(T.name+' delivered beside you — press E near it to crew it');
+    return;
+  }
   const spot=tankSpots.find(s=>!s.taken);
   if(!spot){ flashPrompt('No free deck slot — a bigger ship carries more tanks'); return; }
   money-=cost;
@@ -5105,9 +5127,9 @@ function updatePrompt(){
   else if(capIsl){ msg=capIsl.contested?'🏝 '+capIsl.name.toUpperCase()+' CONTESTED — clear enemy ships and defenders':
       capIsl.captureTeam===0?'🏝 SECURING '+capIsl.name.toUpperCase()+' — '+Math.floor(capIsl.capture/ISLAND_CAPTURE_TIME*100)+'%':'🏝 HOLD POSITION TO CAPTURE '+capIsl.name.toUpperCase(); }
   else if(drivingTank){ const t=drivingTank; msg='Tank '+Math.max(0,Math.ceil(t.hp/t.maxhp*100))+'% — W/S drive · Click fire · R repair · '+(t.onDeck?'G land ashore':(playerShipLost?'Ship lost':'G re-embark'))+' · T view · E dismount'+tankPartSummary(t); }
-  else if(onFoot){ const near=!landCampaignMode&&Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<player.build.halfLen+18, hp=' · HP '+Math.ceil(footHP)+'%';
+  else if(onFoot){ const near=!landCampaignMode&&Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<player.build.halfLen+18, hp=' · HP '+Math.ceil(footHP)+'%', ftk=nearestFieldTank();
     if(playerShipLost) msg=(nearFriendlyHarborForReplacement()?'Harbor reached — press P for a replacement ship':'Ship lost — swim/walk back to your harbor')+hp+' · WASD '+(footLand?'walk':'swim')+' · Click: '+(HANDHELD[equippedGun]||HANDHELD.pistol).name;
-    else msg=(landCampaignMode?'Airborne assault':(footLand?'Ashore':'Swimming'))+hp+' — WASD '+(footLand?'walk':'swim')+' · Click: '+(HANDHELD[equippedGun]||HANDHELD.pistol).name+' · Q switch'+(footLand?' · B build':'') + (near?'   ·   G re-board':''); }
+    else msg=(ftk?'Press E to crew '+(ftk.name||'tank')+' · ':'')+(landCampaignMode?'Airborne assault':(footLand?'Ashore':'Swimming'))+hp+' — WASD '+(footLand?'walk':'swim')+' · Click: '+(HANDHELD[equippedGun]||HANDHELD.pistol).name+' · Q switch'+(footLand?' · B build':'') + (near?'   ·   G re-board':''); }
   else if(driving){ msg='Steering — W/S throttle · A/D rudder' + (player.def.kind==='sub'?'   ·   C dive/surface':'') + '   ·   T view   ·   E to step away'; }
   else if(piloting){
     if(piloting.phase==='takeoff') msg='Taking off…';
