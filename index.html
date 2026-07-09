@@ -216,6 +216,8 @@ function trText(s){ if(!isZh()||!s||typeof s!=='string') return s;
   else if(typeof ZH_PATTERNS!=='undefined'){ for(const p of ZH_PATTERNS){ const m=s.match(p.re); if(m){ out=p.out(m); break; } } }
   _trK=s; _trV=out; return out; }
 function catTr(zh,id,field,en){ if(!isZh()||!zh) return en; const d=zh[id]; return (d&&d[field])||en; }
+function trRank(n){ if(!isZh()) return n; return (typeof RANKS_ZH!=='undefined'&&RANKS_ZH[n])||trName(n); }  // 'Commander' means 中校 as a rank, 指挥官 as tank crew
+let menuSubEn=null;   // last contextual respawn/refusal message shown in #menu .sub — survives language switches
 function setLang(l){ if(l===I18N.lang)return; I18N.lang=l; NAME_ZH_CI=null; _trK=null; _trV=null;
   try{localStorage.setItem('ironTideLang',l);}catch(e){} refreshLanguage(); }
 
@@ -2240,7 +2242,7 @@ function updateWarPacing(dt){
   if(!el){ const parent=document.getElementById('objective');
     if(parent){ el=document.createElement('div'); el.id='sideob';
       el.style.cssText='margin-top:3px;font-size:11px;color:#ffd060;letter-spacing:1px;'; parent.appendChild(el); } }
-  if(el) el.textContent = sideOb ? ('★ '+sideOb.label+'  '+Math.min(sideOb.goal,sideObProgress())+'/'+sideOb.goal+' · '+Math.ceil(sideOb.t)+'s · $'+sideOb.pay) : '';
+  if(el) el.textContent = sideOb ? ('★ '+trText(sideOb.label)+'  '+Math.min(sideOb.goal,sideObProgress())+'/'+sideOb.goal+' · '+Math.ceil(sideOb.t)+'s · $'+sideOb.pay) : '';
 }
 function sideObProgress(){ if(!sideOb) return 0;
   return sideOb.kind==='sink'?sunk-sideOb.base : sideOb.kind==='planes'?sessPlanes-sideOb.base : controlledIslandCount(0)-sideOb.base; }
@@ -2283,6 +2285,7 @@ function initClaude(){
     if(claudeHidden){ claudeHidden=false; bb.style.display='block'; }
     claudeT=14; claudeLastMsg=''; claudeSay(nextClaudeTip()); };
   document.getElementById('claudeX').onclick=()=>{ claudeHidden=true; document.getElementById('claudeBubble').style.display='none'; };
+  if(claudeHidden) document.getElementById('claudeBubble').style.display='none';   // stay dismissed across re-inits (e.g. language switch)
 }
 function nextClaudeTip(){
   // urgent, situation-aware advice first
@@ -2537,11 +2540,11 @@ function buildMenu(){
     const r=careerRank(), nx=nextRank(), d=document.createElement('div');
     d.id='career';
     d.style.cssText='text-align:center;margin:-8px 0 14px;font-size:12px;color:#7e93a8;letter-spacing:1px;';
-    d.innerHTML=`<span style="color:#ffd060">⚓ ${isZh()?trName(r.name):r.name.toUpperCase()}</span>`+
+    d.innerHTML=`<span style="color:#ffd060">⚓ ${isZh()?trRank(r.name):r.name.toUpperCase()}</span>`+
       (r.perk?` <span style="color:#7fd0a0">${T('+'+Math.round(r.perk*100)+'% starting funds','初始资金 +'+Math.round(r.perk*100)+'%')}</span>`:'')+
       ` &nbsp;·&nbsp; `+T(`${career.sunk} ships · ${career.planes} aircraft · ${career.islands} islands · ${career.wins}W/${career.losses}L`,
         `击沉 ${career.sunk} · 飞机 ${career.planes} · 岛屿 ${career.islands} · ${career.wins}胜/${career.losses}负`)+
-      (nx?` &nbsp;·&nbsp; <span style="color:#5f7a90">${T(careerScore()+'/'+nx.score+' to '+nx.name,careerScore()+'/'+nx.score+' 分升'+trName(nx.name))}</span>`:'');
+      (nx?` &nbsp;·&nbsp; <span style="color:#5f7a90">${T(careerScore()+'/'+nx.score+' to '+nx.name,careerScore()+'/'+nx.score+' 分升'+trRank(nx.name))}</span>`:'');
     sub.after(d);
   }
   buildCampaignPicker();
@@ -2673,7 +2676,8 @@ function startGame(shipId){
 }
 function chooseShip(shipId){
   if(phase==='respawn'&&shipId==='boss'&&friendlyBossUsed){
-    const sub=document.querySelector('#menu .sub');if(sub)sub.textContent=trText('The Leviathan was a one-life flagship and cannot be deployed again. Choose another ship.');
+    menuSubEn='The Leviathan was a one-life flagship and cannot be deployed again. Choose another ship.';
+    const sub=document.querySelector('#menu .sub');if(sub)sub.textContent=trText(menuSubEn);
     return;
   }
   if(phase==='respawn') respawnPlayer(shipId); else startGame(shipId);
@@ -2691,7 +2695,8 @@ function showRespawnMenu(msg){
   mouseDownFire=false;
   if(document.pointerLockElement) document.exitPointerLock();
   const sub=document.querySelector('#menu .sub');
-  if(sub) sub.textContent=trText(msg||'Pick a replacement. It redeploys from your harbor.');
+  menuSubEn=msg||'Pick a replacement. It redeploys from your harbor.';
+  if(sub) sub.textContent=trText(menuSubEn);
   document.getElementById('menu').style.display='flex';
   updateMode();
 }
@@ -2963,7 +2968,7 @@ function tankLandToggle(){
 const TPART_NAME={ trackL:'Left track', trackR:'Right track', engine:'Engine', trans:'Transmission', turret:'Turret ring', barrel:'Gun barrel', breech:'Breech', optics:'Optics', ammo:'Ammo rack', fuel:'Fuel tank', driver:'Driver', gunner:'Gunner', loader:'Loader', commander:'Commander' };
 function initTankParts(){ return { trackL:0,trackR:0,engine:0,trans:0,turret:0,barrel:0,breech:0,optics:0,ammo:0,fuel:0,driver:0,gunner:0,loader:0,commander:0 }; }
 function tankWP(tk){ return tk.onDeck?tk.group.getWorldPosition(new THREE.Vector3()):(tk.pos||tk.group.position).clone(); }
-function tankPartSummary(tk){ const pr=tk.parts; if(!pr) return ''; const s=[]; for(const k in pr){ if(pr[k]>0) s.push(TPART_NAME[k].split(' ')[0]+(pr[k]>=3?'✖':pr[k]>=2?'‼':'!')); } return s.length?'  ·  🔧 '+s.join(' '):''; }
+function tankPartSummary(tk){ const pr=tk.parts; if(!pr) return ''; const s=[]; for(const k in pr){ if(pr[k]>0) s.push((isZh()?trName(TPART_NAME[k]):TPART_NAME[k].split(' ')[0])+(pr[k]>=3?'✖':pr[k]>=2?'‼':'!')); } return s.length?'  ·  🔧 '+s.join(' '):''; }
 function damageTankTrack(tk){ const pr=tk.parts; const t=(pr.trackL<=pr.trackR?'trackL':'trackR'); if(pr[t]<3){ pr[t]++; flashPrompt('⚠ '+TPART_NAME[t]+' '+PART_STATE[pr[t]]); } }
 function damageTankPart(tk,facing,top){ const pr=tk.parts;
   let pool = top?['turret','commander','optics','engine','ammo','loader']
@@ -3914,7 +3919,7 @@ function damagePlanePart(P){
     if(k==='weap'){ flashPrompt('Weapons knocked out!'); }
   }
 }
-function partSummary(P){ const pr=P.parts, s=[]; for(const k in pr){ if(pr[k]>0) s.push(PART_NAME[k].split(' ')[0]+(pr[k]>=3?'✖':pr[k]>=2?'‼':'!')); } return s.length?'  ·  🔧 '+s.join(' '):''; }
+function partSummary(P){ const pr=P.parts, s=[]; for(const k in pr){ if(pr[k]>0) s.push((isZh()?trName(PART_NAME[k]):PART_NAME[k].split(' ')[0])+(pr[k]>=3?'✖':pr[k]>=2?'‼':'!')); } return s.length?'  ·  🔧 '+s.join(' '):''; }
 function debrisBurst(pos,n){ for(let i=0;i<n;i++){ const d=mkBox(0.45,0.45,0.45,SILVER(0x6a7078)); d.position.copy(pos); scene.add(d);
   fx.push({mesh:d,life:1.1,fade:true,grav:true,vel:new THREE.Vector3((Math.random()-0.5)*16,Math.random()*9,(Math.random()-0.5)*16)}); } }
 function planeSmoke(P,dt){ const pr=P.parts;applyPlaneDamageVisual(P);
@@ -5370,12 +5375,12 @@ function endGame(win,msg){
   document.getElementById('over').style.display='flex';
   const t=document.getElementById('overTitle');
   t.textContent = win?T('VICTORY','胜利'):T('DEFEAT','战败'); t.style.color = win?'#7ff0a8':'#ff7a6a';
-  const promo = r.name!==oldRank.name ? T(`  ⭐ PROMOTED TO ${r.name.toUpperCase()}!`,`  ⭐ 晋升为${trName(r.name)}！`) : '';
+  const promo = r.name!==oldRank.name ? T(`  ⭐ PROMOTED TO ${r.name.toUpperCase()}!`,`  ⭐ 晋升为${trRank(r.name)}！`) : '';
   document.getElementById('overText').innerHTML =
     (msg?trText(msg)+'  ':'') + T(`You sank ${sunk} ${sunk===1?'ship':'ships'}. ($${money} in the bank.)`,`你击沉了 ${sunk} 艘敌舰。（存款 $${money}）`)+promo +
-    `<br><br><span style="color:#9fc6e8">${T('⚓ WAR RECORD — '+r.name+' (+'+Math.round(r.perk*100)+'% starting funds)','⚓ 战绩档案——'+trName(r.name)+'（初始资金 +'+Math.round(r.perk*100)+'%）')}</span>` +
+    `<br><br><span style="color:#9fc6e8">${T('⚓ WAR RECORD — '+r.name+' (+'+Math.round(r.perk*100)+'% starting funds)','⚓ 战绩档案——'+trRank(r.name)+'（初始资金 +'+Math.round(r.perk*100)+'%）')}</span>` +
     '<br>'+T(`Ships sunk ${career.sunk} · Aircraft ${career.planes} · Islands ${career.islands} · Leviathans ${career.bosses} · Wars ${career.wins}W/${career.losses}L`,`击沉军舰 ${career.sunk} · 击落飞机 ${career.planes} · 占领岛屿 ${career.islands} · 利维坦 ${career.bosses} · 战争 ${career.wins}胜/${career.losses}负`) +
-    (nx?`<br><span style="color:#6b7d92">${T('Next rank: '+nx.name+' at '+nx.score+' points (you have '+careerScore()+')','下一军衔：'+trName(nx.name)+'（需 '+nx.score+' 分，你有 '+careerScore()+' 分）')}</span>`:`<br><span style="color:#ffd060">${T('Highest rank achieved.','已达到最高军衔。')}</span>`)+
+    (nx?`<br><span style="color:#6b7d92">${T('Next rank: '+nx.name+' at '+nx.score+' points (you have '+careerScore()+')','下一军衔：'+trRank(nx.name)+'（需 '+nx.score+' 分，你有 '+careerScore()+' 分）')}</span>`:`<br><span style="color:#ffd060">${T('Highest rank achieved.','已达到最高军衔。')}</span>`)+
     unlockMsg;
 }
 
@@ -6380,6 +6385,14 @@ const ZH_PATTERNS = (() => {
   return rules;
 })();
 
+// ---------- i18n: review-pass supplements (strings the generated dictionaries missed) ----------
+Object.assign(ZH_EXACT,{
+  'Threat clear — resuming patrol.':'威胁解除——恢复巡逻。',
+  'Engaging enemy contact!':'发现敌舰，正在交战！',
+});
+ZH_PATTERNS.push({re:/^Holding off (.+) — securing it\.$/, out:m=>'在 '+trName(m[1])+' 附近掩护——正在夺取。'});
+Object.assign(NAME_ZH,{ 'FLAGSHIP':'旗舰', 'Command Center':'指挥中心' });
+
 // ---------- i18n: campaign helpers, static UI translation & language refresh ----------
 function campaignName(i){ const M=CAMPAIGN[i]; if(!M) return '';
   return (isZh()&&typeof CAMPAIGN_ZH!=='undefined'&&CAMPAIGN_ZH[i]&&CAMPAIGN_ZH[i].name)||M.name; }
@@ -6388,7 +6401,7 @@ function campaignTheme(i){ const M=CAMPAIGN[i]; if(!M) return '';
 function applyStaticI18n(){
   document.title=T('Iron Tide — Battleship Command','Iron Tide 钢铁怒潮——战舰指挥官');
   const set=(sel,html)=>{ const el=document.querySelector(sel); if(el) el.innerHTML=html; };
-  set('#menu .sub',T('Choose your command. Buy guns. Hold the line.','选择座舰，买炮装舰，守住防线。'));
+  set('#menu .sub',(phase==='respawn'&&menuSubEn)?trText(menuSubEn):T('Choose your command. Buy guns. Hold the line.','选择座舰，买炮装舰，守住防线。'));
   const obj=document.getElementById('objective');
   if(obj) obj.innerHTML='<div style="color:#ff9a8a;letter-spacing:1px;">'+T('DESTROY THE ENEMY HARBOR','摧毁敌方海港')+'</div>'+
     '<div style="display:flex;gap:14px;justify-content:center;margin-top:3px;">'+
