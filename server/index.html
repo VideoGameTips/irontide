@@ -1169,6 +1169,7 @@ function buildLand(kind,team,pos,type){
     const mant=mkBox(0.7,0.6,0.5,SILVER(0x44483a)); mant.position.z=T.turL/2; tur.add(mant);
     const barrel=mkCyl(T.barR,T.barR*1.1,T.barL,SILVER(0x9aa0a8)); barrel.rotation.x=Math.PI/2; barrel.position.z=T.turL/2+T.barL/2; tur.add(barrel);
     const flag=mkBox(0.1,0.7,0.5,new THREE.MeshStandardMaterial({color:tcol,emissive:tcol,emissiveIntensity:0.4})); flag.position.set(0,1.1,-T.turL/2); tur.add(flag);
+    const mk=teamMarker(team,6.2);mk.position.set(0,4.2,0);g.add(mk);
     // detail: commander cupola, coaxial MG, side fenders, exhaust, antenna
     const cup=mkCyl(0.34,0.36,0.32,body,10); cup.position.set(-T.turW*0.22,0.55,-T.turL*0.18); tur.add(cup);
     const hatch=mkCyl(0.3,0.3,0.06,SILVER(0x33372a),10); hatch.position.set(-T.turW*0.22,0.74,-T.turL*0.18); tur.add(hatch);
@@ -3204,7 +3205,12 @@ function sonarPing(){
 function updateFogOfWar(dt){
   sonarCooldown=Math.max(0,sonarCooldown-dt);sonarPulse=Math.max(0,sonarPulse-dt);
   enemies.forEach(e=>{if(e.build)e.build.group.visible=enemyDetected(e);});
-  landUnits.forEach(u=>{if(u.team===1&&u.group)u.group.visible=enemyDetectedAt(u.pos,1);});
+  landUnits.forEach(u=>{if(u.team===1&&u.group){
+    const sameIsland=onFoot&&footLand&&u.island===footLand;
+    const groundTheater=!!(window._MAP&&window._MAP.ground);
+    const close=groundTheater&&u.pos.distanceTo(activePlayerWorldPos())<1700;
+    u.group.visible=sameIsland||close||enemyDetectedAt(u.pos,groundTheater?1.8:1);
+  }});
   aiPlanes.forEach(p=>{if(p.team!==1)return;const seen=enemyDetectedAt(p.pos,1.15);p.group.visible=seen;if(p.marker)p.marker.visible=seen;});
 }
 function shipEngagingActivePlayer(s,p){
@@ -4838,7 +4844,8 @@ function incomingWarning(pos,team,life){
 }
 function nearestGroundCombatTarget(team,pos,maxR=220,island=null){
   const foe=1-team;let best=null,bd=maxR;
-  landUnits.forEach(u=>{if(u.dead||u.team!==foe)return;if(island&&u.island&&u.island!==island)return;
+  const groundTheater=!!(window._MAP&&window._MAP.ground);
+  landUnits.forEach(u=>{if(u.dead||u.team!==foe)return;if(!groundTheater&&island&&u.island&&u.island!==island)return;
     const d=u.pos.distanceTo(pos);if(d<bd){bd=d;best={kind:'land',unit:u,pos:u.pos.clone().setY(u.kind==='soldier'?1.4:2.3),d};}});
   if(team===1&&onFoot&&footHP>0){const d=footPos.distanceTo(pos);if(d<bd){bd=d;best={kind:'foot',pos:footPos.clone().setY(1.2),d};}}
   if(team===1&&drivingTank&&drivingTank.hp>0&&!drivingTank.onDeck){const d=drivingTank.pos.distanceTo(pos);if(d<bd){bd=d;best={kind:'playerTank',pos:drivingTank.pos.clone().setY(2.5),d};}}
@@ -4847,9 +4854,15 @@ function nearestGroundCombatTarget(team,pos,maxR=220,island=null){
 function moveLandUnitToward(u,target,dt,stop){
   if(!target||u.kind!=='tank'&&u.kind!=='soldier')return;
   const to=target.clone().sub(u.pos);to.y=0;const d=to.length();if(d<stop||d<1)return;
-  const sp=u.kind==='tank'?(u.tank&&u.tank.speed?u.tank.speed*.45:7.5):5.2;
+  const sp=u.kind==='tank'?(u.tank&&u.tank.speed?u.tank.speed*.7:10):7.2;
   to.normalize();u.pos.addScaledVector(to,sp*dt);if(u.island)clampToIsland(u.pos,u.island,0.9);
   u.pos.y=u.kind==='tank'?2:1.4;u.group.position.copy(u.pos);u.group.rotation.y=Math.atan2(to.x,to.z);
+}
+function groundAdvanceTarget(u,foe){
+  const command=landUnits.find(x=>!x.dead&&x.team===foe&&x.kind==='command')||landUnits.find(x=>!x.dead&&x.team===foe);
+  if(command)return command.pos.clone().setY(2);
+  const h=harborOf(foe);if(h)return h.pos.clone().setY(2);
+  return null;
 }
 function updateLandUnit(u,dt){
   if(u.dead) return;
@@ -4930,11 +4943,15 @@ function updateLandUnit(u,dt){
   }
   // coastal / artillery / tank / soldier — ground units now fight soldiers/tanks first, ships second
   const sh=nearestShipOf(foe,u.pos);
-  let target, tvel=null, ground=nearestGroundCombatTarget(u.team,u.pos,u.kind==='soldier'?u.range:u.range*1.15,u.island);
+  let target, tvel=null, ground=nearestGroundCombatTarget(u.team,u.pos,window._MAP&&window._MAP.ground?900:(u.kind==='soldier'?u.range:u.range*1.15),u.island);
   if(ground) target=ground.pos;
-  if(!target){ if(!sh) return; target=sh.pos.clone().setY((sh.def?sh.def.deckY:2)+1); tvel=sh.vel; }
+  if(!target){
+    if((window._MAP&&window._MAP.ground)&&(u.kind==='soldier'||u.kind==='tank')) target=groundAdvanceTarget(u,foe);
+    if(!target){ if(!sh) return; target=sh.pos.clone().setY((sh.def?sh.def.deckY:2)+1); tvel=sh.vel; }
+  }
   const to=target.clone().sub(u.pos); const dist=to.length();
-  if(ground) moveLandUnitToward(u,target,dt,u.kind==='soldier'?u.range*.72:u.range*.55);
+  if(ground) moveLandUnitToward(u,target,dt,u.kind==='soldier'?38:55);
+  else if((window._MAP&&window._MAP.ground)&&(u.kind==='soldier'||u.kind==='tank')){const adv=groundAdvanceTarget(u,foe);if(adv)moveLandUnitToward(u,adv,dt,90);}
   if(u.turret){ const wantYaw=Math.atan2(to.x,to.z); u.turret.rotation.y += Math.max(-2*dt,Math.min(2*dt, ((wantYaw-u.turret.rotation.y+Math.PI*3)%(Math.PI*2))-Math.PI)); }
   u.fireT-=dt;
   if(u.fireT<=0 && dist<u.range){ u.fireT=u.fireRate*reloadFactor(u)*(0.8+Math.random()*0.5);
