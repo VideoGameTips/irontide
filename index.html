@@ -2447,7 +2447,13 @@ addEventListener('keydown',e=>{
     return;
   }
   if(e.code==='Enter'&&!e.repeat){e.preventDefault();openChat();return;}
-  if(e.code==='Escape'&&tutIdx>=0) skipTutorial();
+  if(e.code==='Escape'){                                    // Esc closes an open panel first; only a bare Esc skips the tutorial
+    if(shopOpen){ toggleShop(); return; }
+    if(harborOpen){ toggleHarbor(); return; }
+    if(buildOpen){ toggleBuild(); return; }
+    if(tacticalOpen){ toggleTacticalMap(false); return; }
+    if(tutIdx>=0&&phase==='play') skipTutorial();
+  }
   keys[e.code]=1; if(e.code==='Tab'){ e.preventDefault(); toggleShop(); } if(e.code==='Space') e.preventDefault();
   if(e.code==='KeyF') tryPlace(); if(e.code==='KeyE') toggleMan(); if(e.code==='KeyG'){ if(drivingTank) tankLandToggle(); else toggleFoot(); }
   if(e.code==='KeyH') toggleHarbor(); if(e.code==='KeyM') sfxToggle(); if(e.code==='KeyC') toggleDive();
@@ -2623,17 +2629,18 @@ function makePlayerShip(shipId){
   const nT=def.len>70?4:def.len>48?3:2;
   for(let i=0;i<nT;i++) tankSpots.push({ pos:new THREE.Vector3(slots[i][0],dTop,slots[i][1]), taken:false });
   if(def.boss)installBossStarterGuns(build);
+  else if(def.kind==='sub') installStarterGuns(build,[WEAPONS.deckgun,WEAPONS.deckgun],[0,2]);   // skip mounts[1] — the sail top, where the periscope lives
   else installStarterGuns(build, def.len>60?[WEAPONS.deckgun,WEAPONS.deckgun,WEAPONS.aa]:[WEAPONS.deckgun,WEAPONS.deckgun]);
   walkPos.set(0, deckEyeY(), def.len*0.28); camYaw.v=player.heading; camPitch.v=0.04;
 }
 // every hull sails with free basic guns already mounted — autoGun fires them, so a
 // brand-new captain has firepower before ever opening the armory
-function installStarterGuns(build,defs){
-  const half=Math.floor(build.mounts.length/2), slots=[0,half,1,half+1];
+function installStarterGuns(build,defs,slotsOverride){
+  const half=Math.floor(build.mounts.length/2), slots=slotsOverride||[0,half,1,half+1];
   defs.forEach((w,i)=>{ const p=build.mounts[slots[i]]; if(!p) return;
     const t=buildTurret(w); t.position.copy(p); build.group.add(t);
     const gunner=buildSailor('gunner');gunner.scale.setScalar(.85);gunner.position.set(0,(w.size||1)*.35,-.45);(t.userData.yawG||t).add(gunner);
-    placed.push({def:w,group:t,yaw:0,pitch:.1,cd:0,gunner}); });
+    placed.push({def:w,group:t,yaw:0,pitch:.1,cd:0,gunner,free:true}); });   // free → scraps for $0
 }
 function friendlyCommandIsland(){
   let best=null, bz=-Infinity;
@@ -2689,7 +2696,7 @@ function startGame(shipId){
     startTutorial();       // first-ever battle walks through W → mouse → first kill → armory (no-op once completed)
   }
   const cv=document.getElementById('c');
-  cv.addEventListener('click',()=>{ sfxResume(); if(phase==='play' && !shopOpen && !harborOpen) cv.requestPointerLock(); });
+  cv.addEventListener('click',()=>{ sfxResume(); if(phase==='play' && !gamePaused()) cv.requestPointerLock(); });
   document.addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv){
     camYaw.v -= e.movementX*0.0023; camPitch.v -= e.movementY*0.0023;
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v)); }});
@@ -3751,7 +3758,7 @@ function deleteTurret(){   // X next to a deck gun scraps it for a half refund
   if(manning===pl) manning=null;
   destroyObject3D(pl.group);
   const i=placed.indexOf(pl); if(i>=0) placed.splice(i,1);
-  const refund=Math.round(priceOf(pl.def.cost)*0.5); money+=refund;
+  const refund=pl.free?0:Math.round(priceOf(pl.def.cost)*0.5); money+=refund;   // free starter guns refund nothing
   refreshShop(); updateHUD(); sfxClick(); flashPrompt('Scrapped '+pl.def.name+' (+$'+refund+')'); updateMode();
 }
 function nearestHelm(){ return (player.helm && flatDL(player.helm)<4.5) ? player.helm : null; }
@@ -3772,7 +3779,7 @@ function tryPlace(){
   let px,pz,mountPos=null;
   if(driving){                          // at the helm: F drops the new gun onto the next free hull mount
     mountPos=freeMountLocal(w);
-    if(!mountPos){ flashPrompt('No free mount — scrap a gun with X or pick a bigger hull'); return; }
+    if(!mountPos){ flashPrompt('All mounts are full — press E to step onto the deck, then F places it anywhere'); return; }
     px=mountPos.x; pz=mountPos.z;
   } else {
     // install a couple feet ahead of where you stand, on the deck (free placement anywhere)
@@ -5360,10 +5367,11 @@ function drawTacticalMap(){
     g.fillStyle=u.team===0?'#77ddff':'#ff6868';g.fillRect(x-6,y-6,12,12);
     if(sel){g.strokeStyle='#fff36d';g.lineWidth=3;g.beginPath();g.arc(x,y,12,0,Math.PI*2);g.stroke();}});
   const hint=document.getElementById('tacticalHint'),s=selectedNukeSilo;
-  hint.textContent=!s?T('No friendly R-36M silo exists. Build one on a controlled island.','我方还没有 R-36M 发射井。先在已控制的岛屿上建造一座。'):
+  hint.textContent=(!s?T('No friendly R-36M silo exists. Build one on a controlled island.','我方还没有 R-36M 发射井。先在已控制的岛屿上建造一座。'):
     !structurePowered(s)?T('Selected silo is OFFLINE — build or repair its island power station.','选中的发射井离线——需要修好或建造岛上的发电站。'):
     s.fireT>0?T('R-36M reloading: '+Math.ceil(s.fireT)+' seconds. Select another silo or press N to close.','R-36M 装填中：还需 '+Math.ceil(s.fireT)+' 秒。可选择其他发射井，或按 N 关闭。'):
-    T('R-36M READY — click a target area. Harbors and their exclusion zones cannot be targeted.','R-36M 就绪——点击目标区域。海港及其禁区无法作为目标。');
+    T('R-36M READY — click a target area. Harbors and their exclusion zones cannot be targeted.','R-36M 就绪——点击目标区域。海港及其禁区无法作为目标。'))
+    +T('  ·  ⏸ war paused while this map is open','  ·  ⏸ 地图打开时战斗暂停');
 }
 function tacticalMapClick(e){
   if(!tacticalOpen)return;
@@ -5432,16 +5440,18 @@ let tutSteps=null, tutIdx=-1, tutHold=0, tutCamBase=0, tutPlacedBase=0, tutSunkB
 function tutorialDone(){ try{ return localStorage.getItem(TUT_DONE_KEY)==='1'; }catch(e){ return false; } }
 function startTutorial(){
   if(tutorialDone()||landCampaignMode) return;
-  tutCamBase=camYaw.v; tutPlacedBase=placed.length; tutSunkBase=sunk;
-  tutSteps=[
+  tutSteps=[   // enter() re-baselines each step when it becomes active, so dying/respawning mid-tutorial can't skip or double a step
     { text:()=>T('You are at the helm — hold W to sail forward','你已经在舵位上——按住 W，军舰就会前进'), done:()=>player&&player.throttle>0.3 },
-    { text:()=>T('Move the mouse to look around · A/D turn the ship','动一动鼠标看看四周 · A/D 让军舰转向'), done:()=>Math.abs(camYaw.v-tutCamBase)>0.45 },
-    { text:()=>T('Your deck guns aim and fire by themselves — sail toward the red enemy ships!','你的甲板炮会自己瞄准开火——朝红色敌舰开过去吧！'), done:()=>sunk>tutSunkBase },
+    { enter:()=>tutCamBase=camYaw.v,
+      text:()=>T('Move the mouse to look around · A/D turn the ship','动一动鼠标看看四周 · A/D 让军舰转向'), done:()=>Math.abs(camYaw.v-tutCamBase)>0.45 },
+    { enter:()=>tutSunkBase=sunk,
+      text:()=>T('Your deck guns aim and fire by themselves — sail toward the red enemy ships!','你的甲板炮会自己瞄准开火——朝红色敌舰开过去吧！'), done:()=>sunk>tutSunkBase },
     { text:()=>T('Enemy sunk — that paid a bounty! Press Tab to open the Armory','击沉敌舰，赚到赏金了！按 Tab 打开军械库'), done:()=>shopOpen },
-    { text:()=>T('Click a weapon to select it, Tab to close the shop, then press F to mount it at your feet','点选一门武器，按 Tab 关闭商店，再按 F 把它装在脚下'), done:()=>placed.length>tutPlacedBase },
+    { enter:()=>tutPlacedBase=placed.length,
+      text:()=>T('Click a weapon to select it, Tab to close the shop, then press F to mount it','点选一门武器，按 Tab 关闭商店，再按 F 装上新炮'), done:()=>placed.length>tutPlacedBase },
     { text:()=>T('Perfect, Captain! Now sink the enemy harbor to win the war','太棒了，舰长！现在去击沉敌方海港，赢下这场战争'), hold:6 },
   ];
-  tutIdx=0; tutHold=0; _tutLast=''; tutShow();
+  tutIdx=0; tutHold=0; _tutLast=''; if(tutSteps[0].enter)tutSteps[0].enter(); tutShow();
 }
 function tutShow(){
   const el=document.getElementById('tut'); if(!el) return;
@@ -5456,7 +5466,9 @@ function updateTutorial(dt){
   if(tutIdx<0||!tutSteps) return;
   const s=tutSteps[tutIdx];
   if(s.hold!=null){ tutHold+=dt; if(tutHold>=s.hold){ skipTutorial(); return; } }
-  else if(s.done&&s.done()){ tutIdx++; tutHold=0; if(tutIdx>=tutSteps.length){ skipTutorial(); return; } }
+  else if(s.done&&s.done()){ tutIdx++; tutHold=0;
+    if(tutIdx>=tutSteps.length){ skipTutorial(); return; }
+    if(tutSteps[tutIdx].enter) tutSteps[tutIdx].enter(); }
   tutShow();
 }
 
@@ -5466,7 +5478,7 @@ function loop(){
   const dt=Math.min(0.05, clock.getDelta());
   if(phase==='play'){
     if(!gamePaused()){ t2+=dt; update(dt,t2); updateHUD(); }
-    else sfxEngine();                       // ramp engine/wind layers down while the war is frozen
+    else { sfxEngine(); updatePrompt(); }   // audio ramps down; prompt feedback (e.g. 'Not enough funds') stays live in menus
     updateTutorial(dt);                     // tutorial keeps ticking so menu steps can complete while paused
     if(chatOpen&&_chatOpenAt&&performance.now()-_chatOpenAt>9000){
       const ci=document.getElementById('chatinput');
@@ -6472,7 +6484,7 @@ const ZH_PATTERNS = (() => {
 Object.assign(ZH_EXACT,{
   'Threat clear — resuming patrol.':'威胁解除——恢复巡逻。',
   'Engaging enemy contact!':'发现敌舰，正在交战！',
-  'No free mount — scrap a gun with X or pick a bigger hull':'没有空炮位了——按 X 拆掉一门旧炮，或者换更大的船',
+  'All mounts are full — press E to step onto the deck, then F places it anywhere':'炮位都装满了——按 E 走上甲板，再按 F 就能装在任意空地',
 });
 ZH_PATTERNS.push({re:/^Holding off (.+) — securing it\.$/, out:m=>'在 '+trName(m[1])+' 附近掩护——正在夺取。'});
 Object.assign(NAME_ZH,{ 'FLAGSHIP':'旗舰', 'Command Center':'指挥中心' });
