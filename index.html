@@ -189,6 +189,33 @@
 //  IRON TIDE — first-person battleship command (single-file Three.js)
 // =====================================================================
 
+// ---------- i18n core: 中文/English ----------
+// English is the source of truth everywhere in the code. Chinese arrives two ways:
+//  · trText(): boundary translation of full prompt/chat strings (exact match, then
+//    regex patterns for composed strings) — game logic call sites stay untouched.
+//  · T(en,zh) / catTr(): inline pairs for HUD & menu builders and catalog entries.
+// Dictionaries (ZH_EXACT / ZH_PATTERNS / *_ZH / NAME_ZH) live near the end of this
+// file; they are only read at runtime, after the whole script has been parsed.
+const I18N={lang:'en'};
+try{ const saved=localStorage.getItem('ironTideLang');
+  I18N.lang=(saved==='zh'||saved==='en')?saved:(((navigator.language||'').toLowerCase().indexOf('zh')===0)?'zh':'en');
+}catch(e){}
+const isZh=()=>I18N.lang==='zh';
+const T=(en,zh)=>(isZh()&&zh!=null)?zh:en;
+let NAME_ZH_CI=null;
+function trName(n){ if(!isZh()||n==null) return n; const s=String(n);
+  if(typeof NAME_ZH==='undefined') return s;
+  if(NAME_ZH[s]) return NAME_ZH[s];
+  if(!NAME_ZH_CI){ NAME_ZH_CI={}; for(const k in NAME_ZH) NAME_ZH_CI[k.toUpperCase()]=NAME_ZH[k]; }
+  return NAME_ZH_CI[s.toUpperCase()]||s; }
+function trText(s){ if(!isZh()||!s||typeof s!=='string') return s;
+  if(typeof ZH_EXACT!=='undefined'&&ZH_EXACT[s]) return ZH_EXACT[s];
+  if(typeof ZH_PATTERNS!=='undefined') for(const p of ZH_PATTERNS){ const m=s.match(p.re); if(m) return p.out(m); }
+  return s; }
+function catTr(zh,id,field,en){ if(!isZh()||!zh) return en; const d=zh[id]; return (d&&d[field])||en; }
+function setLang(l){ if(l===I18N.lang)return; I18N.lang=l; NAME_ZH_CI=null;
+  try{localStorage.setItem('ironTideLang',l);}catch(e){} refreshLanguage(); }
+
 // ---------- catalogs ----------
 const SHIPS = {
   scout:      { name:'Scout Corvette', cls:'Fast Picket',  len:36, beam:7,  depth:3.5, deckY:2.6, hp:150, kind:'surface', mounts:4,
@@ -1982,7 +2009,7 @@ function updateComms(dt){ if(!_commsLines.length){ const el=document.getElementB
   commsInit(); const el=document.getElementById('comms'); if(!el)return; let html='';
   for(let i=_commsLines.length-1;i>=0;i--){ const L=_commsLines[i]; L.t-=dt; if(L.t<=0){ _commsLines.splice(i,1); continue; } }
   _commsLines.forEach(L=>{ const o=Math.min(1,L.t/2.2).toFixed(2);
-    html+='<div style="opacity:'+o+';color:'+L.col+'"><span style="color:#ffd060">📻 '+L.from+':</span> '+L.msg+'</div>'; });
+    html+='<div style="opacity:'+o+';color:'+L.col+'"><span style="color:#ffd060">📻 '+trName(L.from)+':</span> '+trText(L.msg)+'</div>'; });
   el.innerHTML=html; }
 function nearestCaptureIsland(pos){ let b=null,bd=1e9; islands.forEach(i=>{ if(!i.capturable||i.owner===0||i.r<70)return; const d=i.pos.distanceTo(pos); if(d<bd){bd=d;b=i;} }); return b; }
 function assignAllyRole(a,role){ if(a.role===role)return; a.role=role;
@@ -2237,13 +2264,13 @@ const CLAUDE_TIPS=[
   'Submarines dive with C — invisible to guns, but torpedoes only.',
   'Sinking the enemy harbor wins the war — but islands feed your economy first.',
 ];
-function claudeSay(msg){ const b=document.getElementById('claudeTxt'); if(!b||msg===claudeLastMsg) return; claudeLastMsg=msg; b.textContent=msg; }
+function claudeSay(msg){ const b=document.getElementById('claudeTxt'); if(!b||msg===claudeLastMsg) return; claudeLastMsg=msg; b.textContent=trText(msg); }
 function initClaude(){
   if(document.getElementById('claude')) return;
   const hud=document.getElementById('hud'); if(!hud) return;
   const d=document.createElement('div'); d.id='claude';
   d.innerHTML='<canvas id="claudeIcon" width="11" height="8"></canvas>'+
-    '<div id="claudeBubble"><span id="claudeX">✕</span><b>CLAUDE · SHIP’S AI</b><span id="claudeTxt">Welcome aboard, Captain! Click me anytime for advice.</span></div>';
+    '<div id="claudeBubble"><span id="claudeX">✕</span><b>'+T('CLAUDE · SHIP’S AI','CLAUDE · 舰载 AI')+'</b><span id="claudeTxt">'+T('Welcome aboard, Captain! Click me anytime for advice.','欢迎登舰，舰长！随时点我获取建议。')+'</span></div>';
   hud.appendChild(d);
   const px=['..ooooooo..','..ooooooo..','o.oeoooeo.o','ooooooooooo','..ooooooo..','..o.o.o.o..','..o.o.o.o..'];
   const g=document.getElementById('claudeIcon').getContext('2d');
@@ -2267,7 +2294,8 @@ function nextClaudeTip(){
   if(placed.length===0&&money>=300&&!piloting&&!drivingTank&&!onFoot) return 'No guns mounted yet! Tab → pick a weapon → F on deck to install it.';
   if(typeof sideOb!=='undefined'&&sideOb) return '★ Objective: '+sideOb.label.replace('BONUS: ','')+' — pays $'+sideOb.pay+'.';
   if(money>2600&&Math.random()<0.5) return '$'+money+' in the bunkers — Tab for guns, H for harbor upgrades.';
-  claudeIdx=(claudeIdx+1)%CLAUDE_TIPS.length; return CLAUDE_TIPS[claudeIdx];
+  claudeIdx=(claudeIdx+1)%CLAUDE_TIPS.length;
+  return (isZh()&&typeof CLAUDE_TIPS_ZH!=='undefined'&&CLAUDE_TIPS_ZH[claudeIdx])||CLAUDE_TIPS[claudeIdx];
 }
 function updateClaude(dt){
   if(phase!=='play') return;
@@ -2358,7 +2386,7 @@ function backslashMoneyCode(){
 let chatOpen=false,chatWelcomed=false;
 function chatMessage(text,type='system'){
   const log=document.getElementById('chatlog');if(!log)return;
-  const line=document.createElement('div');line.className='chatline '+type;line.textContent=text;log.appendChild(line);
+  const line=document.createElement('div');line.className='chatline '+type;line.textContent=trText(text);log.appendChild(line);
   while(log.children.length>30)log.firstChild.remove();log.scrollTop=log.scrollHeight;
 }
 function openChat(){
@@ -2448,15 +2476,14 @@ function campaignMapHTML(){
     s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="'+R+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(cur?3:2)+'"/>';
     s+='<text x="'+p.x+'" y="'+p.y+'" text-anchor="middle" dominant-baseline="central" font-size="'+(label.length>1?12:14)+'" font-weight="700" fill="'+txtc+'" style="font-family:inherit">'+label+'</text>';
     if(cur) s+='<text x="'+p.x+'" y="'+(p.y-R-7)+'" text-anchor="middle" font-size="15">⚓</text>';
-    s+='<circle class="cmnode" data-idx="'+i+'" data-locked="'+(locked?1:0)+'" cx="'+p.x+'" cy="'+p.y+'" r="'+(R+7)+'" fill="transparent"><title>'+(i+1)+'. '+M.name+(locked?' — locked':' — '+M.theme)+'</title></circle>';
+    s+='<circle class="cmnode" data-idx="'+i+'" data-locked="'+(locked?1:0)+'" cx="'+p.x+'" cy="'+p.y+'" r="'+(R+7)+'" fill="transparent"><title>'+(i+1)+'. '+campaignName(i)+(locked?T(' — locked',' — 未解锁'):' — '+campaignTheme(i))+'</title></circle>';
     s+='</g>';
   }
   s+='</svg>';
-  const cur=CAMPAIGN[currentMapIdx]||CAMPAIGN[0];
   const cap='<div style="text-align:center;margin:8px 0 2px;font-size:12px;color:#9fc6e8;letter-spacing:1px">'+
-    '<span style="color:#ffd060">⚓ THEATER '+(currentMapIdx+1)+' / '+N+'</span> — '+cur.name+
-    ' &nbsp;·&nbsp; <span style="color:#8ff0b4">✓ '+beaten+' secured</span> &nbsp;·&nbsp; '+
-    (unlocked<N?'<span style="color:#7e93a8">'+(N-unlocked)+' locked</span>':'<span style="color:#7e93a8">all theaters unlocked</span>')+'</div>';
+    '<span style="color:#ffd060">'+T('⚓ THEATER '+(currentMapIdx+1)+' / '+N,'⚓ 战区 '+(currentMapIdx+1)+' / '+N)+'</span> — '+campaignName(currentMapIdx)+
+    ' &nbsp;·&nbsp; <span style="color:#8ff0b4">'+T('✓ '+beaten+' secured','✓ 已攻克 '+beaten)+'</span> &nbsp;·&nbsp; '+
+    (unlocked<N?'<span style="color:#7e93a8">'+T((N-unlocked)+' locked','未解锁 '+(N-unlocked))+'</span>':'<span style="color:#7e93a8">'+T('all theaters unlocked','全部战区已解锁')+'</span>')+'</div>';
   return s+cap;
 }
 function buildCampaignPicker(){
@@ -2465,10 +2492,10 @@ function buildCampaignPicker(){
   let box=document.getElementById('maps');
   if(!box){ box=document.createElement('div'); box.id='maps';
     box.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:0 24px 4px;';
-    const h=document.createElement('div'); h.textContent='CAMPAIGN VOYAGE';
+    const h=document.createElement('div'); h.id='mapsHeader'; h.textContent=T('CAMPAIGN VOYAGE','战役航程');
     h.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:2px 0 10px;';
     box.appendChild(h); ships.parentNode.insertBefore(box, ships);
-    const sh=document.createElement('div'); sh.textContent='— CHOOSE YOUR COMMAND —';
+    const sh=document.createElement('div'); sh.id='menuDivider'; sh.textContent=T('— CHOOSE YOUR COMMAND —','— 选择你的座舰 —');
     sh.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:12px 0 6px;';
     ships.parentNode.insertBefore(sh, ships);
   }
@@ -2482,38 +2509,50 @@ function buildCampaignPicker(){
     const c=document.createElement('div'); c.className='mapcard';
     c.style.cssText='width:152px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:'+(locked?'default':'pointer')+
       ';border:1px solid '+(sel?'#5fd0ff':locked?'#22303c':'#21384e')+';background:'+(sel?'#13283a':'#101a24')+';opacity:'+(locked?0.45:1)+';';
-    c.innerHTML='<div style="color:'+(locked?'#5f7a90':'#cfe6fb')+';font-weight:600;font-size:13px">'+(locked?'🔒 ':'')+(i+1)+'. '+M.name+'</div>'+
-      '<div style="color:#7e93a8;margin-top:4px;line-height:1.4">'+(locked?'Win the previous theater to unlock.':M.theme)+'</div>'+
-      (locked?'':'<div style="color:#5f7a90;margin-top:5px">'+M.enemies+' enemy · '+M.isles+' isles · '+M.weather+(M.boss?' · ⚓ boss':'')+
-        '<br>Ground army '+Math.round(army.soldiers*100)+'% infantry · '+Math.round(army.tanks*100)+'% tanks</div>');
+    c.innerHTML='<div style="color:'+(locked?'#5f7a90':'#cfe6fb')+';font-weight:600;font-size:13px">'+(locked?'🔒 ':'')+(i+1)+'. '+campaignName(i)+'</div>'+
+      '<div style="color:#7e93a8;margin-top:4px;line-height:1.4">'+(locked?T('Win the previous theater to unlock.','打赢上一个战区即可解锁。'):campaignTheme(i))+'</div>'+
+      (locked?'':'<div style="color:#5f7a90;margin-top:5px">'+T(M.enemies+' enemy · '+M.isles+' isles · '+M.weather,M.enemies+' 敌舰 · '+M.isles+' 岛 · '+trName(M.weather.toUpperCase()))+(M.boss?T(' · ⚓ boss',' · ⚓ 旗舰'):'')+
+        '<br>'+T('Ground army '+Math.round(army.soldiers*100)+'% infantry · '+Math.round(army.tanks*100)+'% tanks','地面部队 步兵 '+Math.round(army.soldiers*100)+'% · 坦克 '+Math.round(army.tanks*100)+'%')+'</div>');
     if(!locked) c.onclick=()=>{ currentMapIdx=i; buildCampaignPicker(); };
     box.appendChild(c);
   });
 }
 function buildMenu(){
+  // language toggle — 中文/English switch pinned to the menu's top-right corner
+  const menu=document.getElementById('menu');
+  if(menu && !document.getElementById('langBtn')){
+    const b=document.createElement('button'); b.id='langBtn';
+    b.style.cssText='position:absolute;top:14px;right:16px;z-index:21;padding:7px 14px;font-size:13px;letter-spacing:1px;'+
+      'background:#12202e;border:1px solid #2a4660;color:#cfe6fb;border-radius:8px;cursor:pointer;';
+    b.onclick=()=>setLang(isZh()?'en':'zh');
+    menu.appendChild(b);
+  }
+  const lb=document.getElementById('langBtn'); if(lb) lb.textContent=isZh()?'🌐 English':'🌐 中文';
   // career banner — rank, perks and lifetime record under the subtitle
   const sub=document.querySelector('#menu .sub');
   if(sub && !document.getElementById('career')){
     const r=careerRank(), nx=nextRank(), d=document.createElement('div');
     d.id='career';
     d.style.cssText='text-align:center;margin:-8px 0 14px;font-size:12px;color:#7e93a8;letter-spacing:1px;';
-    d.innerHTML=`<span style="color:#ffd060">⚓ ${r.name.toUpperCase()}</span>`+
-      (r.perk?` <span style="color:#7fd0a0">+${Math.round(r.perk*100)}% starting funds</span>`:'')+
-      ` &nbsp;·&nbsp; ${career.sunk} ships · ${career.planes} aircraft · ${career.islands} islands · ${career.wins}W/${career.losses}L`+
-      (nx?` &nbsp;·&nbsp; <span style="color:#5f7a90">${careerScore()}/${nx.score} to ${nx.name}</span>`:'');
+    d.innerHTML=`<span style="color:#ffd060">⚓ ${isZh()?trName(r.name):r.name.toUpperCase()}</span>`+
+      (r.perk?` <span style="color:#7fd0a0">${T('+'+Math.round(r.perk*100)+'% starting funds','初始资金 +'+Math.round(r.perk*100)+'%')}</span>`:'')+
+      ` &nbsp;·&nbsp; `+T(`${career.sunk} ships · ${career.planes} aircraft · ${career.islands} islands · ${career.wins}W/${career.losses}L`,
+        `击沉 ${career.sunk} · 飞机 ${career.planes} · 岛屿 ${career.islands} · ${career.wins}胜/${career.losses}负`)+
+      (nx?` &nbsp;·&nbsp; <span style="color:#5f7a90">${T(careerScore()+'/'+nx.score+' to '+nx.name,careerScore()+'/'+nx.score+' 分升'+trName(nx.name))}</span>`:'');
     sub.after(d);
   }
   buildCampaignPicker();
   const wrap=document.getElementById('ships');
+  wrap.innerHTML='';   // idempotent: buildMenu is re-run on language switch
   Object.keys(SHIPS).forEach(id=>{
     const s=SHIPS[id];
     const div=document.createElement('div'); div.className='ship';
     const bar=(v,mx)=>`<div class="bar"><i style="width:${Math.round(v/mx*100)}%"></i></div>`;
-    div.innerHTML=`<h3>${s.name}</h3><div class="cls">${s.cls}</div><p>${s.desc}</p>
+    div.innerHTML=`<h3>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'name',s.name)}</h3><div class="cls">${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'cls',s.cls)}</div><p>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'desc',s.desc)}</p>
       <div class="stats">
-        <div class="row"><span>Hull</span>${bar(s.hp,700)}</div>
-        <div class="row"><span>Size</span>${bar(s.len,100)}</div>
-        <div class="row"><span>Mounts</span>${bar(s.mounts,15)}</div>
+        <div class="row"><span>${T('Hull','船体')}</span>${bar(s.hp,700)}</div>
+        <div class="row"><span>${T('Size','尺寸')}</span>${bar(s.len,100)}</div>
+        <div class="row"><span>${T('Mounts','炮位')}</span>${bar(s.mounts,15)}</div>
       </div>`;
     div.onclick=()=>chooseShip(id);
     wrap.appendChild(div);
@@ -2631,7 +2670,7 @@ function startGame(shipId){
 }
 function chooseShip(shipId){
   if(phase==='respawn'&&shipId==='boss'&&friendlyBossUsed){
-    const sub=document.querySelector('#menu .sub');if(sub)sub.textContent='The Leviathan was a one-life flagship and cannot be deployed again. Choose another ship.';
+    const sub=document.querySelector('#menu .sub');if(sub)sub.textContent=trText('The Leviathan was a one-life flagship and cannot be deployed again. Choose another ship.');
     return;
   }
   if(phase==='respawn') respawnPlayer(shipId); else startGame(shipId);
@@ -2649,7 +2688,7 @@ function showRespawnMenu(msg){
   mouseDownFire=false;
   if(document.pointerLockElement) document.exitPointerLock();
   const sub=document.querySelector('#menu .sub');
-  if(sub) sub.textContent=msg||'Pick a replacement. It redeploys from your harbor.';
+  if(sub) sub.textContent=trText(msg||'Pick a replacement. It redeploys from your harbor.');
   document.getElementById('menu').style.display='flex';
   updateMode();
 }
@@ -3474,61 +3513,62 @@ function buildShopUI(){
   Object.keys(WEAPONS).forEach(id=>{
     const w=WEAPONS[id];
     const d=document.createElement('div'); d.className='witem'; d.dataset.id=id;
-    d.innerHTML=`<div class="wn"><span>${w.name}</span><span class="wc">$${priceOf(w.cost)}</span></div>
+    d.innerHTML=`<div class="wn"><span>${catTr(typeof WEAPONS_ZH!=='undefined'?WEAPONS_ZH:null,id,'name',w.name)}</span><span class="wc">$${priceOf(w.cost)}</span></div>
       <div class="wd">${describe(w)}</div>`;
     d.onclick=()=>{ if(money>=priceOf(w.cost)){ selectedWeapon=id; refreshShop(); } };
     list.appendChild(d);
   });
   // --- Hangar (buy instantly; parks on deck) ---
-  const hdr=document.createElement('h2'); hdr.textContent='HANGAR'; hdr.style.marginTop='14px'; list.appendChild(hdr);
-  const sub=document.createElement('div'); sub.className='hint'; sub.textContent='Buys instantly and parks on deck. Walk up and press E to fly.'; list.appendChild(sub);
+  const hdr=document.createElement('h2'); hdr.textContent=T('HANGAR','机库'); hdr.style.marginTop='14px'; list.appendChild(hdr);
+  const sub=document.createElement('div'); sub.className='hint'; sub.textContent=T('Buys instantly and parks on deck. Walk up and press E to fly.','买了立刻停在甲板上。走过去按 E 就能开。'); list.appendChild(sub);
   Object.keys(PLANES).forEach(id=>{
-    const p=PLANES[id];
+    const p=PLANES[id], zh=typeof PLANES_ZH!=='undefined'?PLANES_ZH:null;
     const d=document.createElement('div'); d.className='witem plane'; d.dataset.plane=id;
-    d.innerHTML=`<div class="wn"><span>✈ ${p.name}</span><span class="wc">$${priceOf(p.cost)}</span></div>
-      <div class="wd">${p.faction?`<span style="color:#7fb4d8">${p.faction}${p.year?' · '+p.year:''}</span><br>`:''}${p.desc}</div>`;
+    d.innerHTML=`<div class="wn"><span>✈ ${catTr(zh,id,'name',p.name)}</span><span class="wc">$${priceOf(p.cost)}</span></div>
+      <div class="wd">${p.faction?`<span style="color:#7fb4d8">${catTr(zh,id,'faction',p.faction)}${p.year?' · '+p.year:''}</span><br>`:''}${catTr(zh,id,'desc',p.desc)}</div>`;
     d.onclick=()=>buyPlane(id);
     list.appendChild(d);
   });
   // --- Motor Pool (buy instantly; parks on a deck slot) ---
-  const thdr=document.createElement('h2'); thdr.textContent='MOTOR POOL'; thdr.style.marginTop='14px'; list.appendChild(thdr);
-  const tsub=document.createElement('div'); tsub.className='hint'; tsub.textContent='Buys instantly onto a free deck slot. Walk up and press E to crew it.'; list.appendChild(tsub);
+  const thdr=document.createElement('h2'); thdr.textContent=T('MOTOR POOL','车库'); thdr.style.marginTop='14px'; list.appendChild(thdr);
+  const tsub=document.createElement('div'); tsub.className='hint'; tsub.textContent=T('Buys instantly onto a free deck slot. Walk up and press E to crew it.','买了立刻停在甲板空位上。走过去按 E 驾驶。'); list.appendChild(tsub);
   Object.keys(TANKS).forEach(id=>{
-    const T=TANKS[id];
+    const tk=TANKS[id];
     const d=document.createElement('div'); d.className='witem tank'; d.dataset.tank=id;
-    d.innerHTML=`<div class="wn"><span>🛞 ${T.name}</span><span class="wc">$${priceOf(T.cost)}</span></div>
-      <div class="wd">${T.hp} hp · ${T.dmg} dmg · ${T.speed} spd${T.spg?' · 🎯 indirect lob':''}</div>`;
+    d.innerHTML=`<div class="wn"><span>🛞 ${catTr(typeof TANKS_ZH!=='undefined'?TANKS_ZH:null,id,'name',tk.name)}</span><span class="wc">$${priceOf(tk.cost)}</span></div>
+      <div class="wd">${tk.hp}${T(' hp',' 血量')} · ${tk.dmg}${T(' dmg',' 伤害')} · ${tk.speed}${T(' spd',' 速度')}${tk.spg?T(' · 🎯 indirect lob',' · 🎯 曲射'):''}</div>`;
     d.onclick=()=>buyTank(id);
     list.appendChild(d);
   });
   // --- Small Arms (carried ashore; press G to land, Q to switch) ---
-  const ahdr=document.createElement('h2'); ahdr.textContent='SMALL ARMS'; ahdr.style.marginTop='14px'; list.appendChild(ahdr);
-  const asub=document.createElement('div'); asub.className='hint'; asub.textContent='Carried when you go ashore (G). Buy to equip · Q to switch in the field.'; list.appendChild(asub);
+  const ahdr=document.createElement('h2'); ahdr.textContent=T('SMALL ARMS','随身武器'); ahdr.style.marginTop='14px'; list.appendChild(ahdr);
+  const asub=document.createElement('div'); asub.className='hint'; asub.textContent=T('Carried when you go ashore (G). Buy to equip · Q to switch in the field.','登岸（G）时随身携带。购买即装备 · 野外按 Q 切换。'); list.appendChild(asub);
   Object.keys(HANDHELD).forEach(id=>{
     const W=HANDHELD[id], owned=ownedGuns.has(id);
     const d=document.createElement('div'); d.className='witem gun'; d.dataset.gun=id;
-    const tag = id===equippedGun ? 'EQUIPPED' : owned ? 'OWNED' : (W.cost?('$'+priceOf(W.cost)):'FREE');
-    d.innerHTML=`<div class="wn"><span>${gunIcon(W.gfx)}${W.name}</span><span class="wc">${tag}</span></div>
-      <div class="wd">${W.dmg} dmg · ${(1/W.cd).toFixed(1)}/s${W.pellets?' · '+W.pellets+' pellets':''}${W.splash?' · splash':''}</div>`;
+    const tag = id===equippedGun ? T('EQUIPPED','已装备') : owned ? T('OWNED','已拥有') : (W.cost?('$'+priceOf(W.cost)):T('FREE','免费'));
+    d.innerHTML=`<div class="wn"><span>${gunIcon(W.gfx)}${catTr(typeof HANDHELD_ZH!=='undefined'?HANDHELD_ZH:null,id,'name',W.name)}</span><span class="wc">${tag}</span></div>
+      <div class="wd">${W.dmg}${T(' dmg',' 伤害')} · ${(1/W.cd).toFixed(1)}${T('/s','/秒')}${W.pellets?' · '+W.pellets+T(' pellets',' 弹丸'):''}${W.splash?T(' · splash',' · 溅射'):''}</div>`;
     d.onclick=()=>buyGun(id);
     list.appendChild(d);
   });
   // --- Island Defenses (built where you stand after going ashore with G) ---
-  const ihdr=document.createElement('h2'); ihdr.textContent='ISLAND DEFENSES'; ihdr.style.marginTop='14px'; list.appendChild(ihdr);
-  const isub=document.createElement('div'); isub.className='hint'; isub.textContent='Go ashore (G), then click to emplace it where you stand. Also on the B menu.'; list.appendChild(isub);
+  const ihdr=document.createElement('h2'); ihdr.textContent=T('ISLAND DEFENSES','岛屿防御'); ihdr.style.marginTop='14px'; list.appendChild(ihdr);
+  const isub=document.createElement('div'); isub.className='hint'; isub.textContent=T('Go ashore (G), then click to emplace it where you stand. Also on the B menu.','先登岸（G），再点击建在你站的位置。B 菜单里也有。'); list.appendChild(isub);
   Object.keys(STRUCTS).forEach(k=>{
-    const s=STRUCTS[k];
+    const s=STRUCTS[k], zh=typeof STRUCTS_ZH!=='undefined'?STRUCTS_ZH:null;
     const d=document.createElement('div'); d.className='witem struct'; d.dataset.struct=k;
-    d.innerHTML=`<div class="wn"><span>🏗️ ${s.name}</span><span class="wc">$${priceOf(s.cost)}</span></div>
-      <div class="wd">${s.desc}</div>`;
+    d.innerHTML=`<div class="wn"><span>🏗️ ${catTr(zh,k,'name',s.name)}</span><span class="wc">$${priceOf(s.cost)}</span></div>
+      <div class="wd">${catTr(zh,k,'desc',s.desc)}</div>`;
     d.onclick=()=>buildStructure(k);
     list.appendChild(d);
   });
   refreshShop();
 }
 function describe(w){
-  const k={gun:'Direct fire',cannon:'Arcing heavy shell',missile:'Homing',torpedo:'Sea-skimming',bomb:'Lobbed'}[w.kind];
-  return `${k} · ${w.dmg} dmg · ${(1/w.cd).toFixed(1)}/s${w.splash?' · splash':''}`;
+  const k=isZh()?{gun:'直射',cannon:'重型曲射炮弹',missile:'制导',torpedo:'贴海飞行',bomb:'抛射'}[w.kind]
+             :{gun:'Direct fire',cannon:'Arcing heavy shell',missile:'Homing',torpedo:'Sea-skimming',bomb:'Lobbed'}[w.kind];
+  return `${k} · ${w.dmg}${T(' dmg',' 伤害')} · ${(1/w.cd).toFixed(1)}${T('/s','/秒')}${w.splash?T(' · splash',' · 溅射'):''}`;
 }
 function refreshShop(){
   document.querySelectorAll('.witem').forEach(el=>{
@@ -3555,7 +3595,7 @@ function buildHarborUI(){
   let path=null;
   Object.keys(HARBOR_UP).forEach(k=>{
     const u=HARBOR_UP[k];
-    if(u.path!==path){ path=u.path; const h=document.createElement('div'); h.className='path'; h.textContent=path; list.appendChild(h); }
+    if(u.path!==path){ path=u.path; const h=document.createElement('div'); h.className='path'; h.textContent=(isZh()&&typeof HARBOR_PATH_ZH!=='undefined'&&HARBOR_PATH_ZH[path])||trName(path); list.appendChild(h); }
     const d=document.createElement('div'); d.className='uitem'; d.dataset.up=k;
     d.onclick=()=>buyUpgrade(k);
     list.appendChild(d);
@@ -3567,8 +3607,8 @@ function refreshHarbor(){
     const k=el.dataset.up, u=HARBOR_UP[k], lvl=fU(k), maxed=lvl>=u.max, cost=upgCost(k);
     el.classList.toggle('maxed', maxed);
     el.classList.toggle('poor', !maxed && money<cost);
-    el.innerHTML=`<div class="un"><span>${u.name} <span class="lv">Lv ${lvl}/${u.max}</span></span>`
-      + `<span class="uc">${maxed?'MAX':'$'+cost}</span></div><div class="ud">${u.desc}</div>`;
+    el.innerHTML=`<div class="un"><span>${catTr(typeof HARBOR_UP_ZH!=='undefined'?HARBOR_UP_ZH:null,k,'name',u.name)} <span class="lv">Lv ${lvl}/${u.max}</span></span>`
+      + `<span class="uc">${maxed?T('MAX','满级'):'$'+cost}</span></div><div class="ud">${catTr(typeof HARBOR_UP_ZH!=='undefined'?HARBOR_UP_ZH:null,k,'desc',u.desc)}</div>`;
   });
 }
 function toggleHarbor(){
@@ -3607,7 +3647,7 @@ function refreshBuild(){
   document.querySelectorAll('.uitem[data-struct]').forEach(el=>{
     const k=el.dataset.struct, s=STRUCTS[k], cost=priceOf(s.cost);
     el.classList.toggle('poor', money<cost);
-    el.innerHTML=`<div class="un"><span>${s.name}</span><span class="uc">$${cost}</span></div><div class="ud">${s.desc}</div>`;
+    el.innerHTML=`<div class="un"><span>${catTr(typeof STRUCTS_ZH!=='undefined'?STRUCTS_ZH:null,k,'name',s.name)}</span><span class="uc">$${cost}</span></div><div class="ud">${catTr(typeof STRUCTS_ZH!=='undefined'?STRUCTS_ZH:null,k,'desc',s.desc)}</div>`;
   });
 }
 function toggleBuild(){
@@ -5141,39 +5181,41 @@ function updatePrompt(){
   const capIsl=!piloting&&player?islands.find(i=>i.capturable&&i.owner!==0&&
     ((onFoot&&footLand===i)||insideIslandRange(player.pos,i,65))):null;
   if(promptT>0){ promptT-=0.016; msg=promptMsg; }
-  else if(capIsl){ msg=capIsl.contested?'🏝 '+capIsl.name.toUpperCase()+' CONTESTED — clear enemy ships and defenders':
-      capIsl.captureTeam===0?'🏝 SECURING '+capIsl.name.toUpperCase()+' — '+Math.floor(capIsl.capture/ISLAND_CAPTURE_TIME*100)+'%':'🏝 HOLD POSITION TO CAPTURE '+capIsl.name.toUpperCase(); }
-  else if(drivingTank){ const t=drivingTank; msg='Tank '+Math.max(0,Math.ceil(t.hp/t.maxhp*100))+'% — W/S drive · Click fire · R repair · '+(t.onDeck?'G land ashore':(playerShipLost?'Ship lost':'G re-embark'))+' · T view · E dismount'+tankPartSummary(t); }
+  else if(capIsl){ const iNm=isZh()?trName(capIsl.name):capIsl.name.toUpperCase();
+    msg=capIsl.contested?T('🏝 '+iNm+' CONTESTED — clear enemy ships and defenders','🏝 '+iNm+' 争夺中——清除敌舰和守军'):
+      capIsl.captureTeam===0?T('🏝 SECURING '+iNm+' — ','🏝 正在占领 '+iNm+'——')+Math.floor(capIsl.capture/ISLAND_CAPTURE_TIME*100)+'%':T('🏝 HOLD POSITION TO CAPTURE '+iNm,'🏝 停在这里即可占领 '+iNm); }
+  else if(drivingTank){ const t=drivingTank; msg=T('Tank ','坦克 ')+Math.max(0,Math.ceil(t.hp/t.maxhp*100))+T('% — W/S drive · Click fire · R repair · ','% — W/S 驾驶 · 点击开火 · R 修理 · ')+(t.onDeck?T('G land ashore','G 开上岸'):(playerShipLost?T('Ship lost','船已沉没'):T('G re-embark','G 回到船上')))+T(' · T view · E dismount',' · T 视角 · E 下车')+tankPartSummary(t); }
   else if(onFoot){ const near=!landCampaignMode&&Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<player.build.halfLen+18, hp=' · HP '+Math.ceil(footHP)+'%', ftk=nearestFieldTank();
-    if(playerShipLost) msg=(nearFriendlyHarborForReplacement()?'Harbor reached — press P for a replacement ship':'Ship lost — swim/walk back to your harbor')+hp+' · WASD '+(footLand?'walk':'swim')+' · Click: '+(HANDHELD[equippedGun]||HANDHELD.pistol).name;
-    else msg=(ftk?'Press E to crew '+(ftk.name||'tank')+' · ':'')+(landCampaignMode?'Airborne assault':(footLand?'Ashore':'Swimming'))+hp+' — WASD '+(footLand?'walk':'swim')+' · Click: '+(HANDHELD[equippedGun]||HANDHELD.pistol).name+' · Q switch'+(footLand?' · B build':'') + (near?'   ·   G re-board':''); }
-  else if(driving){ msg='Steering — W/S throttle · A/D rudder' + (player.def.kind==='sub'?'   ·   C dive/surface':'') + '   ·   T view   ·   E to step away'; }
+    const gunNm=trName((HANDHELD[equippedGun]||HANDHELD.pistol).name);
+    if(playerShipLost) msg=(nearFriendlyHarborForReplacement()?T('Harbor reached — press P for a replacement ship','已到海港——按 P 领取新船'):T('Ship lost — swim/walk back to your harbor','船沉了——游泳/走路回到我方海港'))+hp+' · WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm;
+    else msg=(ftk?T('Press E to crew '+(ftk.name||'tank')+' · ','按 E 进入'+trName(ftk.name||'坦克')+' · '):'')+(landCampaignMode?T('Airborne assault','空降突击'):(footLand?T('Ashore','登岸'):T('Swimming','游泳中')))+hp+' — WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm+T(' · Q switch',' · Q 换枪')+(footLand?T(' · B build',' · B 建造'):'') + (near?T('   ·   G re-board','   ·   G 回船'):''); }
+  else if(driving){ msg=T('Steering — W/S throttle · A/D rudder','掌舵中 — W/S 油门 · A/D 转舵') + (player.def.kind==='sub'?T('   ·   C dive/surface','   ·   C 下潜/上浮'):'') + T('   ·   T view   ·   E to step away','   ·   T 视角   ·   E 离开舵位'); }
   else if(piloting){
-    if(piloting.phase==='takeoff') msg='Taking off…';
-    else if(piloting.phase==='landing') msg='Landing — line up OVER the ship and descend · E to abort';
-    else { const heli=piloting.plane.def.heli; const b=piloting.plane.def.bomb?`   ·   Space drop (${piloting.plane.bombsLeft})`:'';
-      const ga=piloting.plane.gunAmmo==null?'':`   ·   Gun ammo ${piloting.plane.gunAmmo}`;
-      const f=Math.ceil(piloting.fuel/piloting.fuelMax*100); const eng = !piloting.engineOn ? '   ·   ⚠ ENGINE OUT' : (f<25?'   ·   ⚠ LOW FUEL':'');
-      msg=(heli?'W/S fwd · A/D turn · Mouse = climb/descend':'W/S throttle · A/D turn · Mouse = pitch')+' · Click guns'+ga+b+`   ·   Fuel ${f}%`+eng+(piloting.parts?partSummary(piloting):'')+'   ·   P parachute · T view · E to land'; }
+    if(piloting.phase==='takeoff') msg=T('Taking off…','正在起飞…');
+    else if(piloting.phase==='landing') msg=T('Landing — line up OVER the ship and descend · E to abort','降落——对准舰船正上方缓慢下降 · E 取消');
+    else { const heli=piloting.plane.def.heli; const b=piloting.plane.def.bomb?T(`   ·   Space drop (${piloting.plane.bombsLeft})`,`   ·   空格投弹 (${piloting.plane.bombsLeft})`):'';
+      const ga=piloting.plane.gunAmmo==null?'':T(`   ·   Gun ammo ${piloting.plane.gunAmmo}`,`   ·   弹药 ${piloting.plane.gunAmmo}`);
+      const f=Math.ceil(piloting.fuel/piloting.fuelMax*100); const eng = !piloting.engineOn ? T('   ·   ⚠ ENGINE OUT','   ·   ⚠ 引擎熄火') : (f<25?T('   ·   ⚠ LOW FUEL','   ·   ⚠ 燃油不足'):'');
+      msg=(heli?T('W/S fwd · A/D turn · Mouse = climb/descend','W/S 前进 · A/D 转向 · 鼠标 = 升降'):T('W/S throttle · A/D turn · Mouse = pitch','W/S 油门 · A/D 转向 · 鼠标 = 俯仰'))+T(' · Click guns',' · 点击开炮')+ga+b+T(`   ·   Fuel ${f}%`,`   ·   燃油 ${f}%`)+eng+(piloting.parts?partSummary(piloting):'')+T('   ·   P parachute · T view · E to land','   ·   P 跳伞 · T 视角 · E 降落'); }
   }
   else if(!manning && !shopOpen && !harborOpen){
     const tu=nearestTurret(), pa=nearestPlane(), hm=nearestHelm(), dtk=nearestDeckTank();
     let alongside=null; landSpots().forEach(o=>{ if(islandEdgeDistance(player.pos,o)<80) alongside=o; });
-    if(hm) msg='Press E to take the helm (steer the ship)';
-    else if(dtk) msg='Press E to crew the '+dtk.name;
-    else if(alongside) msg='Press G to go ashore'+(alongside.name?' on '+alongside.name:'');
-    else if(tu) msg='Press E to man '+tu.def.name+'   ·   X to scrap it';
-    else if(pa) msg='Press E to fly the '+pa.def.name+'   ·   Y to send it up under AI';
-    else if(placed.length>=player.def.mounts) msg='Gun limit reached ('+placed.length+'/'+player.def.mounts+') — a bigger ship mounts more';
-    else msg= selectedWeapon? 'Press F to install '+WEAPONS[selectedWeapon].name+' ($'+priceOf(WEAPONS[selectedWeapon].cost)+')  ['+placed.length+'/'+player.def.mounts+' guns]   ·   H: harbor upgrades' : 'Pick a weapon in the Armory (Tab) · H for harbor upgrades';
-  } else if(manning){ msg='Fire: Left Click   ·   T view   ·   E to leave turret'; }
-  el.style.display=msg?'block':'none'; el.textContent=msg;
+    if(hm) msg=T('Press E to take the helm (steer the ship)','按 E 掌舵（开动军舰）');
+    else if(dtk) msg=T('Press E to crew the '+dtk.name,'按 E 进入 '+trName(dtk.name));
+    else if(alongside) msg=T('Press G to go ashore'+(alongside.name?' on '+alongside.name:''),'按 G 登岸'+(alongside.name?'——'+trName(alongside.name):''));
+    else if(tu) msg=T('Press E to man '+tu.def.name+'   ·   X to scrap it','按 E 操作 '+trName(tu.def.name)+'   ·   X 拆除');
+    else if(pa) msg=T('Press E to fly the '+pa.def.name+'   ·   Y to send it up under AI','按 E 驾驶 '+trName(pa.def.name)+'   ·   Y 让 AI 飞行员出击');
+    else if(placed.length>=player.def.mounts) msg=T('Gun limit reached ('+placed.length+'/'+player.def.mounts+') — a bigger ship mounts more','火炮已装满（'+placed.length+'/'+player.def.mounts+'）——更大的船能装更多炮');
+    else msg= selectedWeapon? T('Press F to install '+WEAPONS[selectedWeapon].name+' ($'+priceOf(WEAPONS[selectedWeapon].cost)+')  ['+placed.length+'/'+player.def.mounts+' guns]   ·   H: harbor upgrades','按 F 安装 '+trName(WEAPONS[selectedWeapon].name)+'（$'+priceOf(WEAPONS[selectedWeapon].cost)+'）  [火炮 '+placed.length+'/'+player.def.mounts+']   ·   H 海港升级') : T('Pick a weapon in the Armory (Tab) · H for harbor upgrades','按 Tab 打开军械库选一门炮 · 按 H 升级海港');
+  } else if(manning){ msg=T('Fire: Left Click   ·   T view   ·   E to leave turret','开火：鼠标左键   ·   T 视角   ·   E 离开炮位'); }
+  el.style.display=msg?'block':'none'; el.textContent=trText(msg);
 }
 function critStatus(){
   let extra='';
-  if(player.def.kind==='sub') extra='   ·   '+(player.submerged?'🌊 DIVED':'⚓ SURFACED')+' Air '+Math.ceil(player.air==null?100:player.air)+'%';
+  if(player.def.kind==='sub') extra='   ·   '+(player.submerged?T('🌊 DIVED','🌊 已下潜'):T('⚓ SURFACED','⚓ 已上浮'))+T(' Air ',' 氧气 ')+Math.ceil(player.air==null?100:player.air)+'%';
   const parts=compartmentsOf(player),pct=k=>Math.max(0,Math.round(parts[k].hp/parts[k].max*100));
-  extra+='   ·   SECTIONS B'+pct('bow')+' M'+pct('mid')+' S'+pct('stern')+'% ['+(player.dcPriority||'mid').toUpperCase()+']';
+  extra+=T('   ·   SECTIONS B','   ·   舱段 艏')+pct('bow')+T(' M',' 中')+pct('mid')+T(' S',' 艉')+pct('stern')+'% ['+T((player.dcPriority||'mid').toUpperCase(),({bow:'艏',mid:'中',stern:'艉'})[player.dcPriority||'mid'])+']';
   const c=player.crit; if(!c) return extra;
   const s=[];
   if(c.fire>0)   s.push('🔥'.repeat(c.fire));
@@ -5182,24 +5224,24 @@ function critStatus(){
   if(c.guns>0)   s.push('🔫✖'.repeat(c.guns));
   if(c.radar>0)  s.push('📡✖');
   if(c.deck>0)   s.push('✈️✖');
-  return extra + (s.length? '   ·   DAMAGE '+s.join(' ') : '');
+  return extra + (s.length? T('   ·   DAMAGE ','   ·   损伤 ')+s.join(' ') : '');
 }
 function updateHUD(){
   document.getElementById('money').textContent='$'+money;
   const wg = weather.type==='storm'?'⛈️':weather.type==='fog'?'🌫️':weather.type==='overcast'?'☁️':(weather.day<0.32?'🌙':'☀️');
-  const forceLabel=(window._MAP&&window._MAP.ground)?('Ground '+landUnits.filter(u=>!u.dead&&u.team===0).length+'v'+landUnits.filter(u=>!u.dead&&u.team===1).length):('Fleet '+(allies.length+1)+'v'+enemies.length);
-  document.getElementById('score').textContent=wg+'  Sunk: '+sunk+'   ·   '+forceLabel+
-    '   ·   Dots '+[...allies,...enemies].filter(s=>s.proxy).length+
-    '   ·   Guns '+placed.filter(p=>!p.ko).length+'/'+player.def.mounts+
-    '   ·   Sonar '+(sonarCooldown>0?Math.ceil(sonarCooldown)+'s':'READY')+
-    '   ·   Mines '+mines.filter(m=>m.team===0).length+'/'+MAX_MINES_PER_TEAM+critStatus();
+  const forceLabel=(window._MAP&&window._MAP.ground)?(T('Ground ','陆军 ')+landUnits.filter(u=>!u.dead&&u.team===0).length+'v'+landUnits.filter(u=>!u.dead&&u.team===1).length):(T('Fleet ','舰队 ')+(allies.length+1)+'v'+enemies.length);
+  document.getElementById('score').textContent=wg+'  '+T('Sunk:','击沉:')+' '+sunk+'   ·   '+forceLabel+
+    '   ·   '+T('Dots','远方')+' '+[...allies,...enemies].filter(s=>s.proxy).length+
+    '   ·   '+T('Guns','火炮')+' '+placed.filter(p=>!p.ko).length+'/'+player.def.mounts+
+    '   ·   '+T('Sonar','声呐')+' '+(sonarCooldown>0?Math.ceil(sonarCooldown)+'s':T('READY','就绪'))+
+    '   ·   '+T('Mines','水雷')+' '+mines.filter(m=>m.team===0).length+'/'+MAX_MINES_PER_TEAM+critStatus();
   document.querySelector('#shiphp>i').style.width=((onFoot?footHP/footMaxHP:player.hp/player.maxhp)*100)+'%';
   if(enemyHarbor){ document.getElementById('ehp').textContent=Math.ceil(enemyHarbor.hp/enemyHarbor.maxhp*100)+'%'; }
   if(friendlyHarbor){ document.getElementById('fhp').textContent=Math.ceil(friendlyHarbor.hp/friendlyHarbor.maxhp*100)+'%'; }
   const blue=controlledIslandCount(0), red=controlledIslandCount(1), total=islands.filter(i=>i.capturable).length;
   const active=islands.find(i=>i.capturable&&i.captureTeam===0&&i.capture>0);
-  document.getElementById('territory').textContent='ISLANDS  BLUE '+blue+' · RED '+red+' · NEUTRAL '+(total-blue-red)+
-    '   |   +$'+(blue*2)+'/s · RADAR +'+(blue*35)+(active?'   |   CAPTURING '+Math.floor(active.capture/ISLAND_CAPTURE_TIME*100)+'%':'');
+  document.getElementById('territory').textContent=T('ISLANDS  BLUE ','岛屿  蓝方 ')+blue+T(' · RED ',' · 红方 ')+red+T(' · NEUTRAL ',' · 中立 ')+(total-blue-red)+
+    '   |   +$'+(blue*2)+T('/s','/秒')+T(' · RADAR +',' · 雷达 +')+(blue*35)+(active?T('   |   CAPTURING ','   |   占领中 ')+Math.floor(active.capture/ISLAND_CAPTURE_TIME*100)+'%':'');
   drawMinimap();
 }
 // ---------- tactical minimap: top-down radar, player-centred ----------
@@ -5271,10 +5313,10 @@ function drawTacticalMap(){
     g.fillStyle=u.team===0?'#77ddff':'#ff6868';g.fillRect(x-6,y-6,12,12);
     if(sel){g.strokeStyle='#fff36d';g.lineWidth=3;g.beginPath();g.arc(x,y,12,0,Math.PI*2);g.stroke();}});
   const hint=document.getElementById('tacticalHint'),s=selectedNukeSilo;
-  hint.textContent=!s?'No friendly R-36M silo exists. Build one on a controlled island.':
-    !structurePowered(s)?'Selected silo is OFFLINE — build or repair its island power station.':
-    s.fireT>0?'R-36M reloading: '+Math.ceil(s.fireT)+' seconds. Select another silo or press N to close.':
-    'R-36M READY — click a target area. Harbors and their exclusion zones cannot be targeted.';
+  hint.textContent=!s?T('No friendly R-36M silo exists. Build one on a controlled island.','我方还没有 R-36M 发射井。先在已控制的岛屿上建造一座。'):
+    !structurePowered(s)?T('Selected silo is OFFLINE — build or repair its island power station.','选中的发射井离线——需要修好或建造岛上的发电站。'):
+    s.fireT>0?T('R-36M reloading: '+Math.ceil(s.fireT)+' seconds. Select another silo or press N to close.','R-36M 装填中：还需 '+Math.ceil(s.fireT)+' 秒。可选择其他发射井，或按 N 关闭。'):
+    T('R-36M READY — click a target area. Harbors and their exclusion zones cannot be targeted.','R-36M 就绪——点击目标区域。海港及其禁区无法作为目标。');
 }
 function tacticalMapClick(e){
   if(!tacticalOpen)return;
@@ -5294,19 +5336,19 @@ document.getElementById('tacticalCanvas').addEventListener('click',tacticalMapCl
 document.getElementById('minimap').addEventListener('click',()=>toggleTacticalMap(true));
 function updateMode(){
   const el=document.getElementById('mode');
-  el.innerHTML = drivingTank ? '<b>TANK</b><br>W/S drive · A/D turn<br>Mouse aim · Click fire · E dismount'
-    : buildOpen ? '<b>ISLAND ENGINEERS</b><br>Click a defense to build<br>B to close'
-    : onFoot ? (playerShipLost?'<b>SURVIVOR</b><br>Get to friendly harbor<br>P replacement ship'
-        : landCampaignMode?'<b>AIRBORNE ASSAULT</b><br>WASD walk/swim · Click = rifle · B build<br>E board tank · Capture command posts'
-        : footLand?'<b>ASHORE</b><br>WASD walk · Click = rifle · B build<br>E board tank · G re-board ship':'<b>SWIMMING</b><br>WASD swim to land or ship<br>Click = rifle')
-    : driving ? '<b>AT THE HELM</b><br>W/S throttle · A/D rudder'+(player.def.kind==='sub'?' · C dive':'')+'<br>Mouse look · E to step away'
-    : piloting ? (piloting.phase==='takeoff' ? '<b>TAKEOFF</b><br>Climbing out…'
-        : piloting.phase==='landing' ? '<b>LANDING</b><br>Descend over the ship<br>E to abort'
-        : '<b>IN FLIGHT</b><br>Mouse + A/D steer · W/S throttle<br>Click guns · Space bombs · P parachute · E land')
-    : manning ? '<b>GUNNERY</b><br>Mouse aim · Click fire · E exit'
-    : shopOpen ? '<b>ARMORY OPEN</b><br>Click weapon/plane · Tab to close'
-    : harborOpen ? '<b>HARBOR COMMAND</b><br>Click an upgrade to buy · H to close'
-    : '<b>ON DECK</b><br>WASD walk · Mouse look<br>F install · E man/fly · G ashore<br>R sonar · V mine · Z damage control<br>N map · Tab shop · H harbor · Enter chat';
+  el.innerHTML = drivingTank ? T('<b>TANK</b><br>W/S drive · A/D turn<br>Mouse aim · Click fire · E dismount','<b>坦克</b><br>W/S 前进后退 · A/D 转向<br>鼠标瞄准 · 点击开火 · E 下车')
+    : buildOpen ? T('<b>ISLAND ENGINEERS</b><br>Click a defense to build<br>B to close','<b>岛屿工程</b><br>点击建造防御设施<br>B 关闭')
+    : onFoot ? (playerShipLost?T('<b>SURVIVOR</b><br>Get to friendly harbor<br>P replacement ship','<b>幸存者</b><br>回到我方海港<br>按 P 领取新船')
+        : landCampaignMode?T('<b>AIRBORNE ASSAULT</b><br>WASD walk/swim · Click = rifle · B build<br>E board tank · Capture command posts','<b>空降突击</b><br>WASD 行走/游泳 · 点击开枪 · B 建造<br>E 上坦克 · 占领指挥所')
+        : footLand?T('<b>ASHORE</b><br>WASD walk · Click = rifle · B build<br>E board tank · G re-board ship','<b>登岸</b><br>WASD 行走 · 点击开枪 · B 建造<br>E 上坦克 · G 回船'):T('<b>SWIMMING</b><br>WASD swim to land or ship<br>Click = rifle','<b>游泳中</b><br>WASD 游向陆地或船只<br>点击开枪'))
+    : driving ? (T('<b>AT THE HELM</b><br>W/S throttle · A/D rudder','<b>掌舵中</b><br>W/S 油门 · A/D 舵')+(player.def.kind==='sub'?T(' · C dive',' · C 下潜'):'')+T('<br>Mouse look · E to step away','<br>鼠标看四周 · E 离开舵位'))
+    : piloting ? (piloting.phase==='takeoff' ? T('<b>TAKEOFF</b><br>Climbing out…','<b>起飞</b><br>正在爬升…')
+        : piloting.phase==='landing' ? T('<b>LANDING</b><br>Descend over the ship<br>E to abort','<b>降落</b><br>对准舰船上方下降<br>E 取消')
+        : T('<b>IN FLIGHT</b><br>Mouse + A/D steer · W/S throttle<br>Click guns · Space bombs · P parachute · E land','<b>飞行中</b><br>鼠标 + A/D 操纵 · W/S 油门<br>点击开炮 · 空格投弹 · P 跳伞 · E 降落'))
+    : manning ? T('<b>GUNNERY</b><br>Mouse aim · Click fire · E exit','<b>炮手位</b><br>鼠标瞄准 · 点击开火 · E 离开')
+    : shopOpen ? T('<b>ARMORY OPEN</b><br>Click weapon/plane · Tab to close','<b>军械库</b><br>点击武器/飞机购买 · Tab 关闭')
+    : harborOpen ? T('<b>HARBOR COMMAND</b><br>Click an upgrade to buy · H to close','<b>海港指挥部</b><br>点击购买升级 · H 关闭')
+    : T('<b>ON DECK</b><br>WASD walk · Mouse look<br>F install · E man/fly · G ashore<br>R sonar · V mine · Z damage control<br>N map · Tab shop · H harbor · Enter chat','<b>甲板上</b><br>WASD 走动 · 鼠标看四周<br>F 装炮 · E 上炮位/开飞机 · G 登岸<br>R 声呐 · V 水雷 · Z 损管<br>N 地图 · Tab 商店 · H 海港 · Enter 聊天');
 }
 
 // =====================================================================
@@ -5319,18 +5361,18 @@ function endGame(win,msg){
   const r=careerRank(), nx=nextRank();
   let unlockMsg='';
   if(win){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
-      unlockMsg=`<br><br><span style="color:#7ff0a8">🗺 NEW THEATER UNLOCKED — ${nm.name}!</span>`; }
-    else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); } unlockMsg='<br><br><span style="color:#ffd060">🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.</span>'; } }
+      unlockMsg=`<br><br><span style="color:#7ff0a8">${T('🗺 NEW THEATER UNLOCKED — '+nm.name+'!','🗺 新战区解锁——'+campaignName(currentMapIdx+1)+'！')}</span>`; }
+    else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); } unlockMsg=`<br><br><span style="color:#ffd060">${T('🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.','🏆 战役全部通关——所有战区都是你的了，舰队司令！')}</span>`; } }
   if(document.pointerLockElement)document.exitPointerLock();
   document.getElementById('over').style.display='flex';
   const t=document.getElementById('overTitle');
-  t.textContent = win?'VICTORY':'DEFEAT'; t.style.color = win?'#7ff0a8':'#ff7a6a';
-  const promo = r.name!==oldRank.name ? `  ⭐ PROMOTED TO ${r.name.toUpperCase()}!` : '';
+  t.textContent = win?T('VICTORY','胜利'):T('DEFEAT','战败'); t.style.color = win?'#7ff0a8':'#ff7a6a';
+  const promo = r.name!==oldRank.name ? T(`  ⭐ PROMOTED TO ${r.name.toUpperCase()}!`,`  ⭐ 晋升为${trName(r.name)}！`) : '';
   document.getElementById('overText').innerHTML =
-    (msg?msg+'  ':'') + `You sank ${sunk} ${sunk===1?'ship':'ships'}. ($${money} in the bank.)${promo}` +
-    `<br><br><span style="color:#9fc6e8">⚓ WAR RECORD — ${r.name} (+${Math.round(r.perk*100)}% starting funds)</span>` +
-    `<br>Ships sunk ${career.sunk} · Aircraft ${career.planes} · Islands ${career.islands} · Leviathans ${career.bosses} · Wars ${career.wins}W/${career.losses}L` +
-    (nx?`<br><span style="color:#6b7d92">Next rank: ${nx.name} at ${nx.score} points (you have ${careerScore()})</span>`:'<br><span style="color:#ffd060">Highest rank achieved.</span>')+
+    (msg?trText(msg)+'  ':'') + T(`You sank ${sunk} ${sunk===1?'ship':'ships'}. ($${money} in the bank.)`,`你击沉了 ${sunk} 艘敌舰。（存款 $${money}）`)+promo +
+    `<br><br><span style="color:#9fc6e8">${T('⚓ WAR RECORD — '+r.name+' (+'+Math.round(r.perk*100)+'% starting funds)','⚓ 战绩档案——'+trName(r.name)+'（初始资金 +'+Math.round(r.perk*100)+'%）')}</span>` +
+    '<br>'+T(`Ships sunk ${career.sunk} · Aircraft ${career.planes} · Islands ${career.islands} · Leviathans ${career.bosses} · Wars ${career.wins}W/${career.losses}L`,`击沉军舰 ${career.sunk} · 击落飞机 ${career.planes} · 占领岛屿 ${career.islands} · 利维坦 ${career.bosses} · 战争 ${career.wins}胜/${career.losses}负`) +
+    (nx?`<br><span style="color:#6b7d92">${T('Next rank: '+nx.name+' at '+nx.score+' points (you have '+careerScore()+')','下一军衔：'+trName(nx.name)+'（需 '+nx.score+' 分，你有 '+careerScore()+' 分）')}</span>`:`<br><span style="color:#ffd060">${T('Highest rank achieved.','已达到最高军衔。')}</span>`)+
     unlockMsg;
 }
 
@@ -5344,18 +5386,1050 @@ function loop(){
   renderer.render(scene,camera);
 }
 
+// ---------- i18n dictionaries: 中文翻译字典（生成于目录与提示语清单，英文缺译时自动回退） ----------
+// Iron Tide 简体中文目录字典 — 由 catTr()/trName() 在运行时读取；键与 index.html 目录 id / 英文显示名严格一致。
+
+// ---------- 舰船 ----------
+const SHIPS_ZH = {
+  scout:      { name:'侦察巡逻舰', cls:'快速哨舰', desc:'小巧又飞快。炮位少、船壳薄——打了就跑。' },
+  submarine:  { name:'攻击潜艇',   cls:'潜水艇',   desc:'按 C 下潜——潜在水下时敌人看不见你，火炮也打不到你，但你只能用鱼雷。想用甲板炮就得上浮。' },
+  destroyer:  { name:'驱逐舰',     cls:'护航舰',   desc:'全能选手。速度、船体和炮位都很均衡。' },
+  cruiser:    { name:'重巡洋舰',   cls:'战列线舰', desc:'炮更重、装甲带更结实，甲板空间也很充足。' },
+  battleship: { name:'战列舰',     cls:'主力舰',   desc:'装甲厚、主炮大。开得慢，但一炮一个疼。' },
+  dreadnought:{ name:'无畏舰',     cls:'超级主力舰', desc:'一座会漂的堡垒。炮位密密麻麻，船体巨大。' },
+  boss:       { name:'利维坦',     cls:'首领战舰', desc:'每方只有一艘。缓慢的装甲旗舰，自带十二门炮，火力吓人，沉了就没有第二艘。' },
+  carrier:    { name:'航空母舰',   cls:'平顶船',   desc:'宽阔的飞行甲板随你跑，舰岛在右舷。还带炸弹舱。' },
+};
+const FLEET_TENDER_ZH = { name:'舰队补给舰', cls:'支援舰', desc:'' };
+
+// ---------- 甲板武器（desc 留空，数据行由代码生成） ----------
+const WEAPONS_ZH = {
+  deckgun: { name:'甲板炮', desc:'' },
+  aa:      { name:'防空炮', desc:'' },
+  twin:    { name:'双联炮塔', desc:'' },
+  torpedo: { name:'鱼雷发射管', desc:'' },
+  bomb:    { name:'臼炮', desc:'' },
+  cannon:  { name:'主炮', desc:'' },
+  missile: { name:'导弹发射器', desc:'' },
+  oerlikon:{ name:'20mm 厄利孔机炮', desc:'' },
+  bofors:  { name:'40mm 博福斯高射炮', desc:'' },
+  pompom:  { name:'2磅砰砰炮', desc:'' },
+  ciws:    { name:'密集阵近防炮', desc:'' },
+  sam:     { name:'防空导弹发射器', desc:'' },
+  fiveinch:{ name:'5英寸/38 两用炮', desc:'' },
+  sixinch: { name:'6英寸巡洋舰炮', desc:'' },
+  eightin: { name:'8英寸重巡炮', desc:'' },
+  sixteen: { name:'16英寸 Mk7 主炮', desc:'' },
+  quadtorp:{ name:'五联装鱼雷', desc:'' },
+  m2:      { name:'M2 勃朗宁机枪', desc:'' },
+  m777:    { name:'M777 榴弹炮', desc:'' },
+  patriot: { name:'爱国者防空导弹', desc:'' },
+  tomahawk:{ name:'战斧导弹发射器', desc:'' },
+};
+
+// ---------- 飞机 ----------
+const PLANES_ZH = {
+  fighter:    { name:'战斗机', desc:'又快又灵活。机头有两挺机枪。' },
+  divebomber: { name:'俯冲轰炸机', desc:'机枪加重磅炸弹（按 Space 投弹）。' },
+  torpbomber: { name:'鱼雷轰炸机', desc:'把鱼雷投在水面上，直奔敌舰。' },
+  f22:  { name:'F-22 猛禽', desc:'争夺制空权的隐形战斗机。机炮 + 追踪导弹（Space）。' },
+  f18:  { name:'F/A-18 大黄蜂', desc:'航母上的多面手攻击战斗机。机炮 + 炸弹。' },
+  a10:  { name:'A-10 疣猪', desc:'坦克克星。机头机炮威力吓人，还带炸弹。' },
+  b2:   { name:'B-2 幽灵', desc:'隐形飞翼轰炸机。载弹量超级大。' },
+  f35:  { name:'F-35B 闪电', desc:'隐形多面手战机。机炮 + 追踪导弹。' },
+  apache:{ name:'AH-64 阿帕奇', desc:'武装直升机——能悬停，链炮加追踪火箭。' },
+  cobra: { name:'AH-1 眼镜蛇', desc:'又轻又快的武装直升机。悬停时特别灵活。' },
+  p51:  { name:'P-51 野马', desc:'高速螺旋桨战斗机——六挺 .50 机枪，空战高手。' },
+  spitfire:{ name:'超级马林喷火', desc:'皇家空军的传奇截击机——转弯超紧的空战好手。' },
+  bf109:{ name:'梅塞施密特 Bf 109', desc:'德国空军的主力——速度快，机头炮打得狠。' },
+  zero: { name:'三菱零式', desc:'超轻的舰载战斗机——转弯快得惊人，可惜装甲很薄。' },
+  p38:  { name:'P-38 闪电', desc:'双尾撑重型战斗机——机头火力集中，还能挂炸弹。' },
+  stuka:{ name:'Ju 87 斯图卡', desc:'会尖啸的俯冲轰炸机——一颗重磅炸弹指哪打哪。' },
+  corsair:{ name:'F4U 海盗', desc:'弯翅膀的海军战斗轰炸机——机枪 + 炸弹。' },
+  b17:  { name:'B-17 空中堡垒', desc:'二战重型轰炸机——浑身自卫机枪，炸弹装得满满的。' },
+  lancaster:{ name:'阿弗罗兰开斯特', desc:'皇家空军夜间轰炸机——专扔最重的超级炸弹。' },
+  b24:  { name:'B-24 解放者', desc:'四发重型轰炸机，航程远，常规炸弹带得多。' },
+  b29:  { name:'B-29“艾诺拉·盖伊”', desc:'历史名机 B-29——只带一颗原子弹，爆炸范围超大，用完就没有了。' },
+  b36:  { name:'B-36 和平缔造者', desc:'六台发动机的巨型战略轰炸机——飞得慢但特别结实，常规炸弹装满仓。' },
+  tu95v:{ name:'图-95V 熊式——沙皇炸弹', desc:'贵得吓人的改装熊式。带一颗一次性的沙皇炸弹，能抹平整片战场。' },
+  halifax:{ name:'汉德利·佩奇哈利法克斯', desc:'四发皇家空军重型轰炸机，自卫火力很强。' },
+  pe8:  { name:'佩特利亚科夫 Pe-8', desc:'罕见的苏联重型轰炸机，能挂特别巨大的常规炸弹。' },
+  he177:{ name:'亨克尔 He 177 狮鹫', desc:'飞得快的德国重型轰炸机，双联发动机，载弹量大。' },
+  tu4:  { name:'图波列夫图-4 公牛', desc:'苏联远程活塞轰炸机，遥控自卫炮塔很厉害。' },
+  vulcan:{ name:'阿弗罗火神', desc:'三角翼冷战轰炸机，常规载弹量很大。' },
+  tu16: { name:'图波列夫图-16 獾式', desc:'后掠翼苏联喷气轰炸机，带尾炮，常规炸弹装得多。' },
+  m4bison:{ name:'米亚西舍夫 M-4 野牛', desc:'巨大的四发苏联战略喷气轰炸机，航程远、防御强。' },
+  b58:  { name:'B-58 盗贼', desc:'超音速三角翼轰炸机——飞得飞快，但挂的大家伙少一些。' },
+  victor:{ name:'汉德利·佩奇胜利者', desc:'月牙翼的英国 V 式轰炸机——航程出色，弹舱巨大。' },
+  f16:  { name:'F-16 战隼', desc:'灵活的多面手喷气机。火神机炮 + 追踪导弹。' },
+  b52:  { name:'B-52 同温层堡垒', desc:'战略轰炸机——用超大载弹量地毯式轰炸。' },
+  uh60: { name:'UH-60 黑鹰', desc:'通用运输直升机——机身结实，两侧舱门各有一挺机枪。' },
+  m27:  { name:'M-27', faction:'麦肯齐第四帝国', desc:'2011 年制空战斗机。两门高速机炮；时速 1,300 英里。' },
+  mh221:{ name:'MH-221', faction:'麦肯齐第四帝国', desc:'1980 年截击机，2001 年改到完美。不用子弹，改带一大堆便宜的防空导弹。' },
+  m42:  { name:'M-42', faction:'麦肯齐第四帝国', desc:'2027 年双炮制空战斗机；时速 1,500 英里。' },
+  mhkl235:{ name:'MHKL-235', faction:'麦肯齐第四帝国', desc:'2018 年搜索歼灭机。机枪很弱，机身加固后成了威力惊人的战时神风撞击机。' },
+  amh112:{ name:'AMH-112 巨兽', faction:'麦肯齐第四帝国', desc:'2017 年的飞行驱逐舰：八门机炮、三十枚导弹、装甲超厚，时速 500 英里。' },
+  ss17: { name:'SS-17 电弧战斗机', faction:'平克钦共和国', desc:'2052 年战斗机，两门超高速电能机炮，极速 2,000 英里。' },
+  p11:  { name:'P-11 隐形轰炸机', faction:'平克钦共和国', desc:'2032 年隐形重型轰炸机。满载时速 1,000 英里，扔空炸弹后能飙到 1,600 英里。' },
+  sp9r: { name:'SP-9-R', faction:'平克钦共和国', desc:'1999 年侦察机。双机炮加 2,500 英里时速，可惜油箱特别小。' },
+  a251: { name:'A-251', faction:'阿尔西亚联盟', desc:'2025 年战斗机，散射机炮加十五枚导弹。燃料越烧越轻，时速从 1,000 一路飙到 3,000 英里。' },
+  ah887:{ name:'AH-887 飞行超级堡垒', faction:'阿尔西亚联盟', desc:'2033 年双发飞行堡垒。三叶主旋翼、80 枚导弹，外加 500 发点射火箭弹。' },
+  lfc5: { name:'LFC-5', faction:'阿尔西亚联盟', desc:'2046 年管制级搜索歼灭机，带着十三枚会追踪的核弹头。' },
+  chicken3:{ name:'小鸡-3', faction:'遥远之国', desc:'时速 1,600 英里的制空战斗机，装了三门机炮。' },
+};
+
+// ---------- 坦克（desc 留空，数据行由代码生成） ----------
+const TANKS_ZH = {
+  sherman: { name:'M4 谢尔曼', desc:'' },
+  t34:     { name:'T-34', desc:'' },
+  panzer4: { name:'四号坦克', desc:'' },
+  panther: { name:'黑豹', desc:'' },
+  tiger:   { name:'虎式', desc:'' },
+  is2:     { name:'IS-2 斯大林', desc:'' },
+  stuart:  { name:'M3 斯图亚特', desc:'' },
+  abrams:  { name:'M1 艾布拉姆斯', desc:'' },
+  leopard2:{ name:'豹2', desc:'' },
+  challenger2:{ name:'挑战者2', desc:'' },
+  t90:     { name:'T-90', desc:'' },
+  t14:     { name:'T-14 阿玛塔', desc:'' },
+  type99:  { name:'99式', desc:'' },
+  k2:      { name:'K2 黑豹', desc:'' },
+  priest:  { name:'M7 牧师', desc:'' },
+  wespe:   { name:'黄蜂自行火炮', desc:'' },
+  m109:    { name:'M109 帕拉丁', desc:'' },
+};
+
+// ---------- 随身武器 ----------
+const HANDHELD_ZH = {
+  pistol:  { name:'M1911 手枪', desc:'标准配发的随身手枪。' },
+  deagle:  { name:'沙漠之鹰', desc:'.50 口径手炮——一枪威力巨大，就是打得慢。' },
+  mp5:     { name:'MP5 冲锋枪', desc:'射速超快，适合近距离。' },
+  ak47:    { name:'AK-47', desc:'全自动突击步枪——皮实又凶狠。' },
+  m16:     { name:'M16', desc:'打得准的全自动步枪。' },
+  shotgun: { name:'战斗霰弹枪', desc:'一次喷出 8 颗弹丸——近身威力吓人。' },
+  sniper:  { name:'狙击步枪', desc:'远距离一枪一个。' },
+  lmg:     { name:'M249 轻机枪', desc:'弹链供弹，火力压制。' },
+  rpg:     { name:'RPG-7', desc:'火箭筒——爆炸带溅射伤害。' },
+};
+
+// ---------- 岛屿建筑 ----------
+const STRUCTS_ZH = {
+  command:   { name:'指挥所', desc:'掌控岛屿归属；每座岛只能有一座大型总部' },
+  barracks:  { name:'兵营', desc:'最多维持三支守岛步兵小队' },
+  tankdepot: { name:'坦克库', desc:'维修坦克，并缓慢补充一辆被毁的守岛坦克' },
+  hospital:  { name:'野战医院', desc:'治疗附近的步兵' },
+  ammo:      { name:'弹药库', desc:'让附近武器装填更快；被炸毁时会大爆炸' },
+  workshop:  { name:'维修车间', desc:'修理附近的坦克和损坏的部件' },
+  coastal:   { name:'海岸炮', desc:'重型反舰炮塔，转向比较慢' },
+  torpbat:   { name:'鱼雷碉堡', desc:'朝附近水道发射鱼雷' },
+  aa:        { name:'防空阵地', desc:'速射高射炮，专打低空飞机' },
+  silo:      { name:'防空导弹阵地', desc:'远程导弹；需要电力和弹药' },
+  nukesilo:  { name:'R-36M“撒旦”核弹发射井', desc:'每方限一座 · 战术地图发射 · 200秒装填 · 可被拦截的 9,999 伤害弹头' },
+  radar:     { name:'雷达站', desc:'扩大侦测范围，还能给远程火炮指示目标' },
+  sonar:     { name:'声呐站', desc:'照出附近的潜艇和水雷' },
+  searchlight:{ name:'探照灯塔', desc:'夜里照出附近的敌人，还能帮防空炮瞄准' },
+  bunker:    { name:'混凝土碉堡', desc:'装甲机枪火力点，保护步兵' },
+  airstrip:  { name:'岛屿机场', desc:'给小型飞机加油、维修、补充弹药' },
+  helipad:   { name:'直升机坪', desc:'直升机的快速维修补给点' },
+  dock:      { name:'登陆码头', desc:'修理并补给靠岸的友军舰船' },
+  fuel:      { name:'燃料库', desc:'加快车辆和飞机的保养；特别容易爆炸' },
+  power:     { name:'发电站', desc:'给雷达、声呐、防空导弹和后勤建筑供电' },
+  bridge:    { name:'加固桥梁', desc:'巨大的装甲通道，地面战的必争之地' },
+  artillery: { name:'重型榴弹炮', desc:'打得又准又远的曲射火炮' },
+  rocket:    { name:'火箭炮阵地', desc:'不太准的远程火力覆盖' },
+  fortress:  { name:'海防要塞炮塔', desc:'嵌进混凝土里的战列舰炮塔' },
+  supergun:  { name:'超重型列车炮', desc:'能打遍全图的巨炮；炮弹有限，装填 32 秒并有警报' },
+  tesla:     { name:'特斯拉线圈', desc:'连锁闪电，专打靠近的小艇和飞机' },
+  wall:      { name:'海墙', desc:'巨大的装甲屏障，保护附近的建筑' },
+};
+
+// ---------- 海港升级 ----------
+const HARBOR_UP_ZH = {
+  coastal:  { name:'海岸炮群', desc:'给你的海港加装 2 门岸防炮' },
+  aa:       { name:'防空炮塔', desc:'加装 2 门高射炮，专撕飞机' },
+  missiles: { name:'导弹阵地', desc:'海港会朝敌舰和飞机发射追踪导弹' },
+  walls:    { name:'海港城墙', desc:'+1500 最大 HP，装甲更硬（每级 −12% 伤害）' },
+  fastBuild:{ name:'加速建造', desc:'舰队增援每级快 60% 抵达' },
+  discount: { name:'装备打折', desc:'军械库、机库和坦克价格每级 −10%' },
+  slots:    { name:'舰队增援', desc:'战舰每级快 35% 抵达——舰队数量没有上限' },
+  income:   { name:'资源仓库', desc:'被动收入（每级 +5/秒）' },
+  repair:   { name:'维修船坞', desc:'自动修理海港附近的你方舰船' },
+  radar:    { name:'雷达塔', desc:'舰队交战距离每级 +60，还提升瞄准辅助' },
+  hangar:   { name:'飞机库', desc:'每级 +2 个机位，起飞和补给更快' },
+};
+const HARBOR_PATH_ZH = {
+  'Defense':'防御', 'Production':'生产', 'Support':'支援',
+  '🏗️ Defense':'🏗️ 防御', '⚙️ Production':'⚙️ 生产', '🔧 Support':'🔧 支援',
+};
+
+// ---------- 战役（31 个战区，按下标对齐 CAMPAIGN) ----------
+const CAMPAIGN_ZH = [
+  { name:'训练湾',       theme:'在浅滩里快速练练手，几乎没有抵抗。' },
+  { name:'大登陆',       theme:'纯陆战——没有敌方舰队。把坦克开上海滩，拿下每一座岛。' },
+  { name:'海岸遭遇战',   theme:'在狭窄水域里的一场短促硬仗。' },
+  { name:'南港浅滩',     theme:'家门口的海域——风平浪静，正好带新舰队见见世面。' },
+  { name:'破碎礁',       theme:'密密麻麻的群岛。一座岛一座岛地打，非常残酷。' },
+  { name:'铁海峡',       theme:'狭窄、被风暴抽打的水道。无处可逃。' },
+  { name:'夜幕航道',     theme:'一场在黑暗中边追边打的战斗。' },
+  { name:'迷雾边境',     theme:'传感器全瞎了。雷达和声呐就是一切。' },
+  { name:'利维坦之墓',   theme:'敌人的旗舰船厂。把整支舰队都带上。' },
+  { name:'黎明巡逻',     theme:'晨光洒在平静的海面上。但平静不了多久。' },
+  { name:'死亡走廊',     theme:'寡不敌众——九艘敌舰对你的一小队。' },
+  { name:'台风航线',     theme:'永不停歇的风暴。山一样的海浪，看不清的炮口。' },
+  { name:'黑水伏击',     theme:'浓得像沥青的大雾里，藏着一艘敌方旗舰。' },
+  { name:'跳岛作战',     theme:'更大规模的陆战——八座岛，没有敌方舰队。' },
+  { name:'午夜突袭',     theme:'在永恒的黑夜里出击。探照灯和曳光弹满天飞。' },
+  { name:'钢铁舰队',     theme:'十一艘敌方战舰从地平线上压过来。' },
+  { name:'破碎海岸',     theme:'被撕成上百条水道的巨大礁区。' },
+  { name:'冰封海峡',     theme:'冰架边的灰色暮光和刺骨浓雾。' },
+  { name:'清算时刻',     theme:'在翻滚的风暴里正面硬刚。' },
+  { name:'幽灵舰队',     theme:'寡不敌众、孤立无援，还被雾和黑夜蒙住了眼。' },
+  { name:'火山湾',       theme:'火山灰遮住天空的密集火山岛链。' },
+  { name:'最后堡垒',     theme:'十座要塞岛等你强攻。装甲部队，马上上岸！' },
+  { name:'漫漫长夜',     theme:'一场永远见不到太阳的战争。' },
+  { name:'飓风走廊',     theme:'风暴一场接一场，敌人的战线还格外厚。' },
+  { name:'双子利维坦',   theme:'敌人把主力战舰全都派了出来。' },
+  { name:'熔炉',         theme:'所有难题一起来——大雾、舰队，还有旗舰。' },
+  { name:'钢铁之雨',     theme:'十二艘敌舰，天上全是落下来的炮弹。' },
+  { name:'无尽地平线',   theme:'广阔无边的战区——驶向炮火的最长航程。' },
+  { name:'最终封锁',     theme:'敌人把整支海军都压向你的防线。' },
+  { name:'诸神黄昏礁',   theme:'黑夜、风暴，加上敌人的全部舰队。毫不留情。' },
+  { name:'最后的浪潮',   theme:'每一门炮。每一艘船。战争在这里终结。' },
+];
+
+// ---------- 军衔 ----------
+const RANKS_ZH = {
+  'Ensign':'少尉',
+  'Lieutenant':'上尉',
+  'Commander':'中校',
+  'Captain':'上校',
+  'Commodore':'准将',
+  'Rear Admiral':'少将',
+  'Vice Admiral':'中将',
+  'Admiral':'上将',
+  'Fleet Admiral':'海军元帅',
+};
+
+// ---------- Claude 小提示（按下标对齐 CLAUDE_TIPS) ----------
+const CLAUDE_TIPS_ZH = [
+  '按 E 掌舵——W/S 油门，A/D 转舵。',
+  '按 Tab 打开军械库，再按 F 就能在你站的位置装上一门炮。',
+  '按 H 打开海港升级——维修船坞能救你的命。',
+  '把船开到岛边，按 G 上岸。按 B 就能在岛上修防御。',
+  '清掉守军、贴近岛屿坚持一会儿就能占领它——岛屿还会扩大你的雷达。',
+  '在机库买飞机：按 E 自己开，按 Y 派 AI 飞行员上天。',
+  '坦克就停在你的甲板上——按 E 开坦克，按 G 把它送上岛。',
+  '注意天气：大雾、风暴和黑夜会让所有人的传感器变短。',
+  '在坦克、飞机、炮塔和舵位上按 T 切换第一人称视角。',
+  '敌人的利维坦值 $30,000。多叫些帮手再上。',
+  '潜艇按 C 下潜——火炮打不到你，但你也只能用鱼雷。',
+  '炸沉敌人海港就能赢下战争——但先占岛才能喂饱你的经济。',
+];
+
+// ---------- 英文显示名 → 中文 平面映射（供 trName() 使用；运行时有大小写兜底） ----------
+const NAME_ZH = {
+  // 舰船
+  'Scout Corvette':'侦察巡逻舰',
+  'Attack Submarine':'攻击潜艇',
+  'Destroyer':'驱逐舰',
+  'Heavy Cruiser':'重巡洋舰',
+  'Battleship':'战列舰',
+  'Dreadnought':'无畏舰',
+  'Leviathan':'利维坦',
+  'Aircraft Carrier':'航空母舰',
+  'Fleet Tender':'舰队补给舰',
+  // 甲板武器
+  'Deck Gun':'甲板炮',
+  'AA Battery':'防空炮',
+  'Twin Turret':'双联炮塔',
+  'Torpedo Tube':'鱼雷发射管',
+  'Bomb Mortar':'臼炮',
+  'Main Battery':'主炮',
+  'Missile Launcher':'导弹发射器',
+  '20mm Oerlikon':'20mm 厄利孔机炮',
+  '40mm Bofors':'40mm 博福斯高射炮',
+  '2-pdr Pom-Pom':'2磅砰砰炮',
+  'Phalanx CIWS':'密集阵近防炮',
+  'SAM Launcher':'防空导弹发射器',
+  '5"/38 Dual Gun':'5英寸/38 两用炮',
+  '6" Cruiser Gun':'6英寸巡洋舰炮',
+  '8" Heavy Cruiser':'8英寸重巡炮',
+  '16" Mk 7 Battery':'16英寸 Mk7 主炮',
+  'Quint Torpedo':'五联装鱼雷',
+  'M2 Browning':'M2 勃朗宁机枪',
+  'M777 Howitzer':'M777 榴弹炮',
+  'Patriot SAM':'爱国者防空导弹',
+  'Tomahawk Launcher':'战斧导弹发射器',
+  // NPC 军械名（AI_WEAPS)
+  'Heavy Gun':'重炮',
+  'Dual Purpose':'两用炮',
+  'Torpedoes':'鱼雷',
+  'Missiles':'导弹',
+  // 飞机
+  'Fighter':'战斗机',
+  'Dive Bomber':'俯冲轰炸机',
+  'Torpedo Bomber':'鱼雷轰炸机',
+  'F-22 Raptor':'F-22 猛禽',
+  'F/A-18 Hornet':'F/A-18 大黄蜂',
+  'A-10 Warthog':'A-10 疣猪',
+  'B-2 Spirit':'B-2 幽灵',
+  'F-35B Lightning':'F-35B 闪电',
+  'AH-64 Apache':'AH-64 阿帕奇',
+  'AH-1 Cobra':'AH-1 眼镜蛇',
+  'P-51 Mustang':'P-51 野马',
+  'Supermarine Spitfire':'超级马林喷火',
+  'Messerschmitt Bf 109':'梅塞施密特 Bf 109',
+  'Mitsubishi A6M Zero':'三菱零式',
+  'P-38 Lightning':'P-38 闪电',
+  'Ju 87 Stuka':'Ju 87 斯图卡',
+  'F4U Corsair':'F4U 海盗',
+  'B-17 Flying Fortress':'B-17 空中堡垒',
+  'Avro Lancaster':'阿弗罗兰开斯特',
+  'B-24 Liberator':'B-24 解放者',
+  'B-29 “Enola Gay”':'B-29“艾诺拉·盖伊”',
+  'B-36 Peacemaker':'B-36 和平缔造者',
+  'Tu-95V Bear — Tsar Bomba':'图-95V 熊式——沙皇炸弹',
+  'Handley Page Halifax':'汉德利·佩奇哈利法克斯',
+  'Petlyakov Pe-8':'佩特利亚科夫 Pe-8',
+  'Heinkel He 177 Greif':'亨克尔 He 177 狮鹫',
+  'Tupolev Tu-4 Bull':'图波列夫图-4 公牛',
+  'Avro Vulcan':'阿弗罗火神',
+  'Tupolev Tu-16 Badger':'图波列夫图-16 獾式',
+  'Myasishchev M-4 Bison':'米亚西舍夫 M-4 野牛',
+  'B-58 Hustler':'B-58 盗贼',
+  'Handley Page Victor':'汉德利·佩奇胜利者',
+  'F-16 Fighting Falcon':'F-16 战隼',
+  'B-52 Stratofortress':'B-52 同温层堡垒',
+  'UH-60 Black Hawk':'UH-60 黑鹰',
+  'M-27':'M-27',
+  'MH-221':'MH-221',
+  'M-42':'M-42',
+  'MHKL-235':'MHKL-235',
+  'AMH-112 Juggernaut':'AMH-112 巨兽',
+  'SS-17 Arc Fighter':'SS-17 电弧战斗机',
+  'P-11 Stealth Bomber':'P-11 隐形轰炸机',
+  'SP-9-R':'SP-9-R',
+  'A-251':'A-251',
+  'AH-887 Flying Superfortress':'AH-887 飞行超级堡垒',
+  'LFC-5':'LFC-5',
+  'Chicken-3':'小鸡-3',
+  // 阵营
+  'Mackenzian Empire IV':'麦肯齐第四帝国',
+  'Pincurchin Republic':'平克钦共和国',
+  'Arcian Union':'阿尔西亚联盟',
+  'Distant Country':'遥远之国',
+  // 坦克
+  'M4 Sherman':'M4 谢尔曼',
+  'T-34':'T-34',
+  'Panzer IV':'四号坦克',
+  'Panther':'黑豹',
+  'Tiger I':'虎式',
+  'IS-2':'IS-2 斯大林',
+  'M3 Stuart':'M3 斯图亚特',
+  'M1 Abrams':'M1 艾布拉姆斯',
+  'Leopard 2':'豹2',
+  'Challenger 2':'挑战者2',
+  'T-90':'T-90',
+  'T-14 Armata':'T-14 阿玛塔',
+  'Type 99':'99式',
+  'K2 Black Panther':'K2 黑豹',
+  'M7 Priest':'M7 牧师',
+  'Wespe':'黄蜂自行火炮',
+  'M109 Paladin':'M109 帕拉丁',
+  // 随身武器
+  'M1911 Pistol':'M1911 手枪',
+  'Desert Eagle':'沙漠之鹰',
+  'MP5 SMG':'MP5 冲锋枪',
+  'AK-47':'AK-47',
+  'M16':'M16',
+  'Combat Shotgun':'战斗霰弹枪',
+  'Sniper Rifle':'狙击步枪',
+  'M249 LMG':'M249 轻机枪',
+  'RPG-7':'RPG-7',
+  // 岛屿建筑
+  'Command Post':'指挥所',
+  'Barracks':'兵营',
+  'Tank Depot':'坦克库',
+  'Field Hospital':'野战医院',
+  'Ammunition Depot':'弹药库',
+  'Repair Workshop':'维修车间',
+  'Coastal Artillery':'海岸炮',
+  'Torpedo Bunker':'鱼雷碉堡',
+  'Anti-Air Emplacement':'防空阵地',
+  'SAM Site':'防空导弹阵地',
+  'R-36M “Satan” Nuclear Silo':'R-36M“撒旦”核弹发射井',
+  'Radar Station':'雷达站',
+  'Sonar Station':'声呐站',
+  'Searchlight Tower':'探照灯塔',
+  'Concrete Bunker':'混凝土碉堡',
+  'Island Airstrip':'岛屿机场',
+  'Helicopter Pad':'直升机坪',
+  'Landing Dock':'登陆码头',
+  'Fuel Depot':'燃料库',
+  'Power Station':'发电站',
+  'Fortified Bridge':'加固桥梁',
+  'Heavy Howitzer':'重型榴弹炮',
+  'Rocket Battery':'火箭炮阵地',
+  'Naval Fortress Turret':'海防要塞炮塔',
+  'Super-Heavy Railway Gun':'超重型列车炮',
+  'Tesla Coil':'特斯拉线圈',
+  'Sea Wall':'海墙',
+  // 海港升级
+  'Coastal Cannons':'海岸炮群',
+  'Anti-Air Turrets':'防空炮塔',
+  'Missile Battery':'导弹阵地',
+  'Harbor Walls':'海港城墙',
+  'Faster Construction':'加速建造',
+  'Cheaper Equipment':'装备打折',
+  'Fleet Reinforcements':'舰队增援',
+  'Resource Storage':'资源仓库',
+  'Repair Dock':'维修船坞',
+  'Radar Tower':'雷达塔',
+  'Aircraft Hangar':'飞机库',
+  // 基地与大地图岛屿
+  'Northwatch':'北望港',
+  'Southhaven':'南港',
+  'Ironwood':'铁木岛',
+  'Stormglass':'风暴镜岛',
+  'Redwater':'红水岛',
+  'Gannet':'塘鹅岛',
+  'Titan’s Reach':'泰坦之臂',
+  'Crownland':'王冠地',
+  'Whalebone':'鲸骨岛',
+  'Long Reef':'长礁',
+  'Shatterbank':'碎滩',
+  'Mariner’s Rest':'水手歇脚岛',
+  // 小型岛屿
+  'Skull Reef':'骷髅礁',
+  'Far Lantern':'远灯岛',
+  'Lowtide':'低潮岛',
+  'Pelican':'鹈鹕岛',
+  'Broken Mast':'断桅岛',
+  // 各战区手工命名岛屿
+  'Target Cay':'靶子屿',
+  'Gunnery Sandbar':'炮术沙洲',
+  'Red Beach':'红滩',
+  'Duneside':'沙丘坡',
+  'Landing Fields':'登陆场',
+  'Tank Plain':'坦克平原',
+  'South Approach':'南航道',
+  'Supply Bluff':'补给崖',
+  'Blackfin':'黑鳍岛',
+  'Cutlass Cay':'弯刀屿',
+  'Saltspire':'盐尖岩',
+  'West Gate':'西门',
+  'East Gate':'东门',
+  'Narrows West':'窄峡西',
+  'Narrows East':'窄峡东',
+  'Darkwater':'暗水岛',
+  'Lantern Reef':'灯笼礁',
+  'Moon Shoal':'月亮浅滩',
+  'Black Sand':'黑沙岛',
+  'Dawn Point':'黎明角',
+  'Blind Reef':'盲礁',
+  'Echo Cay':'回声屿',
+  'Radar Hill':'雷达山',
+  'Greywake':'灰浪岛',
+  'Sonar Bank':'声呐滩',
+  'Mist Point':'迷雾角',
+  'Dry Dock West':'西干船坞',
+  'Shipyard East':'东船厂',
+  'Graveyard':'沉船墓场',
+  'Anchorfall':'落锚地',
+  'Scrapyard':'废船场',
+  'Wreck Point':'残骸角',
+  'Left Battery':'左炮台',
+  'Right Battery':'右炮台',
+  'Middle Gun':'中央炮位',
+  'Last Gun':'最后一炮',
+  'Stormwall':'风暴墙',
+  'Spray Rock':'浪花岩',
+  'Breaker':'碎浪岛',
+  'Whitecap':'白浪头',
+  'Rain Needle':'雨针岩',
+  'Tar Shoal':'沥青浅滩',
+  'Ambush Cay':'伏击屿',
+  'Blackwater':'黑水岛',
+  'Drift Trap':'漂流陷阱',
+  'Hidden Reef':'暗礁岛',
+  'Fog Hook':'雾钩湾',
+  'Beach One':'一号滩',
+  'Beach Two':'二号滩',
+  'Hill Three':'三号山',
+  'Depot Four':'四号仓',
+  'Bridge Five':'五号桥',
+  'Field Six':'六号场',
+  'Seven Palms':'七棕榈岛',
+  'Final Cay':'终点屿',
+  'Searchlight Point':'探照灯角',
+  'Black Pier':'黑码头',
+  'Raid Island':'突袭岛',
+  'Tracer Key':'曳光屿',
+  'Silent Shoal':'寂静浅滩',
+  'Shard One':'碎片一号',
+  'Shard Two':'碎片二号',
+  'Shard Three':'碎片三号',
+  'Shard Four':'碎片四号',
+  'Broken Bay':'破碎湾',
+  'Fracture':'裂缝岛',
+  'Splinter':'碎屑岛',
+  'Ice Gate West':'冰门西',
+  'Ice Gate East':'冰门东',
+  'Frost Channel':'霜冻水道',
+  'Glacier Tooth':'冰川之牙',
+  'Ghost One':'幽灵一号',
+  'Ghost Two':'幽灵二号',
+  'Phantom Bank':'幻影滩',
+  'Wraith Cay':'幽魂屿',
+  'Deadlight':'熄灯岛',
+  'Ashfall':'落灰岛',
+  'Basalt':'玄武岩岛',
+  'Volcano Bay':'火山湾',
+  'Lava Key':'熔岩屿',
+  'Cinder':'火渣岛',
+  'Smoke Point':'烟柱角',
+  'Obsidian':'黑曜石岛',
+  'Hot Spring':'温泉岛',
+  'Outer One':'外围一号',
+  'Outer Two':'外围二号',
+  'Wall Three':'城墙三号',
+  'Wall Four':'城墙四号',
+  'Bastion Five':'堡垒五号',
+  'Bastion Six':'堡垒六号',
+  'Gate Seven':'大门七号',
+  'Gate Eight':'大门八号',
+  'Keep Nine':'主堡九号',
+  'Final Keep':'最终主堡',
+  'Far West':'极西岛',
+  'Far East':'极东岛',
+  'Lonely Cay':'孤独屿',
+  'Open Reef':'开阔礁',
+  'Drifter':'漂泊者岛',
+  'Horizon Rock':'地平线岩',
+  'Compass':'罗盘岛',
+  'Ragnar West':'拉格纳西',
+  'Ragnar East':'拉格纳东',
+  'Thunder One':'雷霆一号',
+  'Thunder Two':'雷霆二号',
+  'Fire Reef':'火焰礁',
+  'Doom Cay':'末日屿',
+  'Last Flame':'最后火焰',
+  'Ash Gate':'灰烬之门',
+  'Final West':'终局西',
+  'Final East':'终局东',
+  'Iron Teeth':'铁齿岛',
+  'Tide Breaker':'破潮者',
+  'Last Harbor':'最后海港',
+  'Victory Reef':'胜利礁',
+  // 程序生成的陆战地图岛名('Landing Zone '+(i+1),isles 上限 10,预留到 12)
+  'Landing Zone':'登陆区',
+  'Landing Zone 1':'登陆区 1',
+  'Landing Zone 2':'登陆区 2',
+  'Landing Zone 3':'登陆区 3',
+  'Landing Zone 4':'登陆区 4',
+  'Landing Zone 5':'登陆区 5',
+  'Landing Zone 6':'登陆区 6',
+  'Landing Zone 7':'登陆区 7',
+  'Landing Zone 8':'登陆区 8',
+  'Landing Zone 9':'登陆区 9',
+  'Landing Zone 10':'登陆区 10',
+  'Landing Zone 11':'登陆区 11',
+  'Landing Zone 12':'登陆区 12',
+  // ISLAND_NAMES 兜底名池(buildIsland 未传名时轮换使用)中尚未覆盖的岛名
+  'Crown Cay':'王冠屿',
+  'Tern Isle':'燕鸥岛',
+  'Driftwood':'浮木岛',
+  'Northstar':'北极星岛',
+  'Cutlass':'弯刀岛',
+  'Windscar':'风痕岛',
+  'Morrow':'明日岛',
+  'Seabreak':'破浪岛',
+  'Kingfisher':'翠鸟岛',
+  'Rookery':'鸟巢岛',
+  'Coral Reach':'珊瑚滩',
+  'Widow’s Cape':'寡妇角',
+  'Osprey':'鱼鹰岛',
+  'Bluewater':'碧水岛',
+  'Harpoon':'鱼叉岛',
+  'Tempest':'狂风岛',
+  'Sable Isle':'黑貂岛',
+  // 战区名（供解锁横幅等模式翻译使用）
+  'Training Bay':'训练湾',
+  'The Landing':'大登陆',
+  'Coastal Skirmish':'海岸遭遇战',
+  'Southhaven Shoals':'南港浅滩',
+  'The Broken Reef':'破碎礁',
+  'Iron Straits':'铁海峡',
+  'Nightfall Passage':'夜幕航道',
+  'Fogbound Marches':'迷雾边境',
+  'Leviathan\'s Grave':'利维坦之墓',
+  'Dawn Patrol':'黎明巡逻',
+  'The Gauntlet':'死亡走廊',
+  'Typhoon Run':'台风航线',
+  'Blackwater Ambush':'黑水伏击',
+  'Island Hopping':'跳岛作战',
+  'Midnight Raid':'午夜突袭',
+  'The Iron Armada':'钢铁舰队',
+  'Shattered Coast':'破碎海岸',
+  'Frozen Straits':'冰封海峡',
+  'The Reckoning':'清算时刻',
+  'Ghost Fleet':'幽灵舰队',
+  'Last Bastion':'最后堡垒',
+  'The Long Night':'漫漫长夜',
+  'Hurricane Alley':'飓风走廊',
+  'Twin Leviathans':'双子利维坦',
+  'The Crucible':'熔炉',
+  'Steel Rain':'钢铁之雨',
+  'Endless Horizon':'无尽地平线',
+  'The Final Blockade':'最终封锁',
+  'Ragnarök Reef':'诸神黄昏礁',
+  'The Last Tide':'最后的浪潮',
+  // 天气（代码里以大写出现在提示中）
+  'CLEAR':'晴朗',
+  'STORM':'风暴',
+  'FOG':'大雾',
+  'OVERCAST':'阴天',
+  // 坦克部件
+  'Left track':'左履带',
+  'Right track':'右履带',
+  'Engine':'发动机',
+  'Transmission':'变速箱',
+  'Turret ring':'炮塔座圈',
+  'Gun barrel':'炮管',
+  'Breech':'炮闩',
+  'Optics':'观瞄镜',
+  'Ammo rack':'弹药架',
+  'Fuel tank':'油箱',
+  'Driver':'驾驶员',
+  'Gunner':'炮手',
+  'Loader':'装填手',
+  'Commander':'指挥官',
+  // 飞机部件
+  'Left wing':'左机翼',
+  'Right wing':'右机翼',
+  'Left engine':'左发动机',   // partLabel() 对双发飞机的 engL 会返回 'Left engine'
+  'Right engine':'右发动机',
+  'Tail':'尾翼',
+  'Elevators':'升降舵',
+  'Ailerons':'副翼',
+  'Weapons':'武器系统',
+  'Landing gear':'起落架',
+  'Rotor':'旋翼',
+  // 部件状态
+  'damaged':'受损',
+  'CRITICAL':'严重受损',
+  'DESTROYED':'已摧毁',
+  // 舰队命令
+  'ALL SHIPS ATTACK':'全体舰船进攻',
+  'CAPTURE ISLANDS':'夺取岛屿',
+  'REGROUP ON FLAGSHIP':'向旗舰集结',
+  // 支线目标
+  'BONUS: sink 3 warships':'奖励：击沉 3 艘战舰',
+  'BONUS: down 3 aircraft':'奖励：击落 3 架飞机',
+  'BONUS: capture an island':'奖励：占领一座岛屿',
+  // 军衔（Commander 键被坦克车长占用，军衔请优先查 RANKS_ZH)
+  'Ensign':'少尉',
+  'Lieutenant':'上尉',
+  'Captain':'上校',
+  'Commodore':'准将',
+  'Rear Admiral':'少将',
+  'Vice Admiral':'中将',
+  'Admiral':'上将',
+  'Fleet Admiral':'海军元帅',
+};
+
+// Iron Tide 中文提示词典 — 供 trText() 边界翻译使用:ZH_EXACT 精确匹配整句,ZH_PATTERNS 处理运行时拼接的动态句(依赖全局 trName() 翻译名称/状态/天气等)。
+const ZH_EXACT = {
+  // ---- 资金 / 舰队命令 ----
+  'Not enough funds': '资金不足',
+  'No warships to command.': '没有可以指挥的战舰。',
+  '📻 ORDER: ALL SHIPS ATTACK': '📻 命令：全舰进攻',
+  '📻 ORDER: CAPTURE ISLANDS': '📻 命令：夺取岛屿',
+  '📻 ORDER: REGROUP ON FLAGSHIP': '📻 命令：向旗舰集结',
+
+  // ---- 打捞 / 水雷 ----
+  '📦 Salvaged repair stores — hull restored': '📦 打捞到维修物资——船体已修复',
+  '📦 Salvaged aviation supplies': '📦 打捞到航空补给',
+  'Mine limit reached (5)': '水雷已达上限（5 颗）',
+  '⚓ Naval mine deployed (5 maximum)': '⚓ 水雷布放完成（最多 5 颗）',
+
+  // ---- 任务 ----
+  '✖ Objective failed.': '✖ 任务失败。',
+  '💰 SECRET FUNDS: +$10,000': '💰 秘密资金：+$10,000',
+
+  // ---- 视角切换(T 键三元字面量) ----
+  'External chase view': '舰外追踪视角',
+  'Bridge view': '舰桥视角',
+  'First-person view': '第一人称视角',
+  'Chase view': '追踪视角',
+
+  // ---- 战舰沉没 / 上下舰 ----
+  '⚓ Your ship was sunk while you were away. Return to your harbor and press P for a replacement.': '⚓ 你不在船上时，战舰被击沉了。回到我方海港，按 P 领取新战舰。',
+  'Return to your friendly harbor, then press P to request a replacement ship.': '回到我方海港，再按 P 申请新战舰。',
+  'P = parachute from aircraft, or request a replacement ship at harbor after yours is sunk.': '按 P：开飞机时跳伞；战舰沉了以后，也能在海港按 P 领新战舰。',
+  'No ship on this theater — this is an airborne ground assault. Capture the command posts.': '这个战区没有战舰——这是空降地面突击。去占领各个指挥所吧。',
+  'Your ship is gone — return to friendly harbor and press P for a replacement.': '你的战舰没了——回到我方海港，按 P 领取新战舰。',
+  'Back aboard.': '回到舰上了。',
+  'Walk back to your ship to climb aboard.': '走回战舰旁边才能上舰。',
+  'Sail right up alongside an island or harbor, then press G to go ashore.': '把战舰紧紧靠上岛屿或海港，再按 G 上岸。',
+  'Ashore! WASD to walk · G to re-board near your ship.': '上岸了！WASD 走动 · 靠近战舰按 G 回船。',
+
+  // ---- 坦克 ----
+  'Out of the tank.': '下车了。',
+  'Bring the ship alongside an island, then G to put the tank ashore': '把战舰开到岛边，再按 G 送坦克上岸',
+  '🪖 Tank ashore — clear the garrison to capture · G to re-embark': '🪖 坦克上岸了——消灭守军就能占领 · G 回船',
+  'No extraction ship in this theater — keep the tank ashore and push the assault.': '这个战区没有接应的战舰——让坦克留在岸上，继续冲锋。',
+  'Your ship is gone — drive or dismount back to harbor for a replacement.': '你的战舰没了——开着坦克或下车走回海港，领取新战舰。',
+  'Tank re-embarked.': '坦克回到甲板上了。',
+  'Drive back alongside your ship to re-embark the tank.': '把坦克开回战舰旁边，才能重新上船。',
+  '🔥 AMMO RACK HIT — bail out!': '🔥 弹药架中弹——快弃车！',
+  '💢 Ricochet!': '💢 跳弹！',
+  'Out of range — aim closer': '太远打不到——瞄近一点',
+  'Tank destroyed!': '坦克被击毁！',
+  'Ammunition cook-off!': '弹药殉爆！',
+  'Burned out!': '烧毁了！',
+
+  // ---- 声呐 ----
+  '◉ SONAR PING — contacts revealed for 4 seconds': '◉ 声呐脉冲——敌人现形 4 秒',
+
+  // ---- 岛屿建造 ----
+  'Go ashore on an island (G) to build defenses': '先按 G 登岛，才能建造防御',
+  'Swim to dry land before building defenses': '先游上岸，才能建造防御',
+  'Capture this position before building defenses': '先占领这里，才能建造防御',
+  'This position is not under friendly control': '这里还不归我方控制',
+  'Only one operational R-36M silo is permitted per side': '每一方只能有一座 R-36M 发射井',
+  'These enormous structures require a proper island': '这种巨型建筑要建在真正的岛屿上',
+  'This island already has a command post': '这座岛已经有指挥所了',
+  'Not enough clear ground — move farther from existing buildings': '空地不够——离旁边的建筑远一点',
+
+  // ---- 甲板炮 ----
+  'Stand next to a deck gun, then X to scrap it': '站到甲板炮旁边，再按 X 拆掉它',
+  'Pick a weapon in the Armory (Tab)': '先在军械库（Tab）里选一件武器',
+  'Too close to the edge of the deck': '离甲板边缘太近了',
+  'Too close to another gun': '离旁边的炮太近了',
+
+  // ---- E 键交互(三元字面量) ----
+  'Get back to your harbor and press P for a replacement ship.': '回到我方海港，按 P 领取新战舰。',
+  'Find a friendly tank to crew, or keep pushing the assault.': '找一辆我方坦克开，或者继续进攻。',
+  'Press G to re-board your ship.': '按 G 回到你的战舰上。',
+  'No deck left to land on — press P to parachute, then reach harbor.': '没有甲板可以降落了——按 P 跳伞，再回海港。',
+  'Landing aborted — climb away.': '取消降落——拉起爬升。',
+  'Walk up to a tank, turret, or plane to operate it': '走到坦克、炮塔或飞机旁边，才能操作它',
+
+  // ---- 飞机 ----
+  'No free flight spot on deck': '甲板上没有空停机位了',
+  'Stand on dry friendly ground to call in a tank': '站到我方陆地上，才能呼叫坦克',
+  'Too crowded for a tank drop — move a few steps': '这里太挤，坦克放不下——走开几步',
+  'No free deck slot — a bigger ship carries more tanks': '甲板没有空位了——更大的战舰能装更多坦克',
+  '✈️ Flight deck wrecked — can’t launch until it’s repaired': '✈️ 飞行甲板被炸坏了——修好之前不能起飞',
+  'Takeoff roll…': '起飞滑跑中……',
+  'Landing — bring it down OVER the ship, or you ditch.': '降落中——一定要降到战舰正上方，不然就会掉进海里。',
+  'Recovered safely on deck.': '安全降落在甲板上。',
+  'OUT OF FUEL — engine dead! Glide her down.': '燃油用光——发动机停了！慢慢滑翔下去吧。',
+  'ENGINE STALL — too steep! Ease off and level out.': '发动机失速——飞得太陡了！放平机身缓一缓。',
+  'Engine restarted.': '发动机重新启动了。',
+  'Weapons knocked out!': '武器被打坏了！',
+  'Airborne — you have control.': '起飞了——飞机交给你了。',
+  '☢ TSAR BOMBA RELEASED — CLEAR THE BLAST AREA!': '☢ 沙皇炸弹已投下——快离开爆炸区！',
+  '☢ STRATEGIC WEAPON RELEASED — CLEAR THE BLAST AREA!': '☢ 战略武器已投下——快离开爆炸区！',
+  'Aircraft lost!': '飞机没了！',
+  'Landing gear collapsed on touchdown!': '着陆时起落架折断了！',
+  'Kamikaze!': '神风撞击！',
+  'Kamikaze into the harbor!': '神风撞进了海港！',
+  'Main rotor failed — going down!': '主旋翼坏了——正在坠落！',
+  'Cockpit hit — pilot down!': '座舱中弹——飞行员倒下了！',
+  'Your aircraft was shot down!': '你的飞机被击落了！',
+  'Ditched in the ocean — aircraft destroyed!': '迫降到海里——飞机报废了！',
+  'Crashed into the sea — aircraft destroyed!': '撞进大海——飞机报废了！',
+  'Flew into the sea — aircraft destroyed!': '一头扎进大海——飞机报废了！',
+
+  // ---- 损管(舰船部件着火/进水,critMsg 字面量) ----
+  'Fighting the fire…': '正在灭火……',
+  '🧯 Fire out.': '🧯 火扑灭了。',
+  'Fire out.': '火扑灭了。',
+  'Flooding slowing…': '进水慢下来了……',
+  '💧 Flooding contained.': '💧 进水堵住了。',
+  '🔥 FIRE': '🔥 起火了',
+  '💧 HULL BREACH — FLOODING': '💧 船体破洞——正在进水',
+  '🛞 ENGINE CRIPPLED — crawling': '🛞 引擎重伤——只能慢慢爬',
+  '🛞 ENGINE DAMAGED — slowed': '🛞 引擎受损——速度变慢',
+  '🔫 TURRET KNOCKED OUT': '🔫 一座炮塔被打哑了',
+  '📡 RADAR DOWN': '📡 雷达坏了',
+  '✈️ FLIGHT DECK WRECKED': '✈️ 飞行甲板被炸坏了',
+  '🛞 ENGINE CRIPPLED': '🛞 引擎重伤',
+  '🛞 ENGINE DAMAGED': '🛞 引擎受损',
+  '🔥 fire reached the engine!': '🔥 大火烧到了引擎！',
+  '🔥 fire reached a magazine!': '🔥 大火烧到了弹药库！',
+  '🛞 engine limping': '🛞 引擎勉强能转了',
+  '🛞 engine repaired': '🛞 引擎修好了',
+  '🔫 turret back online': '🔫 炮塔恢复射击',
+  '📡 radar restored': '📡 雷达修好了',
+  '✈️ flight deck repaired': '✈️ 飞行甲板修好了',
+
+  // ---- 利维坦 / 跳伞 / 潜艇 / 核武 / 警报 ----
+  '⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY': '⚓ 击沉敌方利维坦——赏金 $30,000',
+  '🪂 Parachute deployed — landed safely.': '🪂 降落伞打开——安全着陆。',
+  '🪂 Parachute deployed — splashdown! Swim to land or harbor.': '🪂 降落伞打开——落进海里啦！快游向陆地或海港。',
+  'Only submarines can dive (pick the Attack Submarine)': '只有潜艇能下潜（去选攻击潜艇吧）',
+  '🌊 DIVE! DIVE! — running silent · torpedoes only': '🌊 下潜！下潜！——静音潜航 · 只能发射鱼雷',
+  '⬆ Surfacing — all weapons back online': '⬆ 上浮——所有武器恢复使用',
+  '⚠ Out of air — surfacing!': '⚠ 空气用完了——紧急上浮！',
+  '☢ R-36M WARHEAD DETONATED': '☢ R-36M 核弹头已引爆',
+  '☢ R-36M LAUNCHED — WARHEAD IN FLIGHT': '☢ R-36M 已发射——核弹头飞行中',
+  '☢ ENEMY R-36M LAUNCH DETECTED — INTERCEPT IT!': '☢ 发现敌方 R-36M 发射——快拦截！',
+  '⚠ SUPER-HEAVY ARTILLERY INBOUND — MOVE!': '⚠ 超重型炮弹来袭——快躲开！',
+  '⚠ SAM LAUNCH — BREAK LOCK!': '⚠ 防空导弹来了——快甩掉锁定！',
+  'Build an R-36M silo before opening strategic fire': '先建一座 R-36M 发射井，才能发动战略打击',
+  'R-36M silo offline — island power required': 'R-36M 发射井断电了——岛上需要发电站',
+  'Nuclear targeting prohibited inside a harbor exclusion zone': '海港禁区内不能设为核打击目标',
+
+  // ---- 聊天指令 ----
+  'COMMAND: Type /help to list captain commands.': '指挥部：输入 /help 查看舰长指令。',
+  'COMMANDS: /status · /map · /shop · /harbor · /sonar · /mine · /damage · /sound · /clear': '指令：/status · /map · /shop · /harbor · /sonar · /mine · /damage · /sound · /clear',
+  'COMMAND: Strategic map toggled.': '指挥部：战略地图已切换。',
+  'COMMAND: Armory toggled.': '指挥部：军械库已切换。',
+  'COMMAND: Harbor command toggled.': '指挥部：海港指挥部已切换。',
+
+  // ---- 重新出击菜单(#menu .sub) ----
+  'Pick a replacement. It redeploys from your harbor.': '选一艘替补战舰，它会从我方海港重新出发。',
+  'You were killed ashore — choose a replacement ship or redeploy from harbor.': '你在岸上牺牲了——选一艘替补战舰，从海港重新出发。',
+  'You were lost with your ship — pick a replacement. It redeploys from your harbor. (The war isn’t over until a harbor falls.)': '你和战舰一起沉入了大海——选一艘替补，它会从我方海港重新出发。（只要海港还在，战争就没有结束。）',
+  'Back at harbor — choose your replacement ship. Your last ship is gone for good.': '回到海港了——选择替补战舰。上一艘已经永远回不来了。',
+  'The Leviathan was a one-life flagship and cannot be deployed again. Choose another ship.': '利维坦是只有一条命的旗舰，不能再次出战。换一艘战舰吧。',
+
+  // ---- 战争结束语 ----
+  'All islands secured — the archipelago is yours!': '所有岛屿都拿下了——整片群岛都是你的！',
+  'Enemy harbor destroyed — the coast is yours!': '敌方海港被摧毁——这片海域是你的了！',
+  'Your harbor was overrun!': '我们的海港失守了！',
+
+  // ---- 启动报错 ----
+  'Could not start the 3D engine — try GitHub Pages or open the file directly.': '3D 引擎启动失败——试试 GitHub Pages，或者直接打开文件。',
+  'Three.js failed to load (check connection / use GitHub Pages).': 'Three.js 加载失败（检查网络 / 改用 GitHub Pages）。',
+
+  // ---- 战略地图提示 ----
+  'Select a friendly R-36M silo, then select a target area. Press N to close.': '先选择一座我方 R-36M 发射井，再选择目标区域。按 N 关闭。',
+  'No friendly R-36M silo exists. Build one on a controlled island.': '我方还没有 R-36M 发射井。先在已控制的岛屿上建造一座。',
+  'Selected silo is OFFLINE — build or repair its island power station.': '选中的发射井断电了——建造或修好岛上的发电站。',
+  'R-36M READY — click a target area. Harbors and their exclusion zones cannot be targeted.': 'R-36M 准备就绪——点击目标区域。海港和它的禁区不能作为目标。',
+
+  // ---- Claude 舰载 AI 提示 ----
+  'Welcome aboard, Captain! Click me anytime for advice.': '欢迎登舰，舰长！随时点我，我来出主意。',
+  'Take the helm with E — W/S throttle, A/D rudder.': '按 E 掌舵——W/S 油门，A/D 方向舵。',
+  'Press Tab for the Armory, then F to mount a gun right where you stand.': '按 Tab 打开军械库，再按 F，炮就装在你站的地方。',
+  'Press H for harbor upgrades — the Repair Dock is a lifesaver.': '按 H 升级海港——维修船坞关键时刻能救命。',
+  'Sail beside an island and press G to go ashore. B builds defenses there.': '开到岛边按 G 上岸，再按 B 就能建防御。',
+  'Capture islands by clearing their defenders and holding close — they extend your radar.': '清光守军、守在岛边就能占领——岛屿还能扩大你的雷达。',
+  'Buy planes in the Hangar: E to fly one yourself, Y to send up an AI pilot.': '去机库买飞机：按 E 自己开，按 Y 派 AI 飞行员上天。',
+  'Tanks ride your deck — E to crew one, G to land it on an island.': '坦克就停在甲板上——按 E 上车，按 G 送它登岛。',
+  'Watch the weather: fog, storms and night shrink everyone’s sensors.': '留意天气：大雾、风暴和黑夜会让所有人都看不远。',
+  'Press T for first-person view in tanks, planes, turrets and at the helm.': '开坦克、飞机、炮塔或掌舵时，按 T 切换第一人称视角。',
+  'The enemy Leviathan is worth $30,000. Bring friends.': '敌方利维坦值 $30,000。记得多带帮手。',
+  'Submarines dive with C — invisible to guns, but torpedoes only.': '潜艇按 C 下潜——大炮打不到你，但你也只能用鱼雷。',
+  'Sinking the enemy harbor wins the war — but islands feed your economy first.': '击沉敌方海港就赢了——不过先占岛赚钱更稳。',
+  '⚠ Hull critical, Captain! Run for home — the Repair Dock patches you up.': '⚠ 舰长，船体快撑不住了！快回家——维修船坞能把你修好。',
+  '🔥 We’re on fire! It burns down in time — faster near the Repair Dock.': '🔥 我们着火了！火会慢慢熄灭——靠近维修船坞灭得更快。',
+  '💧 Taking on water! Stop taking hits and the crew will plug the leak.': '💧 船在进水！别再挨打，船员就能把漏洞堵上。',
+  '⛽ Fuel’s low — fly home and press E over the deck to land.': '⛽ 燃油不多了——飞回来，在甲板上方按 E 降落。',
+  '🚨 Our harbor is being pounded — get back and defend it!': '🚨 我们的海港正被猛轰——快回去保卫它！',
+  'No guns mounted yet! Tab → pick a weapon → F on deck to install it.': '还没装炮呢！Tab → 选武器 → 在甲板上按 F 安装。',
+
+  // ---- 奖励任务标签(整句与去前缀两种形态) ----
+  'BONUS: sink 3 warships': '奖励任务：击沉 3 艘战舰',
+  'BONUS: down 3 aircraft': '奖励任务：击落 3 架飞机',
+  'BONUS: capture an island': '奖励任务：占领一座岛',
+  'sink 3 warships': '击沉 3 艘战舰',
+  'down 3 aircraft': '击落 3 架飞机',
+  'capture an island': '占领一座岛',
+
+  // ---- 舰队无线电(comms 字面量) ----
+  'All ships — press the attack!': '全体战舰——发起进攻！',
+  'All ships — take the islands!': '全体战舰——夺取岛屿！',
+  'All ships — form on me!': '全体战舰——向我集结！',
+  '⚠ Taking heavy fire — requesting assistance!': '⚠ 遭到猛烈炮火——请求支援！',
+  'On station — moving to take an island.': '已就位——正去夺岛。',
+  'Reporting for duty — weapons hot.': '前来报到——武器就绪。',
+  'Moving to secure the island.': '正去占领那座岛。',
+
+  // ---- 组合句里的小名词(供模式规则回查) ----
+  'the island': '那座岛',
+  'the command center': '指挥中心',
+  'tank': '坦克'
+};
+
+const ZH_PATTERNS = (() => {
+  const rules = [];
+  // R():先查 ZH_EXACT,再递归尝试各条规则,最后交给 trName() 兜底
+  const R = s => {
+    if (ZH_EXACT[s]) return ZH_EXACT[s];
+    for (const p of rules) { const m = s.match(p.re); if (m) return p.out(m); }
+    return trName(s);
+  };
+  // SUM():部件简报尾巴(如 '  ·  🔧 Left! Engine‼')。代码只取部件名的首个单词
+  // (TPART_NAME/PART_NAME 的 .split(' ')[0]),所以先查缩写表,再交 trName() 兜底。
+  const ABBR = {
+    Left: '左', Right: '右', Engine: '发动机', Transmission: '变速箱', Turret: '炮塔',
+    Gun: '炮管', Breech: '炮闩', Optics: '观瞄镜', Ammo: '弹药', Fuel: '油箱',
+    Driver: '驾驶员', Gunner: '炮手', Loader: '装填手', Commander: '指挥官',
+    Tail: '尾翼', Elevators: '升降舵', Ailerons: '副翼', Weapons: '武器',
+    Landing: '起落架', Rotor: '旋翼'
+  };
+  const SUM = s => s.replace(/[A-Za-z]+/g, w => ABBR[w] || trName(w));
+  const FACING = { front: '正面', rear: '尾部', side: '侧面', top: '顶部' };
+  const DC = { BOW: '船头', MID: '船中', STERN: '船尾' };
+
+  rules.push(
+    // ---- 阵亡后的重新出击长句(先匹配带固定后缀的组合句) ----
+    { re: /^([\s\S]+) You did not bail out — choose another ship or restart from harbor\.$/, out: m => R(m[1]) + '你没能跳伞——另选一艘战舰，或从海港重新开始。' },
+    { re: /^([\s\S]+) Your crew was lost — pick a replacement from harbor\.$/, out: m => R(m[1]) + '车组全员牺牲——去海港选一艘替补战舰吧。' },
+    { re: /^Kamikaze run on the (.+)!$/, out: m => '神风撞向了' + trName(m[1]) + '！' },
+    { re: /^Tank knocked out \[(front|rear|side|top)\]!$/, out: m => '坦克被击毁[' + FACING[m[1]] + ']！' },
+    { re: /^Tank hit \[(front|rear|side|top)\] (\d+)%([\s\S]*)$/, out: m => '坦克中弹[' + FACING[m[1]] + '] ' + m[2] + '%' + SUM(m[3]) },
+
+    // ---- ⚠ 家族:由具体到宽泛 ----
+    { re: /^⚠ ENEMY OFFENSIVE — (\d+) warships inbound!$/, out: m => '⚠ 敌军大举进攻——' + m[1] + ' 艘战舰来袭！' },
+    { re: /^⚠ (.+) COMMAND POST DESTROYED — ISLAND NEUTRALIZED$/, out: m => '⚠ ' + trName(m[1]) + ' 的指挥所被摧毁——岛屿失去归属' },
+    { re: /^⚠ (.+) LOST — enemy forces captured the outpost$/, out: m => '⚠ 失去了 ' + trName(m[1]) + '——敌军占领了前哨' },
+    { re: /^⚠ (.+?) (damaged|CRITICAL|DESTROYED)$/, out: m => '⚠ ' + trName(m[1]) + ' ' + trName(m[2]) },
+
+    // ---- 🏝 家族 ----
+    { re: /^🏝 (.+) SECURED — command post established; construction unlocked$/, out: m => '🏝 拿下 ' + trName(m[1]) + '——指挥所已建立，可以开工建造了' },
+    { re: /^🏝 (.+) — refueling and rearming$/, out: m => '🏝 ' + trName(m[1]) + '——正在加油补弹' },
+
+    // ---- 💥 家族 ----
+    { re: /^💥 (.+) torn off!$/, out: m => '💥 ' + trName(m[1]) + ' 整个被打飞了！' },
+
+    // ---- 🔧 家族 ----
+    { re: /^🔧 DAMAGE CONTROL PRIORITY: (BOW|MID|STERN)$/, out: m => '🔧 损管优先：' + DC[m[1]] },
+    { re: /^🔧 (.+) repaired$/, out: m => '🔧 ' + trName(m[1]) + ' 修好了' },
+
+    // ---- 天气 / 声音 / 装备 / 打捞 / 水雷 ----
+    { re: /^⛅ Weather: (.+)$/, out: m => '⛅ 天气：' + trName(m[1]) },
+    { re: /^🔊 Sound (ON|OFF)$/, out: m => '🔊 声音：' + (m[1] === 'ON' ? '开' : '关') },
+    { re: /^Equipped (.+)$/, out: m => '装备了 ' + trName(m[1]) },
+    { re: /^📦 Salvaged \$(\d+)$/, out: m => '📦 打捞到 $' + m[1] },
+    { re: /^Mine rack reloading — (\d+)s$/, out: m => '水雷架装填中——' + m[1] + ' 秒' },
+    { re: /^A naval mine costs \$(\d+)$/, out: m => '布一颗水雷要花 $' + m[1] },
+
+    // ---- 任务 / 空降 / 战区开场 ----
+    { re: /^✅ OBJECTIVE COMPLETE — \+\$(\d+)$/, out: m => '✅ 任务完成——+$' + m[1] },
+    { re: /^★ NEW OBJECTIVE — (.+) \(\$(\d+)\)$/, out: m => '★ 新任务——' + R(m[1]) + '（$' + m[2] + '）' },
+    { re: /^🪂 AIRBORNE ASSAULT — landed at (.+)\. Secure every island\.$/, out: m => '🪂 空降突击——降落在' + R(m[1]) + '。去占领所有岛屿！' },
+    // 战区开场横幅:名字被大写显示,主题句是 CAMPAIGN[i].theme 原文——按名字反查
+    // CAMPAIGN/CAMPAIGN_ZH(按下标对齐)取全中文;字典不在场时退回 trName()。
+    { re: /^⚔ (.+?) — ([\s\S]+)$/, out: m => {
+        let zn = null, zt = null;
+        if (typeof CAMPAIGN !== 'undefined' && typeof CAMPAIGN_ZH !== 'undefined') {
+          const i = CAMPAIGN.findIndex(c => c && c.name && c.name.toUpperCase() === m[1].toUpperCase());
+          if (i >= 0 && CAMPAIGN_ZH[i]) { zn = CAMPAIGN_ZH[i].name; if (CAMPAIGN[i].theme === m[2]) zt = CAMPAIGN_ZH[i].theme; }
+        }
+        return '⚔ ' + (zn || trName(m[1])) + '——' + (zt || trName(m[2]));
+      } },
+    { re: /^⚕ Hit on foot — (\d+)% health$/, out: m => '⚕ 你中弹了——生命值 ' + m[1] + '%' },
+
+    // ---- 坦克动态句 ----
+    { re: /^Crewing the (.+) — WASD drive · Mouse aim · Click fire · E to dismount\.$/, out: m => '开上' + R(m[1]) + '——WASD 驾驶 · 鼠标瞄准 · 点击开火 · E 下车。' },
+    { re: /^🪖 Tank ashore on (.+) — clear the garrison to capture · G to re-embark$/, out: m => '🪖 坦克登上 ' + trName(m[1]) + '——消灭守军就能占领 · G 回船' },
+
+    // ---- 声呐 / 升级 / 建造 ----
+    { re: /^SONAR recharging — (\d+)s$/, out: m => '声呐充能中——' + m[1] + ' 秒' },
+    { re: /^(.+) → Lv (\d+)$/, out: m => trName(m[1]) + ' → Lv ' + m[2] },
+    { re: /^Go ashore on an island \(G\) to emplace (.+)$/, out: m => '先按 G 登岛，才能布设' + trName(m[1]) },
+    { re: /^Swim to dry land before building (.+)$/, out: m => '先游上岸，才能建造' + trName(m[1]) },
+    { re: /^(.+) is too large for that patch of ground$/, out: m => trName(m[1]) + ' 太大了，这块地放不下' },
+    { re: /^(.+) constructed — OFFLINE until a power station is built$/, out: m => trName(m[1]) + ' 建好了——在建成发电站之前处于断电状态' },
+    { re: /^(.+) constructed$/, out: m => trName(m[1]) + ' 建好了' },
+    { re: /^Scrapped (.+) \(\+\$(\d+)\)$/, out: m => '拆掉了 ' + trName(m[1]) + '（+$' + m[2] + '）' },
+    { re: /^Gun limit reached — this hull mounts only (\d+) guns$/, out: m => '火炮满了——这艘船最多装 ' + m[1] + ' 门炮' },
+
+    // ---- 飞机 / 坦克购买与派遣 ----
+    { re: /^🤖 (.+) launched under AI control — it fights for you$/, out: m => '🤖 ' + trName(m[1]) + ' 由 AI 驾驶起飞——它会替你作战' },
+    { re: /^(.+) ready on deck — press E aboard it to fly$/, out: m => trName(m[1]) + ' 已停上甲板——走过去按 E 起飞' },
+    { re: /^(.+) delivered beside you — press E near it to crew it$/, out: m => trName(m[1]) + ' 已送到你身边——靠近按 E 上车' },
+    { re: /^(.+) loaded on deck — walk up and press E to crew it$/, out: m => trName(m[1]) + ' 已装上甲板——走过去按 E 上车' },
+
+    // ---- 飞行中弹 ----
+    { re: /^Hit! (\d+)%([\s\S]*)$/, out: m => '中弹！' + m[1] + '%' + SUM(m[2]) },
+
+    // ---- R-36M ----
+    { re: /^R-36M reloading — (\d+) seconds$/, out: m => 'R-36M 装填中——' + m[1] + ' 秒' },
+    { re: /^R-36M reloading: (\d+) seconds\. Select another silo or press N to close\.$/, out: m => 'R-36M 装填中：' + m[1] + ' 秒。选别的发射井，或按 N 关闭。' },
+
+    // ---- 登岸 ----
+    { re: /^Ashore on (.+)! WASD to walk · G to re-board near your ship\.$/, out: m => '登上' + trName(m[1]) + '了！WASD 走动 · 靠近战舰按 G 回船。' },
+
+    // ---- 聊天 ----
+    { re: /^STATUS: Hull (\d+)% · \$(\d+) · Fleet (\d+)v(\d+) · Islands (\d+)\/(\d+)$/, out: m => '状态：船体 ' + m[1] + '% · $' + m[2] + ' · 舰队 ' + m[3] + 'v' + m[4] + ' · 岛屿 ' + m[5] + '/' + m[6] },
+    { re: /^UNKNOWN COMMAND: \/(.*) — type \/help$/, out: m => '未知指令：/' + m[1] + '——输入 /help 查看帮助' },
+    { re: /^CAPTAIN: ([\s\S]*)$/, out: m => '舰长：' + m[1] },
+
+    // ---- Claude 动态提示 ----
+    { re: /^★ Objective: (.+) — pays \$(\d+)\.$/, out: m => '★ 任务：' + R(m[1]) + '——完成奖励 $' + m[2] + '。' },
+    { re: /^\$(\d+) in the bunkers — Tab for guns, H for harbor upgrades\.$/, out: m => '仓库里存着 $' + m[1] + '——Tab 买炮，H 升级海港。' },
+
+    // ---- 舰队无线电动态句 ----
+    { re: /^Moving to secure (.+)\.$/, out: m => '正去占领' + R(m[1]) + '。' },
+    { re: /^Copy — inbound to cover (.+)\.$/, out: m => '收到——马上赶去支援 ' + m[1] + '。' },
+
+    // ---- 宽泛兜底(务必放最后):critMsg 与坦克摧毁广播 ----
+    { re: /^⚠ (.+)$/, out: m => '⚠ ' + R(m[1]) },
+    { re: /^💥 (.+)$/, out: m => '💥 ' + R(m[1]) }
+  );
+  return rules;
+})();
+
+// ---------- i18n: campaign helpers, static UI translation & language refresh ----------
+function campaignName(i){ const M=CAMPAIGN[i]; if(!M) return '';
+  return (isZh()&&typeof CAMPAIGN_ZH!=='undefined'&&CAMPAIGN_ZH[i]&&CAMPAIGN_ZH[i].name)||M.name; }
+function campaignTheme(i){ const M=CAMPAIGN[i]; if(!M) return '';
+  return (isZh()&&typeof CAMPAIGN_ZH!=='undefined'&&CAMPAIGN_ZH[i]&&CAMPAIGN_ZH[i].theme)||M.theme; }
+function applyStaticI18n(){
+  document.title=T('Iron Tide — Battleship Command','Iron Tide 钢铁怒潮——战舰指挥官');
+  const set=(sel,html)=>{ const el=document.querySelector(sel); if(el) el.innerHTML=html; };
+  set('#menu .sub',T('Choose your command. Buy guns. Hold the line.','选择座舰，买炮装舰，守住防线。'));
+  const obj=document.getElementById('objective');
+  if(obj) obj.innerHTML='<div style="color:#ff9a8a;letter-spacing:1px;">'+T('DESTROY THE ENEMY HARBOR','摧毁敌方海港')+'</div>'+
+    '<div style="display:flex;gap:14px;justify-content:center;margin-top:3px;">'+
+    '<span style="color:#ff9a8a;">'+T('Enemy HQ ','敌方总部 ')+'<b id="ehp">100%</b></span>'+
+    '<span style="color:#9fd0ff;">'+T('Your HQ ','我方总部 ')+'<b id="fhp">100%</b></span></div>'+
+    '<div id="territory" style="margin-top:3px;color:#a9b8c8;font-size:11px;"></div>';
+  set('#shiphpwrap .lab',T('HULL INTEGRITY','船体完整度'));
+  const ci=document.getElementById('chatinput');
+  if(ci) ci.placeholder=T('Message or /command · Enter to send · Esc to close','输入消息或 /命令 · Enter 发送 · Esc 关闭');
+  set('#tactical h2',T('☢ STRATEGIC MISSILE COMMAND','☢ 战略导弹指挥部'));
+  set('#tacticalHint',T('Select a friendly R-36M silo, then select a target area. Press N to close.','先选中我方 R-36M 发射井，再选择目标区域。按 N 关闭。'));
+  set('#shop h2',T('ARMORY','军械库'));
+  set('#shop .hint',T('Click to select, then close (Tab) and aim at a glowing mount on deck, press <b>F</b> to install.','点击选中武器，关闭商店（Tab）后站到甲板上，按 <b>F</b> 安装在脚前。'));
+  set('#harbor h2',T('⚓ HARBOR COMMAND','⚓ 海港指挥部'));
+  set('#harbor .hint',T('Spend funds to fortify and supply your harbor. Press <b>H</b> to close.','花钱加固和补给你的海港。按 <b>H</b> 关闭。'));
+  set('#build h2',T('🏝️ ISLAND ENGINEERS','🏝️ 岛屿工程队'));
+  set('#build .hint',T('No slot limit: every structure has a huge physical footprint and needs clear ground. Face the build location, then click. Press <b>B</b> to close.','数量不限：每座建筑都很占地方，需要空旷的地面。面向要建的位置再点击。按 <b>B</b> 关闭。'));
+  set('#over button',T('NEW COMMAND','再战一局'));
+}
+function refreshLanguage(){
+  applyStaticI18n();
+  // menu pieces are created-once with guards — remove them so buildMenu rebuilds localized copies
+  ['career','maps','menuDivider'].forEach(id=>{ const el=document.getElementById(id); if(el) el.remove(); });
+  buildMenu();
+  const cl=document.getElementById('claude'); if(cl){ cl.remove(); claudeLastMsg=''; }   // Claude widget re-inits localized
+  if(phase==='play'||phase==='respawn'){
+    buildShopUI(); if(harborOpen) buildHarborUI(); if(buildOpen) buildBuildUI();
+    if(player&&player.def){ updateMode(); updateHUD(); }
+  }
+}
+applyStaticI18n();
+
 // boot — show the menu immediately (pure DOM), then start 3D once Three.js is ready.
 // (some hosts, e.g. htmlpreview.github.io, run this script before the CDN <script> finishes.)
 buildMenu();
 function start3D(){ try{ initThree(); initWaterBase(); loop(); }catch(e){ console.error(e);
-  const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent='Could not start the 3D engine — try GitHub Pages or open the file directly.'; } }
+  const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent=trText('Could not start the 3D engine — try GitHub Pages or open the file directly.'); } }
 if(window.THREE){ start3D(); }
 else { let n=0, cdnTried=false; (function wait(){ if(window.THREE){ start3D(); }
   else if(n++<200){
     if(n===40 && !cdnTried){ cdnTried=true;   // local copy missing/blocked after ~2s — fall back to the CDN
       const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; document.head.appendChild(s); }
     setTimeout(wait,50); }
-  else { const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent='Three.js failed to load (check connection / use GitHub Pages).'; } })(); }
+  else { const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent=trText('Three.js failed to load (check connection / use GitHub Pages).'); } })(); }
 </script>
 </body>
 </html>
