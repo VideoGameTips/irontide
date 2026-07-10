@@ -26,6 +26,39 @@
   .ship .bar{height:6px;background:#0c1620;border-radius:3px;overflow:hidden;flex:1;margin-left:8px;align-self:center;}
   .ship .bar>i{display:block;height:100%;background:linear-gradient(90deg,#3a7fb4,#6fd0ff);}
 
+  /* ---- Campaign voyage map: one animated chart replaces the 31-card grid ---- */
+  #campmap svg{width:100%;height:auto;max-width:900px;display:block;margin:0 auto;overflow:visible;}
+  #campmap .cmg{transform-box:fill-box;transform-origin:center;}
+  #campmap .cmg.anim{opacity:0;animation:cmNodeIn .42s cubic-bezier(.34,1.4,.6,1) forwards;}
+  @keyframes cmNodeIn{from{opacity:0;transform:translateY(7px) scale(.55);}to{opacity:1;transform:none;}}
+  #campmap .cmg.open .hit{cursor:pointer;}
+  #campmap .cmg.open:hover .ring{stroke:#7fd0ff;}
+  #campmap .cmg.open:hover .lbl{fill:#eaf6ff;}
+  #campmap .trav.anim{animation:cmDraw 1.05s .1s ease-out both;}
+  @keyframes cmDraw{from{stroke-dashoffset:var(--len);}to{stroke-dashoffset:0;}}
+  #mapcard{width:min(560px,92vw);margin:12px auto 0;padding:13px 16px;border-radius:11px;
+    border:1px solid #2a4c68;background:linear-gradient(180deg,#13283a 0%,#101c28 100%);text-align:left;}
+  #mapcard.anim{animation:cardIn .28s ease-out;}
+  @keyframes cardIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+  #mapcard .no{font-size:11px;letter-spacing:2px;color:#ffd060;}
+  #mapcard .nm{font-size:19px;color:#e8f4ff;margin:3px 0 5px;}
+  #mapcard .th{font-size:12px;color:#8aa0b6;line-height:1.55;}
+  #mapcard .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+  #mapcard .tag{font-size:11px;color:#9fc6e8;background:#0d1a26;border:1px solid #24405a;border-radius:20px;padding:3px 10px;}
+  #mapcard .tag.boss{color:#ffd8a8;border-color:#6a4d2a;background:#1d1408;}
+  #mapsToggle{background:none;border:none;color:#5f8bab;font-size:12px;letter-spacing:1px;cursor:pointer;padding:6px 10px;}
+  #mapsToggle:hover{color:#9fc6e8;}
+  #moreShips{display:block;margin:2px auto 26px;background:none;border:none;color:#5f8bab;
+    font-size:13px;letter-spacing:1px;cursor:pointer;padding:8px 14px;}
+  #moreShips:hover{color:#9fc6e8;}
+  @media (prefers-reduced-motion:reduce){
+    #campmap .cmg.anim,#campmap .trav.anim,#mapcard.anim{animation:none;opacity:1;stroke-dashoffset:0;}
+  }
+  @media (max-width:560px){   /* the language button owns the top-right corner on a phone */
+    #menu h1{padding-top:60px;font-size:26px;letter-spacing:4px;}
+    #ships{gap:12px;padding:0 16px 20px;}
+  }
+
   /* ---- HUD ---- */
   #hud{position:fixed;inset:0;z-index:10;pointer-events:none;display:none;}
   #cross{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);}
@@ -2556,77 +2589,110 @@ addEventListener('keyup',e=>{ keys[e.code]=0; });
 //  MENU
 // =====================================================================
 // Serpentine "voyage map" of the whole campaign — shows the route, what's secured, and where the fleet is now.
-function campaignMapHTML(){
-  const N=CAMPAIGN.length, per=8, sp=111, px=54, py=50, rh=92, R=15, W=880;
-  const rows=Math.ceil(N/per), H=py*2+(rows-1)*rh;
-  const unlocked=mapsUnlocked(), beaten=career.completed?N:Math.max(0,unlocked-1);
+// The voyage map and the theater detail are one component: pick a node, the card below it
+// updates. Nodes stagger in and the travelled route draws itself the first time you see it.
+let _mapAnimated=false, _mapsOpen=false, _mapsInit=false, _allShips=false;
+const STARTER_SHIPS=['destroyer','scout','cruiser'];   // the recommended all-rounder first, then fast and heavy
+function mapPerRow(){ return document.documentElement.clientWidth<680 ? 4 : 8; }
+let _mapPer=0;
+function campaignMapSVG(animate){
+  const N=CAMPAIGN.length, per=(_mapPer=mapPerRow()), sp=111, px=54, py=50, rh=92, R=15;
+  const W=px*2+(per-1)*sp, rows=Math.ceil(N/per), H=py*2+(rows-1)*rh;
+  const unlocked=mapsUnlocked();
+  const beaten=career.completed?N:Math.max(0,unlocked-1);
   const pos=i=>{ const row=Math.floor(i/per); let col=i%per; if(row%2) col=per-1-col; return {x:px+col*sp,y:py+row*rh}; };
   const pt=i=>{ const p=pos(i); return p.x.toFixed(1)+','+p.y.toFixed(1); };
   const full='M'+Array.from({length:N},(_,i)=>pt(i)).join(' L');
   const travN=Math.min(N-1,currentMapIdx);
   const trav=travN>0 ? 'M'+Array.from({length:travN+1},(_,i)=>pt(i)).join(' L') : '';
-  let s='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;max-width:900px;display:block;margin:0 auto">';
+  let travLen=0; for(let i=1;i<=travN;i++){ const a=pos(i-1),b=pos(i); travLen+=Math.hypot(b.x-a.x,b.y-a.y); }
+  let s='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+T('Campaign voyage','战役航程')+'">';
   s+='<path d="'+full+'" fill="none" stroke="#22394d" stroke-width="4" stroke-dasharray="2 9" stroke-linecap="round"/>';
-  if(trav) s+='<path d="'+trav+'" fill="none" stroke="#3f88c8" stroke-width="4" stroke-linecap="round" opacity="0.92"/>';
-  for(let i=0;i<N;i++){ const p=pos(i), M=CAMPAIGN[i];
+  if(trav) s+='<path class="trav'+(animate?' anim':'')+'" style="--len:'+travLen.toFixed(1)+'" d="'+trav+
+    '" fill="none" stroke="#3f88c8" stroke-width="4" stroke-linecap="round" opacity="0.92"/>';
+  for(let i=0;i<N;i++){ const p=pos(i);
     const locked=i>=unlocked, done=i<beaten, cur=i===currentMapIdx;
     let fill='#123048',stroke='#3579a8',txtc='#cfe6fb',label=String(i+1);
     if(locked){ fill='#16222e';stroke='#2a3d4e';txtc='#51697d';label='🔒'; }
     else if(done){ fill='#123726';stroke='#3fae78';txtc='#8ff0b4';label='✓'; }
     if(cur){ stroke='#ffd060';txtc='#ffe9a8';label=String(i+1); }
-    s+='<g>';
+    const delay=animate?Math.min(0.9,i*0.028):0;
+    s+='<g class="cmg'+(locked?'':' open')+(animate?' anim':'')+'" data-idx="'+i+'" style="animation-delay:'+delay.toFixed(3)+'s">';
     if(cur) s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="'+(R+5)+'" fill="none" stroke="#ffd060" stroke-width="2"><animate attributeName="r" values="'+(R+4)+';'+(R+10)+';'+(R+4)+'" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.6s" repeatCount="indefinite"/></circle>';
-    s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="'+R+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(cur?3:2)+'"/>';
-    s+='<text x="'+p.x+'" y="'+p.y+'" text-anchor="middle" dominant-baseline="central" font-size="'+(label.length>1?12:14)+'" font-weight="700" fill="'+txtc+'" style="font-family:inherit">'+label+'</text>';
+    s+='<circle class="ring" cx="'+p.x+'" cy="'+p.y+'" r="'+R+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(cur?3:2)+'"/>';
+    s+='<text class="lbl" x="'+p.x+'" y="'+p.y+'" text-anchor="middle" dominant-baseline="central" font-size="'+(label.length>1?12:14)+'" font-weight="700" fill="'+txtc+'" style="font-family:inherit">'+label+'</text>';
     if(cur) s+='<text x="'+p.x+'" y="'+(p.y-R-7)+'" text-anchor="middle" font-size="15">⚓</text>';
-    s+='<circle class="cmnode" data-idx="'+i+'" data-locked="'+(locked?1:0)+'" cx="'+p.x+'" cy="'+p.y+'" r="'+(R+7)+'" fill="transparent"><title>'+(i+1)+'. '+campaignName(i)+(locked?T(' — locked',' — 未解锁'):' — '+campaignTheme(i))+'</title></circle>';
+    s+='<circle class="hit" cx="'+p.x+'" cy="'+p.y+'" r="'+(R+7)+'" fill="transparent"><title>'+(i+1)+'. '+campaignName(i)+(locked?T(' — locked',' — 未解锁'):' — '+campaignTheme(i))+'</title></circle>';
     s+='</g>';
   }
-  s+='</svg>';
-  const cap='<div style="text-align:center;margin:8px 0 2px;font-size:12px;color:#9fc6e8;letter-spacing:1px">'+
-    '<span style="color:#ffd060">'+T('⚓ THEATER '+(currentMapIdx+1)+' / '+N,'⚓ 战区 '+(currentMapIdx+1)+' / '+N)+'</span> — '+campaignName(currentMapIdx)+
-    ' &nbsp;·&nbsp; <span style="color:#8ff0b4">'+T('✓ '+beaten+' secured','✓ 已攻克 '+beaten)+'</span> &nbsp;·&nbsp; '+
-    (unlocked<N?'<span style="color:#7e93a8">'+T((N-unlocked)+' locked','未解锁 '+(N-unlocked))+'</span>':'<span style="color:#7e93a8">'+T('all theaters unlocked','全部战区已解锁')+'</span>')+'</div>';
-  return s+cap;
+  return s+'</svg>';
 }
+function theaterCardHTML(i){
+  const M=CAMPAIGN[i], army=mapArmyProfile(1,M), N=CAMPAIGN.length;
+  const tag=(t,cls)=>'<span class="tag'+(cls?' '+cls:'')+'">'+t+'</span>';
+  return '<div class="no">'+T('THEATER '+(i+1)+' / '+N,'战区 '+(i+1)+' / '+N)+'</div>'+
+    '<div class="nm">'+campaignName(i)+'</div>'+
+    '<div class="th">'+campaignTheme(i)+'</div>'+
+    '<div class="tags">'+
+      tag(T(M.enemies+' enemy ships',M.enemies+' 艘敌舰'))+
+      tag(T(M.isles+' islands',M.isles+' 座岛屿'))+
+      tag(trName(M.weather.toUpperCase()))+
+      (M.boss?tag(T('⚓ Enemy flagship','⚓ 敌方旗舰'),'boss'):'')+
+      tag(T('Ground army '+Math.round(army.soldiers*100)+'% / '+Math.round(army.tanks*100)+'%','地面部队 步兵 '+Math.round(army.soldiers*100)+'% · 坦克 '+Math.round(army.tanks*100)+'%'))+
+    '</div>';
+}
+function selectTheater(i){
+  if(i>=mapsUnlocked()||i===currentMapIdx) return;
+  currentMapIdx=i;
+  const cm=document.getElementById('campmap'); if(cm) cm.innerHTML=campaignMapSVG(false);
+  wireMapNodes();
+  const card=document.getElementById('mapcard');
+  if(card){ card.classList.remove('anim'); void card.offsetWidth; card.innerHTML=theaterCardHTML(i); card.classList.add('anim'); }
+}
+function wireMapNodes(){
+  document.querySelectorAll('#campmap .cmg.open').forEach(g=>{ g.onclick=()=>selectTheater(+g.getAttribute('data-idx')); });
+}
+// the serpentine reflows between 8 and 4 columns; rebuild it when the breakpoint is crossed
+addEventListener('resize',()=>{ if(document.getElementById('campmap') && mapPerRow()!==_mapPer) buildCampaignPicker(); });
 function buildCampaignPicker(){
   const ships=document.getElementById('ships'); if(!ships) return;
   if(currentMapIdx>=mapsUnlocked()) currentMapIdx=mapsUnlocked()-1; if(currentMapIdx<0) currentMapIdx=0;
+  const unlocked=mapsUnlocked(), N=CAMPAIGN.length;
   let box=document.getElementById('maps');
   if(!box){ box=document.createElement('div'); box.id='maps';
-    box.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;padding:0 24px 4px;';
-    const h=document.createElement('div'); h.id='mapsHeader'; h.textContent=T('CAMPAIGN VOYAGE','战役航程');
-    h.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:2px 0 10px;';
-    box.appendChild(h);
-    const dr=document.createElement('div'); dr.id='diffRow';
-    dr.style.cssText='width:100%;display:flex;flex-direction:column;align-items:center;gap:5px;margin:0 0 12px;';
-    box.appendChild(dr);
-    const sr=document.createElement('div'); sr.id='setRow';
-    sr.style.cssText='width:100%;display:flex;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:0 0 12px;';
-    box.appendChild(sr);
+    box.style.cssText='display:flex;flex-direction:column;align-items:center;padding:0 24px 4px;';
     ships.parentNode.insertBefore(box, ships);
     const sh=document.createElement('div'); sh.id='menuDivider'; sh.textContent=T('— CHOOSE YOUR COMMAND —','— 选择你的座舰 —');
     sh.style.cssText='width:100%;text-align:center;color:#6fa0c8;font-size:12px;letter-spacing:3px;margin:12px 0 6px;';
     ships.parentNode.insertBefore(sh, ships);
   }
-  // (re)draw the voyage map at the top of the box, then the theater detail cards below it
-  let cm=document.getElementById('campmap');
-  if(!cm){ cm=document.createElement('div'); cm.id='campmap'; cm.style.cssText='width:100%;margin:0 0 14px;'; box.insertBefore(cm, box.children[1]||null); }
-  cm.innerHTML=campaignMapHTML();
-  cm.querySelectorAll('.cmnode').forEach(el=>{ if(el.getAttribute('data-locked')==='0'){ el.style.cursor='pointer'; el.onclick=()=>{ currentMapIdx=+el.getAttribute('data-idx'); buildCampaignPicker(); }; } });
+  box.innerHTML='';
+  // With one theater unlocked, thirty padlocks say nothing except "this is complicated".
+  // Show the route only once there is a route to show; otherwise a single line of context.
+  // a returning captain wants the theater they just unlocked, not the training bay they cleared
+  if(unlocked>1 && !_mapsInit){ _mapsInit=true; _mapsOpen=true; if(currentMapIdx===0) currentMapIdx=unlocked-1; }
+  const showMap = unlocked>1 && _mapsOpen;
+  if(unlocked>1){
+    const t=document.createElement('button'); t.id='mapsToggle';
+    t.textContent=(_mapsOpen?'▾ ':'▸ ')+T('CAMPAIGN VOYAGE  ','战役航程  ')+T('('+(unlocked-1)+' of '+N+' secured)','（已攻克 '+(unlocked-1)+'/'+N+'）');
+    t.onclick=()=>{ _mapsOpen=!_mapsOpen; _mapAnimated=false; buildCampaignPicker(); };
+    box.appendChild(t);
+  }
+  if(showMap){
+    const cm=document.createElement('div'); cm.id='campmap'; cm.style.cssText='width:100%;margin:2px 0 0;';
+    cm.innerHTML=campaignMapSVG(!_mapAnimated); box.appendChild(cm);
+    _mapAnimated=true;
+  }
+  const card=document.createElement('div'); card.id='mapcard'; card.className='anim';
+  card.innerHTML=theaterCardHTML(currentMapIdx); box.appendChild(card);
+  if(showMap) wireMapNodes();
+  const dr=document.createElement('div'); dr.id='diffRow';
+  dr.style.cssText='width:100%;display:flex;flex-direction:column;align-items:center;gap:5px;margin:16px 0 6px;';
+  box.appendChild(dr);
+  const sr=document.createElement('div'); sr.id='setRow';
+  sr.style.cssText='width:100%;display:none;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:8px 0 0;';
+  box.appendChild(sr);
   renderDiffRow(); renderSettingsRow();
-  [...box.querySelectorAll('.mapcard')].forEach(e=>e.remove());
-  CAMPAIGN.forEach((M,i)=>{ const locked=i>=mapsUnlocked(), sel=i===currentMapIdx, army=mapArmyProfile(1,M);
-    const c=document.createElement('div'); c.className='mapcard';
-    c.style.cssText='width:152px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:'+(locked?'default':'pointer')+
-      ';border:1px solid '+(sel?'#5fd0ff':locked?'#22303c':'#21384e')+';background:'+(sel?'#13283a':'#101a24')+';opacity:'+(locked?0.45:1)+';';
-    c.innerHTML='<div style="color:'+(locked?'#5f7a90':'#cfe6fb')+';font-weight:600;font-size:13px">'+(locked?'🔒 ':'')+(i+1)+'. '+campaignName(i)+'</div>'+
-      '<div style="color:#7e93a8;margin-top:4px;line-height:1.4">'+(locked?T('Win the previous theater to unlock.','打赢上一个战区即可解锁。'):campaignTheme(i))+'</div>'+
-      (locked?'':'<div style="color:#5f7a90;margin-top:5px">'+T(M.enemies+' enemy · '+M.isles+' isles · '+M.weather,M.enemies+' 敌舰 · '+M.isles+' 岛 · '+trName(M.weather.toUpperCase()))+(M.boss?T(' · ⚓ boss',' · ⚓ 旗舰'):'')+
-        '<br>'+T('Ground army '+Math.round(army.soldiers*100)+'% infantry · '+Math.round(army.tanks*100)+'% tanks','地面部队 步兵 '+Math.round(army.soldiers*100)+'% · 坦克 '+Math.round(army.tanks*100)+'%')+'</div>');
-    if(!locked) c.onclick=()=>{ currentMapIdx=i; buildCampaignPicker(); };
-    box.appendChild(c);
-  });
 }
 function renderDiffRow(){
   const dr=document.getElementById('diffRow'); if(!dr) return;
@@ -2651,6 +2717,12 @@ function renderDiffRow(){
   dr.appendChild(row);
   const d=document.createElement('div'); d.textContent=descs[difficulty];
   d.style.cssText='font-size:11px;color:#5f7a90;'; dr.appendChild(d);
+  // settings live behind a gear so the first screen stays short
+  const g=document.createElement('button'); g.id='mapsToggle';
+  g.textContent='⚙️ '+T('Settings','设置');
+  g.onclick=()=>{ const sr=document.getElementById('setRow'); if(!sr) return;
+    sr.style.display=(sr.style.display==='none'?'flex':'none'); };
+  dr.appendChild(g);
 }
 function renderSettingsRow(){
   const sr=document.getElementById('setRow'); if(!sr) return;
@@ -2681,9 +2753,10 @@ function buildMenu(){
     menu.appendChild(b);
   }
   const lb=document.getElementById('langBtn'); if(lb) lb.textContent=isZh()?'🌐 English':'🌐 中文';
-  // career banner — rank, perks and lifetime record under the subtitle
+  // career banner — rank, perks and lifetime record under the subtitle.
+  // A row of zeroes teaches a first-time captain nothing, so it waits until there is a record.
   const sub=document.querySelector('#menu .sub');
-  if(sub && !document.getElementById('career')){
+  if(sub && !document.getElementById('career') && career.wins+career.losses>0){
     const r=careerRank(), nx=nextRank(), d=document.createElement('div');
     d.id='career';
     d.style.cssText='text-align:center;margin:-8px 0 14px;font-size:12px;color:#7e93a8;letter-spacing:1px;';
@@ -2709,7 +2782,11 @@ function buildMenu(){
   buildCampaignPicker();
   const wrap=document.getElementById('ships');
   wrap.innerHTML='';   // idempotent: buildMenu is re-run on language switch
-  Object.keys(SHIPS).forEach(id=>{
+  // Eight hulls (one of them a one-life flagship) is a lot to weigh up before your first
+  // battle. A first-time captain sees three; the rest are one click away.
+  const rookie = career.wins+career.losses===0 && !_allShips;
+  const ids = rookie ? STARTER_SHIPS : Object.keys(SHIPS);
+  ids.forEach(id=>{
     const s=SHIPS[id];
     const div=document.createElement('div'); div.className='ship';
     const bar=(v,mx)=>`<div class="bar"><i style="width:${Math.round(v/mx*100)}%"></i></div>`;
@@ -2724,6 +2801,13 @@ function buildMenu(){
     div.onclick=()=>chooseShip(id);
     wrap.appendChild(div);
   });
+  const old=document.getElementById('moreShips'); if(old) old.remove();
+  if(rookie){
+    const b=document.createElement('button'); b.id='moreShips';
+    b.textContent='▾ '+T('Show all '+Object.keys(SHIPS).length+' warships','显示全部 '+Object.keys(SHIPS).length+' 艘军舰');
+    b.onclick=()=>{ _allShips=true; buildMenu(); };
+    wrap.parentNode.insertBefore(b, wrap.nextSibling);
+  }
 }
 function installBossStarterGuns(build){
   const half=Math.floor(build.mounts.length/2),slots=[0,1,2,3,4,5,half,half+1,half+2,half+3,half+4,half+5];
