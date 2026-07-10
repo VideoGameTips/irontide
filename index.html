@@ -519,7 +519,9 @@ function mkCyl(rt,rb,h,m,seg=14){ const x=new THREE.Mesh(new THREE.CylinderGeome
 let water, waterGeo;
 function initThree(){
   renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),antialias:true});
-  renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(Math.min(1.5,devicePixelRatio));
+  // phones and tablets render the same 20k-mesh scene on a fraction of the GPU — cap the
+  // pixel ratio harder there so a busy fleet battle still holds a playable frame rate
+  renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(Math.min(TOUCH?1:1.5,devicePixelRatio));
   renderer.shadowMap.enabled=false;   // shadows were rendering ~20k meshes twice — huge cost
   renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.05;   // filmic curve only — no sRGB remap, keeps the original palette (silver ships stay silver)
   scene=new THREE.Scene();
@@ -2711,7 +2713,9 @@ function buildMenu(){
     const s=SHIPS[id];
     const div=document.createElement('div'); div.className='ship';
     const bar=(v,mx)=>`<div class="bar"><i style="width:${Math.round(v/mx*100)}%"></i></div>`;
-    div.innerHTML=`<h3>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'name',s.name)}</h3><div class="cls">${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'cls',s.cls)}</div><p>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'desc',s.desc)}</p>
+    const rec = id==='destroyer' && career.wins+career.losses===0;   // point brand-new captains at the all-rounder
+    if(rec) div.style.borderColor='#7fd0a0';
+    div.innerHTML=`<h3>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'name',s.name)}${rec?`<span style="float:right;font-size:10px;color:#7fd0a0;letter-spacing:1px;padding-top:5px">${T('★ START HERE','★ 新手推荐')}</span>`:''}</h3><div class="cls">${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'cls',s.cls)}</div><p>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'desc',s.desc)}</p>
       <div class="stats">
         <div class="row"><span>${T('Hull','船体')}</span>${bar(s.hp,700)}</div>
         <div class="row"><span>${T('Size','尺寸')}</span>${bar(s.len,100)}</div>
@@ -5502,8 +5506,10 @@ function drawMinimap(){
   [[friendlyHarbor,'#39d0ff'],[enemyHarbor,'#ff5a5a']].forEach(p=>{ const h=p[0]; if(!h||h.hp<=0||!inR(h.pos.x,h.pos.z))return;
     const [mx,my]=to(h.pos.x,h.pos.z); g.fillStyle=p[1]; g.fillRect(mx-3.5,my-3.5,7,7); });
   // allies (always visible) + enemies (within sensor range)
+  // friend/foe differ by SHAPE as well as colour — red-green colourblind players see ~8% of boys
+  const diamond=(x,y,r)=>{ g.beginPath(); g.moveTo(x,y-r); g.lineTo(x+r,y); g.lineTo(x,y+r); g.lineTo(x-r,y); g.closePath(); g.fill(); };
   g.fillStyle='#39d0ff'; allies.forEach(a=>{ if(a.sinkT>0||!inR(a.pos.x,a.pos.z))return; const [mx,my]=to(a.pos.x,a.pos.z); dot(mx,my,2.3); });
-  g.fillStyle='#ff3b3b'; enemies.forEach(e=>{ if(e.sinkT>0||!inR(e.pos.x,e.pos.z)||!enemyDetected(e))return; const [mx,my]=to(e.pos.x,e.pos.z); dot(mx,my,e.def.kind==='sub'?3:2.3); });
+  g.fillStyle='#ff3b3b'; enemies.forEach(e=>{ if(e.sinkT>0||!inR(e.pos.x,e.pos.z)||!enemyDetected(e))return; const [mx,my]=to(e.pos.x,e.pos.z); diamond(mx,my,e.def.kind==='sub'?3.6:2.9); });
   aiPlanes.forEach(p=>{ if(p.hp<=0||!inR(p.pos.x,p.pos.z))return; if(p.team===1&&!enemyDetectedAt(p.pos,1.15))return;
     const [mx,my]=to(p.pos.x,p.pos.z); g.fillStyle=p.team===1?'#ff8a3b':'#8fd6ff'; dot(mx,my,1.5); });
   salvage.forEach(s=>{if(!inR(s.pos.x,s.pos.z))return;const [mx,my]=to(s.pos.x,s.pos.z);g.fillStyle='#ffd050';dot(mx,my,2);});
