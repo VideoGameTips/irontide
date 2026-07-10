@@ -153,6 +153,7 @@
   #shopHead{position:sticky;top:-16px;z-index:3;margin:0 -16px 8px;padding:8px 16px;
     background:rgba(9,16,24,.97);border-bottom:1px solid #21384e;display:flex;align-items:center;justify-content:space-between;gap:8px;}
   #shopBal{font-size:19px;color:#ffe08a;letter-spacing:1px;text-shadow:0 0 8px rgba(255,200,80,.35);}
+  #shopDPS{font-size:12px;color:#9fc6e8;white-space:nowrap;}
   #shopPause{font-size:11px;color:#8fc9e9;background:#10222f;border:1px solid #2a4660;border-radius:20px;padding:3px 10px;white-space:nowrap;}
   #shopToast{display:none;margin:0 0 10px;padding:8px 11px;border-radius:8px;font-size:12px;line-height:1.45;
     border:1px solid #2a4660;background:#0e1a26;color:#cfe6fb;animation:toastIn .18s ease-out;}
@@ -274,7 +275,7 @@
 
 <!-- SHOP -->
 <div id="shop">
-  <div id="shopHead"><span id="shopBal">$0</span><span id="shopPause">⏸ war paused</span></div>
+  <div id="shopHead"><span id="shopBal">$0</span><span id="shopDPS"></span><span id="shopPause">⏸ war paused</span></div>
   <h2>ARMORY</h2>
   <div class="hint">Click a weapon, then press <b>F</b> to install it.</div>
   <div id="shopToast"></div>
@@ -2218,7 +2219,6 @@ function warRecord(k,n){ career[k]=(career[k]||0)+(n||1); saveCareer(); }
 loadCareer();
 let money=Math.round(8000*(1+careerRank().perk)), sunk=0;   // veteran perk: +% starting funds per rank
 const placed=[];           // {def, group, mountIdx, yaw, pitch, cd}
-const mountMarkers=[];     // glowing rings
 const enemies=[];          // {build, hp, maxhp, pos, heading, fireT, sinkT}
 const shells=[];           // {mesh, vel, dmg, team, splash, arc, homing, water, owner}
 const fx=[];
@@ -3924,10 +3924,18 @@ function buildShopUI(){
   });
   refreshShop();
 }
+function fleetDPS(){ return placed.filter(p=>!p.ko).reduce((s,p)=>s+p.def.dmg/p.def.cd,0); }
+function strongestPlaced(){ return placed.filter(p=>!p.ko).reduce((best,p)=>(!best||p.def.dmg>best.def.dmg)?p:best,null); }
 function describe(w){
   const k=isZh()?{gun:'直射',cannon:'重型曲射炮弹',missile:'制导',torpedo:'贴海飞行',bomb:'抛射'}[w.kind]
              :{gun:'Direct fire',cannon:'Arcing heavy shell',missile:'Homing',torpedo:'Sea-skimming',bomb:'Lobbed'}[w.kind];
-  return `${k} · ${w.dmg}${T(' dmg',' 伤害')} · ${(1/w.cd).toFixed(1)}${T('/s','/秒')}${w.splash?T(' · splash',' · 溅射'):''}`;
+  let cmp='';
+  const strongest=strongestPlaced();
+  if(strongest && strongest.def!==w){
+    const dA=w.dmg>strongest.def.dmg?'↑':w.dmg<strongest.def.dmg?'↓':'≈', rA=(1/w.cd)>(1/strongest.def.cd)?'↑':(1/w.cd)<(1/strongest.def.cd)?'↓':'≈';
+    cmp=`<br><span style="color:#6b7d92;font-size:11px">${T('vs your best gun — dmg','对比你最强的炮——伤害')} ${dA} · ${T('rate','射速')} ${rA}</span>`;
+  }
+  return `${k} · ${w.dmg}${T(' dmg',' 伤害')} · ${(1/w.cd).toFixed(1)}${T('/s','/秒')}${w.splash?T(' · splash',' · 溅射'):''}${cmp}`;
 }
 function refreshShop(){
   shopBalance();
@@ -4102,6 +4110,37 @@ function freeMountLocal(w){   // first hull mount not already crowded by an inst
     if(clear) return p;
   }
   return null;
+}
+// ===== mount preview — SEE where the selected weapon will land, before you spend the money =====
+let _mountRing=null,_mountGhost=null;
+function ensureMountRing(){ if(_mountRing) return _mountRing;
+  const g=new THREE.Mesh(new THREE.RingGeometry(1.1,1.5,24), new THREE.MeshBasicMaterial({color:0x4ade80,transparent:true,opacity:0.7,side:THREE.DoubleSide,depthWrite:false}));
+  g.rotation.x=-Math.PI/2; g.visible=false; return _mountRing=g; }
+function ensureMountGhost(){ if(_mountGhost) return _mountGhost;
+  const g=new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.1,1.6,10), new THREE.MeshBasicMaterial({color:0x4ade80,transparent:true,opacity:0.4,depthWrite:false}));
+  g.visible=false; return _mountGhost=g; }
+function updateMountPreview(){
+  const ring=ensureMountRing(), ghost=ensureMountGhost();
+  if(ring.parent!==player.build.group) player.build.group.add(ring);
+  if(ghost.parent!==player.build.group) player.build.group.add(ghost);
+  if(!selectedWeapon || manning || piloting || landCampaignMode || onFoot || drivingTank || !player || !player.build || player.hp<=0){ ring.visible=false; ghost.visible=false; return; }
+  const w=WEAPONS[selectedWeapon];
+  if(driving){
+    ghost.visible=false;
+    const mp=freeMountLocal(w);
+    if(mp){ ring.visible=true; ring.position.set(mp.x,player.def.deckY+0.12,mp.z);
+      const pulse=0.55+Math.abs(Math.sin(performance.now()*0.004))*0.45; ring.material.opacity=pulse; }
+    else ring.visible=false;
+  } else {
+    ring.visible=false;
+    const ang=camYaw.v-player.heading;
+    const px=walkPos.x+Math.sin(ang)*1.6, pz=walkPos.z+Math.cos(ang)*1.6;
+    const hL=player.build.halfLen*0.9, hB=player.build.halfBeam*0.9;
+    let valid=!(Math.abs(px)>hB||Math.abs(pz)>hL);
+    if(valid) for(const pl of placed){ if(Math.hypot(pl.group.position.x-px,pl.group.position.z-pz)<(w.size||1)*1.3+(pl.def.size||1)*0.9){ valid=false; break; } }
+    ghost.visible=true; ghost.position.set(px,player.def.deckY+(player.def.kind==='carrier'?0.5:0)+0.8,pz);
+    ghost.material.color.setHex(valid?0x4ade80:0xff5555);
+  }
 }
 function tryPlace(){
   if(phase!=='play'||manning||piloting) return;
@@ -5634,6 +5673,11 @@ function shopMsg(msg,kind){
 }
 function shopBalance(){
   const el=document.getElementById('shopBal'); if(el) el.textContent='$'+money;
+  const fp=document.getElementById('shopDPS');
+  if(fp){ const cur=Math.round(fleetDPS()), w=selectedWeapon?WEAPONS[selectedWeapon]:null;
+    if(w){ const next=Math.round(fleetDPS()+w.dmg/w.cd);
+      fp.innerHTML=T('🔫 Fleet power ','🔫 全舰火力 ')+cur+' → <b style="color:#7fd0a0">'+next+' (+'+(next-cur)+')</b>'; }
+    else fp.textContent=T('🔫 Fleet power ','🔫 全舰火力 ')+cur; }
 }
 // there is no F key on a phone, so every hint points at the panel's own Install button
 function installHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
@@ -6131,6 +6175,7 @@ function loop(){
     if(!gamePaused()){ t2+=dt; update(dt,t2); updateHUD();
       _saveT+=dt; if(_saveT>=30){ _saveT=0; saveWar(); } }               // autosave the war twice a minute
     else { sfxEngine(); updatePrompt(); updateCamera(); updateHUD(); }   // audio ramps down; prompts/HUD/camera stay correct in menus
+    updateMountPreview();                   // shop stays open while this runs, so the ghost/ring must update even while paused
     updateTutorial(dt);                     // tutorial keeps ticking so menu steps can complete while paused
     if(TOUCH&&_touchWired) touchLabels();   // context buttons follow whatever the captain is doing
     if(chatOpen&&_chatOpenAt&&performance.now()-_chatOpenAt>9000){
