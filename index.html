@@ -2203,7 +2203,7 @@ function spawnMine(team,pos){
   return true;
 }
 function deployPlayerMine(){
-  if(phase!=='play'||piloting||onFoot||drivingTank)return;
+  if(phase!=='play'||gamePaused()||piloting||onFoot||drivingTank)return;
   if(mineDeployCooldown>0){flashPrompt('Mine rack reloading — '+Math.ceil(mineDeployCooldown)+'s');return;}
   if(mines.filter(m=>m.team===0).length>=MAX_MINES_PER_TEAM){flashPrompt('Mine limit reached (5)');return;}
   const cost=220;if(money<cost){flashPrompt('A naval mine costs $'+cost);return;}
@@ -2516,8 +2516,8 @@ function runChatCommand(raw){
 }
 function submitChat(){
   const input=document.getElementById('chatinput'),raw=(input&&input.value||'').trim();if(!raw){closeChat();return;}
+  if(input)input.value=''; closeChat();   // close first — /sonar, /mine and friends refuse to run while the chat pause is up
   if(raw.startsWith('/'))runChatCommand(raw);else chatMessage('CAPTAIN: '+raw,'captain');
-  if(input)input.value='';closeChat();
 }
 
 addEventListener('keydown',e=>{
@@ -2731,7 +2731,7 @@ function installBossStarterGuns(build){
               WEAPONS.sixteen,WEAPONS.sixteen,WEAPONS.eightin,WEAPONS.ciws,WEAPONS.patriot,WEAPONS.tomahawk];
   slots.forEach((idx,i)=>{const p=build.mounts[idx];if(!p)return;const w=guns[i],t=buildTurret(w);t.position.copy(p);build.group.add(t);
     const gunner=buildSailor('gunner');gunner.scale.setScalar(.85);gunner.position.set(0,(w.size||1)*.35,-.45);(t.userData.yawG||t).add(gunner);
-    placed.push({def:w,group:t,yaw:0,pitch:.1,cd:0,gunner});});
+    placed.push({def:w,group:t,yaw:0,pitch:.1,cd:0,gunner,free:true});});   // free:true — never refundable, they were never bought
 }
 
 // =====================================================================
@@ -3429,7 +3429,8 @@ function enemyDetected(e){
   return enemyDetectedAt(e.pos,e.def&&e.def.kind==='sub'?0.42:1);
 }
 function sonarPing(){
-  if(phase!=='play'||sonarCooldown>0){if(phase==='play')flashPrompt('SONAR recharging — '+Math.ceil(sonarCooldown)+'s');return;}
+  if(phase!=='play'||gamePaused()) return;
+  if(sonarCooldown>0){if(phase==='play')flashPrompt('SONAR recharging — '+Math.ceil(sonarCooldown)+'s');return;}
   sonarCooldown=8;sonarPulse=4;const p=activePlayerWorldPos().clone();
   const ring=new THREE.Mesh(new THREE.RingGeometry(8,10,48),new THREE.MeshBasicMaterial({color:0x62d7ff,transparent:true,opacity:0.8,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2;ring.position.copy(p).setY(1);scene.add(ring);
@@ -3873,9 +3874,11 @@ function refreshBuild(){
     el.innerHTML=`<div class="un"><span>${catTr(typeof STRUCTS_ZH!=='undefined'?STRUCTS_ZH:null,k,'name',s.name)}</span><span class="uc">$${cost}</span></div><div class="ud">${catTr(typeof STRUCTS_ZH!=='undefined'?STRUCTS_ZH:null,k,'desc',s.desc)}</div>`;
   });
 }
+function closeBuild(){ buildOpen=false; document.getElementById('build').style.display='none'; updateMode(); }
 function toggleBuild(){
   if(phase!=='play') return;
-  if(!onFoot){ if(phase==='play') flashPrompt('Go ashore on an island (G) to build defenses'); return; }
+  if(buildOpen){ closeBuild(); return; }   // an open panel always closes, whatever the captain is standing on
+  if(!onFoot){ flashPrompt('Go ashore on an island (G) to build defenses'); return; }
   if(!footLand){ flashPrompt('Swim to dry land before building defenses'); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('Capture this position before building defenses'); return; }
   if(shopOpen) toggleShop(); if(harborOpen) toggleHarbor();
@@ -3938,7 +3941,7 @@ function nearestTurret(){
   return best;
 }
 function deleteTurret(){   // X next to a deck gun scraps it for a half refund
-  if(phase!=='play'||onFoot||driving||piloting||drivingTank||shopOpen||harborOpen||buildOpen) return;
+  if(phase!=='play'||gamePaused()||onFoot||driving||piloting||drivingTank) return;
   const pl=nearestTurret(); if(!pl){ flashPrompt('Stand next to a deck gun, then X to scrap it'); return; }
   if(manning===pl) manning=null;
   destroyObject3D(pl.group);
@@ -3956,7 +3959,7 @@ function freeMountLocal(w){   // first hull mount not already crowded by an inst
   return null;
 }
 function tryPlace(){
-  if(phase!=='play'||manning||piloting||shopOpen||harborOpen) return;
+  if(phase!=='play'||gamePaused()||manning||piloting) return;
   if(!selectedWeapon){ flashPrompt('Pick a weapon in the Armory (Tab)'); return; }
   const w=WEAPONS[selectedWeapon]; const cost=priceOf(w.cost);
   if(placed.length>=player.def.mounts){ flashPrompt('Gun limit reached — this hull mounts only '+player.def.mounts+' guns'); return; }
@@ -4001,7 +4004,7 @@ function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot 
   const pa=nearestPlane(); if(pa) dispatchPlane(pa);
 }
 function toggleMan(){
-  if(phase!=='play'||shopOpen||harborOpen) return;
+  if(phase!=='play'||gamePaused()) return;   // no state changes while a panel has the war frozen
   if(drivingTank){ dismountTank(); return; }
   if(onFoot){ const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
     flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
@@ -4705,7 +4708,7 @@ function bailoutOrBoard(){
   else flashPrompt('P = parachute from aircraft, or request a replacement ship at harbor after yours is sunk.');
 }
 function toggleFoot(){
-  if(phase!=='play'||shopOpen||harborOpen||manning||driving||piloting) return;
+  if(phase!=='play'||gamePaused()||manning||driving||piloting) return;
   if(landCampaignMode){ flashPrompt('No ship on this theater — this is an airborne ground assault. Capture the command posts.'); return; }
   if(playerShipLost){ flashPrompt('Your ship is gone — return to friendly harbor and press P for a replacement.'); return; }
   if(onFoot){ // re-board if standing near the ship
@@ -4801,7 +4804,7 @@ function updateWalk(dt){
 }
 // ---------- SUBMARINE: dive to run silent (stealthed but torpedoes only) ----------
 function toggleDive(){
-  if(phase!=='play'||shopOpen||harborOpen) return;
+  if(phase!=='play'||gamePaused()) return;
   if(player.def.kind!=='sub'){ flashPrompt('Only submarines can dive (pick the Attack Submarine)'); return; }
   player.submerged=!player.submerged;
   flashPrompt(player.submerged?'🌊 DIVE! DIVE! — running silent · torpedoes only':'⬆ Surfacing — all weapons back online');
@@ -5630,6 +5633,7 @@ function endGame(win,msg){
 const SAVE_KEY='ironTideSave';
 let _saveT=0;
 const _idOf=(cat,def)=>{ for(const k in cat) if(cat[k]===def) return k; return null; };
+const _tankId=tk=>Object.keys(TANKS).find(k=>TANKS[k].name===tk.name)||null;
 function warSavable(){
   if(phase!=='play'||!player||!friendlyHarbor||!enemyHarbor) return false;
   return landCampaignMode ? true : (!playerShipLost&&!onFoot&&!piloting&&!drivingTank);   // only snapshot stable aboard-ship states
@@ -5646,7 +5650,9 @@ function saveWar(){ if(!warSavable()) return;
       shipId:_idOf(SHIPS,player.def)||'destroyer', hp:player.hp, px:player.pos.x, pz:player.pos.z, hd:player.heading,
       guns:placed.map(p=>({id:_idOf(WEAPONS,p.def),x:p.group.position.x,y:p.group.position.y,z:p.group.position.z,free:!!p.free,ko:!!p.ko})).filter(g=>g.id),
       planes:planes.filter(p=>p.parked).map(p=>({id:_idOf(PLANES,p.def),sp:planeSpots.indexOf(p.spot),b:p.bombsLeft,ga:p.gunAmmo})).filter(p=>p.id&&p.sp>=0),
-      tanks:playerTanks.filter(tk=>tk.onDeck&&tk.hp>0).map(tk=>({tt:Object.keys(TANKS).find(k=>TANKS[k].name===tk.name)||null})).filter(t=>t.tt),
+      tanks:playerTanks.filter(tk=>tk.onDeck&&tk.hp>0).map(tk=>({tt:_tankId(tk),hp:tk.hp})).filter(t=>t.tt),
+      gtanks:playerTanks.filter(tk=>!tk.onDeck&&tk.hp>0).map(tk=>{ const p=tk.pos||tk.group.position;
+        return {tt:_tankId(tk),x:p.x,z:p.z,hp:tk.hp,hd:tk.heading||0}; }).filter(t=>t.tt),
       owned:[...ownedGuns], eq:equippedGun,
       fbu:friendlyBossUsed, ebu:enemyBossUsed,
       eba:enemies.some(e=>e.boss&&e.sinkT===0&&!e.dead),
@@ -5687,14 +5693,21 @@ function resumeWar(){
     const g=buildPlane(def); g.position.copy(spot.pos); g.rotation.y=0; player.build.group.add(g);
     planes.push({def,group:g,spot,parked:true,bombsLeft:pd.b||0,gunAmmo:pd.ga==null?null:pd.ga}); spot.taken=true; });
   (s.tanks||[]).forEach(td=>{ const spot=tankSpots.find(sp=>!sp.taken); if(!spot||!TANKS[td.tt]) return;
-    buildDeckTank(spot.pos,td.tt); spot.taken=true; });
+    buildDeckTank(spot.pos,td.tt); spot.taken=true;
+    const tk=playerTanks[playerTanks.length-1]; if(td.hp>0) tk.hp=Math.min(td.hp,tk.maxhp); });
   ownedGuns.clear(); (s.owned&&s.owned.length?s.owned:['pistol']).forEach(g=>{ if(HANDHELD[g]) ownedGuns.add(g); });
   if(!ownedGuns.has('pistol')) ownedGuns.add('pistol');
   equippedGun=HANDHELD[s.eq]?s.eq:'pistol';
   player.hp=Math.max(1,Math.min(s.hp,player.maxhp));
   player.pos.set(s.px,0,s.pz); player.heading=s.hd||0;
   friendlyBossUsed=!!s.fbu; enemyBossUsed=!!s.ebu;
-  if(s.ground){ deployLandCampaignStart(true); }
+  if(s.ground){
+    deployLandCampaignStart(true);
+    // the insertion always drops you at the command post; put the captain back where he actually was
+    if(s.px!=null){ const p=new THREE.Vector3(s.px,0,s.pz), isl=islandOfPos(p);
+      if(isl&&isl.owner===0){ footLand=isl; footPos.copy(p); clampToIsland(footPos,isl,0.9);
+        footPos.y=(isl.top||2.1)+EYE; player.pos.copy(footPos).setY(0); player.heading=s.hd||0; camYaw.v=player.heading; } }
+  }
   else {
     landCampaignMode=false;
     if(s.eba){ enemyBossUsed=false; spawnBoss(1); }                       // flagships that were afloat come back
@@ -5703,6 +5716,11 @@ function resumeWar(){
     for(let i=0;i<(M.allies||0);i++) spawnAlly();
     startDrive();
   }
+  // tanks the captain paid for and put ashore — in either theater type
+  (s.gtanks||[]).forEach(td=>{ if(!TANKS[td.tt]) return;
+    const p=new THREE.Vector3(td.x,2.1,td.z), isl=islandOfPos(p); if(!isl) return;
+    buildGroundPlayerTank(p,td.tt,isl);
+    const tk=playerTanks[playerTanks.length-1]; tk.heading=td.hd||0; if(td.hp>0) tk.hp=Math.min(td.hp,tk.maxhp); });
   buildShopUI(); applySimpleHud(); wireGameInput(); updateHUD(); updateMode();
   flashPrompt(T('▶ War resumed — welcome back, Captain!','▶ 战局已恢复——欢迎回来，舰长！'));
 }
@@ -5713,9 +5731,11 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveWar()
 // Self-contained: nothing here runs unless TOUCH is true. The stick writes into the same
 // `keys` map the keyboard uses, and look-drag replaces pointer lock, so no gameplay code
 // needed changing. Add ?touch=1 to force it on for testing, ?touch=0 to force it off.
+// Detect by PRIMARY pointer, not by maxTouchPoints: a Surface / Chromebook driven with a
+// mouse reports ten touch points but wants pointer-lock mouse-look, not a thumbstick.
 const TOUCH=(()=>{ try{ const q=new URLSearchParams(location.search).get('touch');
   if(q==='1') return true; if(q==='0') return false;
-  return (navigator.maxTouchPoints||0)>0 || matchMedia('(pointer:coarse)').matches; }catch(e){ return false; } })();
+  return matchMedia('(pointer:coarse)').matches; }catch(e){ return false; } })();
 const STICK_R=46, STICK_DEAD=0.28;
 let _touchWired=false, _lookId=null, _lookX=0, _lookY=0, _stickId=null, _stickCx=0, _stickCy=0;
 function stickKeys(dx,dy){   // stick vector -> the same WASD flags the keyboard sets
@@ -5776,7 +5796,7 @@ function touchInit(){
 
   cv.addEventListener('pointerdown',e=>{ if(_lookId!=null||gamePaused()) return;
     _lookId=e.pointerId; _lookX=e.clientX; _lookY=e.clientY; capture(cv,e.pointerId); });
-  cv.addEventListener('pointermove',e=>{ if(e.pointerId!==_lookId) return;
+  cv.addEventListener('pointermove',e=>{ if(e.pointerId!==_lookId||gamePaused()) return;   // a second finger opening a panel must stop the drag
     camYaw.v -= (e.clientX-_lookX)*0.005; camPitch.v -= (e.clientY-_lookY)*0.005;
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v));
     _lookX=e.clientX; _lookY=e.clientY; });
@@ -6894,6 +6914,7 @@ function refreshLanguage(){
   const cl=document.getElementById('claude'); if(cl){ cl.remove(); claudeLastMsg=''; }   // Claude widget re-inits localized
   if(phase==='play'||phase==='respawn'){
     buildShopUI(); if(harborOpen) buildHarborUI(); if(buildOpen) buildBuildUI();
+    applySimpleHud();   // applyStaticI18n rebuilt #objective, so the hidden readouts must be re-hidden
     if(player&&player.def){ updateMode(); updateHUD(); }
   }
 }
