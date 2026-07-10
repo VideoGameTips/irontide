@@ -2100,7 +2100,7 @@ const RANKS=[
   {name:'Admiral',       score:1600, perk:0.30},
   {name:'Fleet Admiral', score:2400, perk:0.35},
 ];
-let career={ sunk:0, planes:0, islands:0, wins:0, losses:0, bosses:0 };
+let career={ sunk:0, planes:0, islands:0, wins:0, losses:0, bosses:0, rivalPhase:'intro' };
 function loadCareer(){ try{ const c=JSON.parse(localStorage.getItem('ironTideCareer')); if(c&&typeof c==='object') career={...career,...c}; }catch(e){} }
 function saveCareer(){ try{ localStorage.setItem('ironTideCareer', JSON.stringify(career)); }catch(e){} }
 // ===== CAMPAIGN — conquer a theater to unlock the next =====
@@ -2181,6 +2181,58 @@ function comms(from,msg,col){ _commsLines.push({from,msg,col:col||'#a8d4f0',t:9}
 function commsShip(s,msg,col,quiet=4){
   if(!s)return; if((s._radioQuiet||0)>0)return;
   comms(s.callsign||'SHIP',msg,col); s._radioQuiet=quiet;
+}
+// ===== RIVAL ADMIRAL — a named enemy commander whose attitude shifts over the whole campaign =====
+// intro(arrogant) -> frustrated(first loss) -> angry(his Leviathan sunk) -> respect(halfway) ->
+// showdown(final theaters) -> done(campaign complete). Progress lives on career (permanent, never resets).
+const RIVAL_NAME_EN='Admiral Thorne';
+const RIVAL_ORDER=['intro','frustrated','angry','respect','showdown','done'];
+const RIVAL_LINES={
+  intro:[
+    ['Another green captain sailing into my waters. How amusing.','又一个毛头舰长闯进我的海域，真有意思。'],
+    ['Turn back now, and I might let you keep your hull.','现在回头，我兴许留你一条船。'],
+    ["I've sunk better captains than you before breakfast.",'比你强的舰长，我早饭前就打沉过。'],
+  ],
+  frustrated:[
+    ["...Lucky shot. Don't get used to it.",'……走运罢了，别太得意。'],
+    ["Someone's been paying attention in gunnery school.",'看来你炮术课没白上。'],
+    ['Fine. You have my attention now, Captain.','好吧舰长，你引起我的注意了。'],
+  ],
+  angry:[
+    ["MY LEVIATHAN! You'll pay for that in blood and steel!",'我的利维坦！这笔账我要连本带利讨回来！'],
+    ['Unacceptable. Bring every gun we have to bear!','不可原谅。把所有炮口都对准他们！'],
+    ["You've made an enemy for life, Captain.",'舰长，你给自己树了个死敌。'],
+  ],
+  respect:[
+    ["You fight better than most admirals I've faced.",'你打得比我见过的大多数将军都好。'],
+    ["I underestimated you. That won't happen twice.",'我小看你了，这种事不会有第二次。'],
+    ["A worthy opponent, at last. Let's finish this properly.",'总算遇到个够格的对手，好好打完这仗。'],
+  ],
+  showdown:[
+    ['This ends where it began — between the two of us.','这场仗，该由我们两个亲手了结。'],
+    ['No more games, Captain. Everything, right here.','不玩虚的了，舰长，倾尽全力吧。'],
+    ["Whatever happens next, you've earned this fight.",'不管结果如何，你都配得上这一战。'],
+  ],
+  done:[
+    ['The sea is yours, Captain. I concede — with honor.','这片海是你的了。我认输——心服口服。'],
+    ["I've commanded fleets for thirty years. None sailed like you.",'我带了三十年舰队，没见过像你这样的舰长。'],
+    ["Fair winds, Captain. We won't meet as enemies again.",'一帆风顺，舰长，我们不会再以敌人相见了。'],
+  ],
+  gloat:[
+    ['Down you go! Even the best captains take on water.','沉下去吧！再厉害的舰长也有翻船的时候。'],
+    ["That's one for me, Captain. Get back out here.",'这局算我赢，舰长，赶紧回来找场子。'],
+    ["Careful — I don't want this to end so easily.",'悠着点，我可不希望这么快分出胜负。'],
+  ],
+};
+let _rivalLastLine=null;
+function rivalIdx(phase){ return RIVAL_ORDER.indexOf(phase); }
+function rivalAdvance(target){ if(rivalIdx(target)>rivalIdx(career.rivalPhase)){ career.rivalPhase=target; saveCareer(); } }
+function rivalSpeak(pool){
+  const lines=RIVAL_LINES[pool]; if(!lines||!lines.length) return;
+  let pick=lines[Math.floor(Math.random()*lines.length)];
+  if(lines.length>1 && pick===_rivalLastLine) pick=lines[(lines.indexOf(pick)+1)%lines.length];
+  _rivalLastLine=pick;
+  comms(RIVAL_NAME_EN, T(pick[0],pick[1]), '#ff8a70');
 }
 function updateComms(dt){ if(!_commsLines.length){ const el=document.getElementById('comms'); if(el&&el.innerHTML)el.innerHTML=''; return; }
   commsInit(); const el=document.getElementById('comms'); if(!el)return; let html='';
@@ -2975,6 +3027,8 @@ function startGame(shipId){
     for(let i=0;i<M.allies;i++) spawnAlly();   // NPC starting fleets per map
     showBanner(T('OPERATION '+(currentMapIdx+1),'第 '+(currentMapIdx+1)+' 号作战')+' · '+campaignName(currentMapIdx),
       campaignTheme(currentMapIdx)+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:3});
+    if(currentMapIdx>=CAMPAIGN.length-4) rivalAdvance('showdown');
+    rivalSpeak(career.rivalPhase);
     if(M.boss) spawnBoss(1,true);
     if(shipId==='boss')friendlyBossUsed=true;else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
     flashPrompt('⚔ '+M.name.toUpperCase()+' — '+M.theme);
@@ -3039,6 +3093,7 @@ function damageFoot(dmg,from){
 }
 function playerSunk(){
   if(phase!=='play') return;
+  rivalSpeak('gloat');
   const survivedAway=(onFoot||drivingTank||piloting)&&!landCampaignMode;
   if(survivedAway){
     playerShipLost=true; driving=false; manning=null;
@@ -3524,7 +3579,8 @@ function spawnBoss(team,announce){
   (team===0?allies:enemies).push(ship);
   if(team===0)friendlyBossUsed=true;else enemyBossUsed=true;
   if(team===1&&announce){ showBanner(T('⚠ WARNING','⚠ 警告'),
-    T('Enemy flagship LEVIATHAN approaching','敌方旗舰"利维坦"正在逼近'), {dur:2.2,tone:'danger'}); sfxAlarm(); }
+    T('Enemy flagship LEVIATHAN approaching','敌方旗舰"利维坦"正在逼近'), {dur:2.2,tone:'danger'}); sfxAlarm();
+    rivalSpeak(career.rivalPhase); }
   return ship;
 }
 function nearestEnemyShipTo(pos){ let b=null,bd=1e9; enemies.forEach(e=>{ if(e.sinkT>0)return; const d=e.pos.distanceTo(pos); if(d<bd){bd=d;b=e;} }); return b; }
@@ -4771,7 +4827,8 @@ function damageTarget(t,dmg,owner,hitPos){
   if(t===player){ const pd=pDmg(dmg); player.hp-=pd; damageCompartment(player,pd,hitPos); applyCrit(player,pd); if(player.hp<=0){ player.hp=0; playerSunk(); } updateHUD(); return; }
   t.hp-=dmg; damageCompartment(t,dmg,hitPos); applyCrit(t,dmg); if(t.hp<=0 && t.sinkT===0){ t.hp=0; t.sinkT=0.001; spawnSalvage(t.pos.clone());
     const bounty=t.def.boss?30000:t.def.hp>400?700:t.def.hp>250?500:350;
-    sunk++;warRecord('sunk');money+=bounty;if(t.def.boss){warRecord('bosses');flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');}updateHUD();refreshShop(); }
+    sunk++;warRecord('sunk');money+=bounty;if(t.def.boss){warRecord('bosses');flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');
+      if(t.team===1){ rivalAdvance('angry'); rivalSpeak(career.rivalPhase); } }updateHUD();refreshShop(); }
 }
 function strategicBlastFx(pos,rad){
   boom(pos,Math.min(30,3+rad*.15));
@@ -6026,11 +6083,12 @@ function endGame(win,msg){
   clearSave();   // the war is decided — nothing to resume
   const oldRank=careerRank();
   warRecord(win?'wins':'losses');
+  if(win){ rivalAdvance('frustrated'); if(currentMapIdx+1>=Math.floor(CAMPAIGN.length/2)) rivalAdvance('respect'); }
   const r=careerRank(), nx=nextRank();
   let unlockMsg='';
   if(win){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
       unlockMsg=`<br><br><span style="color:#7ff0a8">${T('🗺 NEW THEATER UNLOCKED — '+nm.name+'!','🗺 新战区解锁——'+campaignName(currentMapIdx+1)+'！')}</span>`; }
-    else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); } unlockMsg=`<br><br><span style="color:#ffd060">${T('🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.','🏆 战役全部通关——所有战区都是你的了，舰队司令！')}</span>`; } }
+    else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); rivalAdvance('done'); rivalSpeak('done'); } unlockMsg=`<br><br><span style="color:#ffd060">${T('🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.','🏆 战役全部通关——所有战区都是你的了，舰队司令！')}</span>`; } }
   if(document.pointerLockElement)document.exitPointerLock();
   document.getElementById('over').style.display='flex';
   const t=document.getElementById('overTitle');
@@ -6549,6 +6607,8 @@ const CLAUDE_TIPS_ZH = [
 
 // ---------- 英文显示名 → 中文 平面映射（供 trName() 使用；运行时有大小写兜底） ----------
 const NAME_ZH = {
+  // 宿敌
+  'Admiral Thorne':'索恩将军',
   // 舰船
   'Scout Corvette':'侦察巡逻舰',
   'Attack Submarine':'攻击潜艇',
