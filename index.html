@@ -207,6 +207,17 @@
   #over p{color:#9fb6cc;margin-bottom:22px;}
   #over button{padding:12px 28px;font-size:15px;letter-spacing:2px;background:#1d4d6e;border:1px solid #5fd0ff;
     color:#eaf6ff;border-radius:8px;cursor:pointer;}
+
+  /* ---- Hit marker ---- */
+  #hitMarker{position:fixed;top:50%;left:50%;width:30px;height:30px;transform:translate(-50%,-50%);
+    pointer-events:none;opacity:0;z-index:15;}
+  #hitMarker::before,#hitMarker::after{content:'';position:absolute;top:50%;left:50%;width:100%;height:3px;
+    background:#fff;border-radius:2px;transform-origin:center;}
+  #hitMarker::before{transform:translate(-50%,-50%) rotate(45deg);}
+  #hitMarker::after{transform:translate(-50%,-50%) rotate(-45deg);}
+  #hitMarker.big::before,#hitMarker.big::after{background:#ffd060;}
+  #hitMarker.show{animation:hitFlash .25s ease-out;}
+  @keyframes hitFlash{0%{opacity:1;transform:translate(-50%,-50%) scale(1.35);}100%{opacity:0;transform:translate(-50%,-50%) scale(0.9);}}
 </style>
 </head>
 <body>
@@ -222,6 +233,7 @@
 <!-- HUD -->
 <div id="hud">
   <div id="cross"></div>
+  <div id="hitMarker"></div>
   <div id="topbar"><div id="money">$0</div>
     <div id="objective" style="text-align:center;font-size:13px;color:#cfe6fb;">
       <div style="color:#ff9a8a;letter-spacing:1px;">DESTROY THE ENEMY HARBOR</div>
@@ -1248,6 +1260,7 @@ function islandSurfaceY(pos,o){    // null = open water at this (x,z); otherwise
   if(islandLayerNorm(q,o,1,0)<1) return 1.3;                  // beach
   return null;
 }
+function islandUnderPos(pos){ return islands.find(i=>islandSurfaceY(pos,i)!=null)||null; }   // exact landmass test, no fuzzy pad (unlike islandOfPos)
 function islandPoint(o,a,f=1,y=0){
   const p=islandWorld(o,Math.cos(a)*(o.rx||o.r)*f,Math.sin(a)*(o.rz||o.r)*f); p.y=y; return p;
 }
@@ -4499,7 +4512,7 @@ function spawnShell(w,pos,dir,team,owner,enemyArc,velOverride){
   const sh={ mesh:m, pos:m.position, vel, dmg:w.dmg, team, splash:w.splash||0, homing:!!w.homing, water:w.kind==='torpedo',
     arc:!!lob||!!velOverride, owner, life:w.life||9, col, aa:!!w.aa, strategic:!!w.strategic, nuclear:!!w.nuclear,
     hp:w.hp||0, fixedTarget:w.targetPos?w.targetPos.clone():null, spareHarbors:!!w.spareHarbors,
-    turn:w.turn||2.4, maxDist:w.range||0, dist:0, spawnIsl:islandOfPos(pos) };  // spawnIsl exempts shore weapons from detonating on their own launch island
+    turn:w.turn||2.4, maxDist:w.range||0, dist:0, spawnIsl:islandUnderPos(pos) };  // spawnIsl exempts shore weapons from detonating on their own launch island (exact landmass only — a shot fired from just offshore must NOT get exempted)
   if(w.nuclear){const mark=teamMarker(team,12);mark.position.y=7;m.add(mark);}
   // flame streak / tracer trail — white-hot core sheathed in an orange glow (skip torpedoes — they're in the water)
   if(w.kind!=='torpedo'){
@@ -4719,6 +4732,7 @@ function update(dt,t){
   animateWater(t);
   updateWeather(dt);
   updateGraphics(dt,t);
+  updateHitFlashes(dt);
   // --- controls ---
   if(driving){ updateDrive(dt); }
   if(piloting){ updatePilot(dt); }
@@ -5059,10 +5073,15 @@ function updateShells(dt){
     if(hit){removeShellAt(i);continue;}
     if(s.team===0){
       for(const e of enemies){ if(e.sinkT>0)continue; if(s.mesh.position.distanceTo(e.pos)< e.def.beam/2+2){ onShellHit(s,e.pos.clone(),e); hit=true; break; } }
-      if(!hit) for(const ep of aiPlanes){ if(ep.team!==1||ep.hp<=0)continue; if(s.mesh.position.distanceTo(ep.pos)<3.2){ ep.hp-=s.dmg; hitSpark(s.mesh.position.clone()); if(ep.hp<=0) killAIPlane(ep); hit=true; break; } }
+      if(!hit) for(const ep of aiPlanes){ if(ep.team!==1||ep.hp<=0)continue; if(s.mesh.position.distanceTo(ep.pos)<3.2){ ep.hp-=s.dmg; hitSpark(s.mesh.position.clone());
+        const killed=ep.hp<=0; if(killed) killAIPlane(ep); if(playerCausedShell(s)) playerHitFeedback(ep.group,killed); hit=true; break; } }
       if(!hit && s.mesh.position.y<20) for(const u of landUnits){ if(u.team!==1||u.dead)continue; if(s.mesh.position.distanceTo(u.pos)<Math.max(3.5,(u.footprint||4)*.38)){
-        if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else{u.hp-=s.dmg*wallShield(u);hitSpark(s.mesh.position.clone());if(s.splash)explodeAt(s.mesh.position.clone(),0,s.dmg,s.splash,s.owner);if(u.hp<=0)killLandUnit(u);}hit=true;break;} }
-      if(!hit && enemyHarbor && enemyHarbor.hp>0 && s.mesh.position.distanceTo(enemyHarbor.pos)<enemyHarbor.r){ if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else{damageHarbor(enemyHarbor,s.dmg);hitSpark(s.mesh.position.clone());}hit=true; }
+        if(s.strategic){blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);if(playerCausedShell(s))playerHitFeedback(u.group,false);}
+        else{u.hp-=s.dmg*wallShield(u);hitSpark(s.mesh.position.clone());if(s.splash)explodeAt(s.mesh.position.clone(),0,s.dmg,s.splash,s.owner);
+          const killed=u.hp<=0; if(killed)killLandUnit(u); if(playerCausedShell(s))playerHitFeedback(u.group,killed);}
+        hit=true;break;} }
+      if(!hit && enemyHarbor && enemyHarbor.hp>0 && s.mesh.position.distanceTo(enemyHarbor.pos)<enemyHarbor.r){ if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else{damageHarbor(enemyHarbor,s.dmg);hitSpark(s.mesh.position.clone());}
+        if(playerCausedShell(s)) playerHitFeedback(null,false); hit=true; }
     }
     else {
       if(onFoot&&footHP>0&&s.mesh.position.distanceTo(footPos)<2.2){ damageFoot(s.dmg,s.mesh.position); hitSpark(s.mesh.position.clone()); hit=true; }
@@ -5084,14 +5103,19 @@ function updateShells(dt){
       if(isl && isl!==s.spawnIsl){ const surf=islandSurfaceY(s.mesh.position,isl);   // spawnIsl exemption: a shell never detonates on the island it launched from
         if(surf!=null && s.mesh.position.y<surf){ boom(s.mesh.position.clone(),s.heavy?1.2:0.7);
           if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true; } } }
-    if(!hit && s.mesh.position.y<0.3){ splashAt(s.mesh.position.clone(),s.strategic?8:1);if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true;}
+    if(!hit && s.mesh.position.y<0.3){
+      const nearFoe=(!s.strategic && playerCausedShell(s))?nearestShipOf(1,s.mesh.position):null;
+      if(nearFoe && nearFoe.pos.distanceTo(s.mesh.position)<35) nearMissSplash(s.mesh.position.clone()); else splashAt(s.mesh.position.clone(),s.strategic?8:1);
+      if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true;}
     if(hit||s.life<=0) removeShellAt(i);
   }
 }
 function onShellHit(s,pos,target){
-  if(s.strategic)blastAll(pos,s.dmg,s.splash,true,s.spareHarbors);
-  else if(s.splash) explodeAt(pos,s.team,s.dmg,s.splash,s.owner);
-  else { damageTarget(target,s.dmg,s.owner,pos); boom(pos, 0.7); }
+  const byPlayer=playerCausedShell(s), root=target&&target.build?target.build.group:null;
+  if(s.strategic){ blastAll(pos,s.dmg,s.splash,true,s.spareHarbors); if(byPlayer) playerHitFeedback(root,false); }
+  else if(s.splash){ explodeAt(pos,s.team,s.dmg,s.splash,s.owner); if(byPlayer) playerHitFeedback(root,false); }
+  else { const hpBefore=target.hp; damageTarget(target,s.dmg,s.owner,pos); boom(pos, 0.7);
+    if(byPlayer) playerHitFeedback(root, hpBefore>0 && target.hp<=0); }
 }
 function keepOffIslands(pos,margin){ // push a ship out of any island / harbor footprint
   const obs=islands.slice(); if(enemyHarbor) obs.push({pos:enemyHarbor.pos,r:enemyHarbor.r}); if(friendlyHarbor) obs.push({pos:friendlyHarbor.pos,r:friendlyHarbor.r});
@@ -5099,6 +5123,41 @@ function keepOffIslands(pos,margin){ // push a ship out of any island / harbor f
     if(n<1){ const x=n>0.001?q.x/n:rx,z=n>0.001?q.z/n:0,p=islandWorld(o,x,z); pos.x=p.x; pos.z=p.z; } });
 }
 function hitSpark(pos){ const s=new THREE.Mesh(new THREE.SphereGeometry(0.4,8,8), new THREE.MeshBasicMaterial({color:0xffe070,transparent:true,opacity:0.9})); s.position.copy(pos); scene.add(s); fx.push({mesh:s,life:0.18,fade:true,grow:true}); }
+// ===== PER-HIT FEEDBACK — hit marker + confirm sound + target flash, gated to shots the PLAYER personally caused =====
+function playerCausedShell(s){ return s.team===0 && !allies.includes(s.owner) && !landUnits.includes(s.owner); }
+function showHitMarker(big){ const el=document.getElementById('hitMarker'); if(!el) return;
+  el.className=big?'big':''; el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); }
+function sfxHit(big){ if(!SFX.on||!SFX.ctx||!_voice(0.16)) return; const ctx=SFX.ctx, t0=ctx.currentTime;
+  const o=ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(big?1500:1200,t0); o.frequency.exponentialRampToValueAtTime(big?820:700,t0+0.12);
+  const g=ctx.createGain(); g.gain.setValueAtTime(0.14,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.14);
+  o.connect(g); g.connect(SFX.master); o.start(); o.stop(t0+0.15); }
+function playerHitFeedback(root,killed){ showHitMarker(!!killed); sfxHit(!!killed); if(root) flashHitTarget(root); }
+let _hitFlashes=[];
+function flashHitTarget(root){
+  root.traverse(ch=>{ if(!ch.isMesh||!ch.material||!ch.material.emissive) return;
+    if(!ch.userData._flashOrig) ch.userData._flashOrig={mat:ch.material,emissive:ch.material.emissive.clone(),intensity:ch.material.emissiveIntensity||0};
+    if(ch.material===ch.userData._flashOrig.mat) ch.material=ch.material.clone();   // split from the shared per-type material on first hit
+    ch.material.emissive.setHex(0xffffff); ch.material.emissiveIntensity=1.6; });
+  const existing=_hitFlashes.find(f=>f.root===root);
+  if(existing) existing.t=0.09; else _hitFlashes.push({root,t:0.09});
+}
+function updateHitFlashes(dt){
+  for(let i=_hitFlashes.length-1;i>=0;i--){ const f=_hitFlashes[i]; f.t-=dt;
+    if(f.t<=0){ f.root.traverse(ch=>{ if(ch.isMesh&&ch.userData._flashOrig&&ch.material!==ch.userData._flashOrig.mat){
+      ch.material.emissive.copy(ch.userData._flashOrig.emissive); ch.material.emissiveIntensity=ch.userData._flashOrig.intensity; } });
+      _hitFlashes.splice(i,1); } }
+}
+function nearMissSplash(pos){ splashAt(pos,1.6);
+  if(ringGeo){ const rp=new THREE.Mesh(ringGeo,new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.55,depthWrite:false}));
+    rp.position.set(pos.x,0.7,pos.z); rp.scale.setScalar(2.4); scene.add(rp);
+    fx.push({mesh:rp,life:0.5,max:0.5,op:0.55,fade:true,grow:true,growRate:10}); }
+  sfxNearMiss(pos);
+}
+function sfxNearMiss(pos){ if(!SFX.on||!SFX.ctx) return; const g0=_dg(pos,320)*0.16; if(g0<=0.02||!_voice(0.22)) return;
+  const ctx=SFX.ctx, t0=ctx.currentTime;
+  const o=ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(520,t0); o.frequency.exponentialRampToValueAtTime(240,t0+0.18);
+  const g=ctx.createGain(); g.gain.setValueAtTime(g0,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.2);
+  o.connect(g); g.connect(SFX.master); o.start(); o.stop(t0+0.2); }
 
 // ---------- auto-gunner: crew operate unmanned turrets ----------
 function autoGun(pl,dt){
