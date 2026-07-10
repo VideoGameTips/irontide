@@ -4353,6 +4353,13 @@ function hurtPlayerPlane(dmg){ // you, flying, took flak/cannon fire
   if(piloting.hp<=0) crashPlane('Your aircraft was shot down!');
   else flashPrompt('Hit! '+Math.max(0,Math.ceil(piloting.hp/piloting.maxhp*100))+'%'+partSummary(piloting));
 }
+function planeTerrainCheck(P){   // true if it handled the moment (caller should return); false if clear to fall through to the sea check
+  const isl=islandUnderPos(P.pos), surf=isl?islandSurfaceY(P.pos,isl):null;
+  if(surf==null || P.pos.y>=surf+2) return false;
+  if(difficulty==='easy'){ P.pos.y=surf+3; P.speed*=0.4; boom(P.pos.clone(),0.6); damagePlanePart(P);
+    flashPrompt(T('⚠ Clipped the terrain!','⚠ 蹭到地形了!'),'bad'); return true; }
+  crashPlane(T('Flew into a hillside — aircraft destroyed!','一头撞进山里——飞机坠毁!')); return true;
+}
 function crashPlane(msg){ // destroyed (ocean ditch / hit the sea / kamikaze)
   const pa=piloting.plane;
   blastAll(piloting.pos.clone().setY(1.5), 40, 13); splashAt(piloting.pos.clone().setY(0.5),2.5);
@@ -4407,6 +4414,7 @@ function updatePilot(dt){
     const local=player.build.group.worldToLocal(P.pos.clone());
     const overShip = Math.abs(local.x)<player.build.halfBeam && Math.abs(local.z)<player.build.halfLen;
     if(P.pos.y<=deckY+1.3 && overShip){ recoverPlane(); return; }
+    if(planeTerrainCheck(P)) return;
     if(P.pos.y<=0.8){ crashPlane('Ditched in the ocean — aircraft destroyed!'); return; }
     return;
   }
@@ -4432,6 +4440,7 @@ function updatePilot(dt){
     pa.group.quaternion.setFromEuler(new THREE.Euler(lean, yaw, P.roll, 'YXZ'));
     spinProp(pa,dt); planeSmoke(P,dt);
     if(playerKamikaze(P)) return;
+    if(planeTerrainCheck(P)) return;
     if(P.pos.y<1.5){ crashPlane('Crashed into the sea — aircraft destroyed!'); return; }
     if(Math.hypot(P.pos.x,P.pos.z)>6200){ P.pos.x*=0.99; P.pos.z*=0.99; }
     const hdir=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch));
@@ -4475,6 +4484,7 @@ function updatePilot(dt){
   setAircraftControlSurfaces(pa.group,P.roll,pitch);
   spinProp(pa,dt); planeSmoke(P,dt);
   if(playerKamikaze(P)) return;
+  if(planeTerrainCheck(P)) return;
   if(P.pos.y<2){ crashPlane('Flew into the sea — aircraft destroyed!'); return; }
   if(Math.hypot(P.pos.x,P.pos.z)>6200){ P.pos.x*=0.99; P.pos.z*=0.99; }
   // weapons (a destroyed weapons system can't fire)
@@ -5272,6 +5282,8 @@ function updateAIPlane(p,dt){
   p.vel=new THREE.Vector3(Math.sin(p.heading)*sp,0,Math.cos(p.heading)*sp);
   if(p.marker) p.marker.position.set(p.pos.x, p.pos.y+5.5, p.pos.z);
   p.pos.y += (targetY-p.pos.y)*Math.min(1,1.2*dt);
+  { const isl=islandUnderPos(p.pos), surf=isl?islandSurfaceY(p.pos,isl):null;   // AI has no terrain awareness at all — soft-clamp only, never kill it for this
+    if(surf!=null) p.pos.y=Math.max(p.pos.y,surf+6); }
   const bank=Math.max(-0.8,Math.min(0.8,-dh*3));
   const aiPitch=p.state==='attack'?-.22:(p.state==='break'?.18:0);
   p.group.position.copy(p.pos); p.group.rotation.set(-aiPitch,p.heading,bank);setAircraftControlSurfaces(p.group,bank,aiPitch);
