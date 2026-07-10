@@ -2927,7 +2927,7 @@ function deployLandCampaignStart(skipEscort){   // skipEscort: resuming a save w
   const isl=friendlyCommandIsland(); if(!isl)return;
   footLand=isl.island||isl; const cmds=islandStructures(footLand,0,'command');
   const c=(cmds[0]?cmds[0].pos:footLand.pos).clone();
-  footPos.copy(c).add(new THREE.Vector3(18,0,24)); clampToIsland(footPos,footLand,0.72); footPos.y=(footLand.top||2.1)+EYE;
+  footPos.copy(c).add(new THREE.Vector3(18,0,24)); clampToIsland(footPos,footLand,0.72); footPos.y=groundHeightAt(footPos,footLand)+EYE;
   player.pos.copy(footPos).setY(0); player.heading=0; camYaw.v=0; camPitch.v=0.02;
   if(!skipEscort){
     const army=mapArmyProfile(0), soldiers=Math.max(5,Math.round(5*army.soldiers)), tanks=Math.max(1,Math.round(1.5*army.tanks));
@@ -3213,10 +3213,12 @@ function garrisonHarbor(c, team){
 }
 const STRUCT_KINDS=Object.keys(STRUCTS);
 function buildAndPushLand(kind,team,pos,yOverride,islOverride,typeOverride){
-  pos.y = yOverride!=null ? yOverride : (kind==='coastal'?0 : STRUCT_KINDS.includes(kind)?2.0 : 1.4);
+  const isl=islOverride||islandOfPos(pos);
+  const groundY=isl?islandSurfaceY(pos,isl):null;
+  pos.y = yOverride!=null ? yOverride : (kind==='coastal'?0 : groundY!=null?groundY : STRUCT_KINDS.includes(kind)?2.0:1.4);
   let type=typeOverride;
   if(kind==='tank'&&!type){ const keys=Object.keys(TANKS); type=keys[Math.floor(Math.random()*keys.length)]; }
-  const u=buildLand(kind,team,pos,type);u.island=islOverride||islandOfPos(pos);
+  const u=buildLand(kind,team,pos,type);u.island=isl;
   if(STRUCTS[kind])u.group.scale.setScalar(STRUCTS[kind].scale||2.4);
   landUnits.push(u); if(kind==='radar') _radar[team]++; return u; }
 // ---------- piloted (drivable) tanks ----------
@@ -3245,7 +3247,7 @@ function mountTank(tk){ drivingTank=tk; onFoot=false;
   flashPrompt('Crewing the '+(tk.name||'tank')+' — WASD drive · Mouse aim · Click fire · E to dismount.'); updateMode(); }
 function dismountTank(){ const tk=drivingTank; drivingTank=null;
   if(tk.onDeck){ walkPos.set(tk.group.position.x, deckEyeY(), tk.group.position.z+3); onFoot=false; }
-  else { onFoot=true; footLand=tk.island; footPos.set(tk.pos.x+4, tk.island.pos.y, tk.pos.z); footPos.y=2.1+EYE; }
+  else { onFoot=true; footLand=tk.island; footPos.set(tk.pos.x+4, tk.island.pos.y, tk.pos.z); footPos.y=groundHeightAt(footPos,tk.island)+EYE; }
   flashPrompt('Out of the tank.'); updateMode(); }
 // ---------- AMPHIBIOUS: land a deck tank onto an island (or re-embark) ----------
 function tankLandToggle(){
@@ -3346,8 +3348,11 @@ function updateTank(dt){
     if(tk.turret) tk.turret.rotation.y = camYaw.v - player.heading - tk.heading;
     wp=g.getWorldPosition(new THREE.Vector3());
   } else {
-    tk.pos.x+=Math.sin(tk.heading)*mv*sp*dt; tk.pos.z+=Math.cos(tk.heading)*mv*sp*dt;
-    clampToIsland(tk.pos,tk.island,0.9); tk.pos.y=2.1;
+    const mvx=Math.sin(tk.heading)*mv*sp*dt, mvz=Math.cos(tk.heading)*mv*sp*dt;
+    const nx=tk.pos.x+mvx, nz=tk.pos.z+mvz;
+    if(!landUnitWalkBlocked(nx,tk.pos.z,tk.island,2)) tk.pos.x=nx;
+    if(!landUnitWalkBlocked(tk.pos.x,nz,tk.island,2)) tk.pos.z=nz;
+    clampToIsland(tk.pos,tk.island,0.9); tk.pos.y=groundHeightAt(tk.pos,tk.island);
     tk.group.position.copy(tk.pos); tk.group.rotation.y=tk.heading;
     if(tk.turret) tk.turret.rotation.y = camYaw.v - tk.heading;
     wp=tk.pos.clone();
@@ -3392,7 +3397,10 @@ function updatePlayerTankAI(dt){
     const to=tgt.pos.clone().sub(wp), yaw=Math.atan2(to.x,to.z);
     if(tk.onDeck){ if(tk.turret)tk.turret.rotation.y=yaw-player.heading-tk.heading; }
     else{
-      if(tgt.unit&&tgt.d>110){const mv=tgt.pos.clone().sub(tk.pos);mv.y=0;if(mv.length()>1){mv.normalize();tk.heading=Math.atan2(mv.x,mv.z);tk.pos.addScaledVector(mv,(tk.speed||18)*.42*dt);if(tk.island)clampToIsland(tk.pos,tk.island,.9);tk.pos.y=2.1;tk.group.position.copy(tk.pos);tk.group.rotation.y=tk.heading;}}
+      if(tgt.unit&&tgt.d>110){const mv=tgt.pos.clone().sub(tk.pos);mv.y=0;if(mv.length()>1){mv.normalize();tk.heading=Math.atan2(mv.x,mv.z);
+        const nx=tk.pos.x+mv.x*(tk.speed||18)*.42*dt, nz=tk.pos.z+mv.z*(tk.speed||18)*.42*dt;
+        if(!landUnitWalkBlocked(nx,nz,tk.island,2)){tk.pos.x=nx;tk.pos.z=nz;}
+        if(tk.island)clampToIsland(tk.pos,tk.island,.9);tk.pos.y=groundHeightAt(tk.pos,tk.island);tk.group.position.copy(tk.pos);tk.group.rotation.y=tk.heading;}}
       if(tk.turret)tk.turret.rotation.y=yaw-tk.heading;
     }
     if(tk.fireCd>0)tk.fireCd-=dt;
@@ -4223,7 +4231,7 @@ function buyTank(id){
     if(!onFoot||!isl){ flashPrompt('Stand on dry friendly ground to call in a tank'); return; }
     const side=new THREE.Vector3(Math.cos(camYaw.v),0,-Math.sin(camYaw.v));
     const p=footPos.clone().add(side.multiplyScalar(8)).add(new THREE.Vector3(0,0,Math.random()*4-2));
-    clampToIsland(p,isl,0.82); p.y=2.1;
+    clampToIsland(p,isl,0.82); p.y=groundHeightAt(p,isl);
     if(playerTanks.some(tk=>!tk.onDeck&&tk.hp>0&&(tk.pos||tk.group.position).distanceTo(p)<7)){ flashPrompt('Too crowded for a tank drop — move a few steps'); return; }
     money-=cost; buildGroundPlayerTank(p,id,isl);
     refreshShop(); updateHUD(); sfxClick(); flashPrompt(T.name+' delivered beside you — press E near it to crew it');
@@ -4866,6 +4874,13 @@ function landSpots(){ const o=islands.map(i=>({pos:i.pos,r:i.r,rx:i.rx,rz:i.rz,a
   if(friendlyHarbor) o.push({pos:friendlyHarbor.pos,r:friendlyHarbor.r,top:2.0,harbor:friendlyHarbor}); return o; }
 function landIdentity(o){ return o ? (o.island||o.harbor||o) : null; }
 function landTop(o){ return o&&o.top!=null?o.top:2.0; }
+function groundHeightAt(pos,spot){   // real terrain height on an island (mound/table/beach), flat fallback on a harbor or off-island
+  // spot may be a raw island (from islands[]/footLand) OR a landSpots()/footSurfaceAt() wrapper
+  // ({...,island:i}) — that wrapper is a fresh object each call, never === a real islands[] member.
+  const isl = spot&&spot.island&&islands.includes(spot.island) ? spot.island : (spot&&islands.includes(spot)?spot:null);
+  if(isl){ const y=islandSurfaceY(pos,isl); if(y!=null) return y; }
+  return landTop(spot);
+}
 function footSurfaceAt(pos,pad=0){
   let best=null,bn=1e9;
   landSpots().forEach(o=>{ const n=islandNorm(pos,o,pad); if(n<1&&n<bn){bn=n;best=o;} });
@@ -4882,7 +4897,7 @@ function parachuteFromAircraft(){
   piloting=null; onFoot=true; driving=false; manning=null; drivingTank=null; resetFootHealth();
   const surf=footSurfaceAt(drop,20); footLand=landIdentity(surf);
   footPos.copy(drop);
-  footPos.y=footLand?(landTop(surf||footLand)+EYE):(0.45+EYE);
+  footPos.y=footLand?(groundHeightAt(footPos,footLand)+EYE):(0.45+EYE);
   player.pos.copy(footPos).setY(0);
   const chute=new THREE.Mesh(new THREE.SphereGeometry(5,16,8,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0xf2f2e8,transparent:true,opacity:.82,side:THREE.DoubleSide}));
   chute.position.copy(footPos).add(new THREE.Vector3(0,8,0));scene.add(chute);
@@ -4916,7 +4931,7 @@ function toggleFoot(){
   if(best && bd<80){
     if(driving) stopDrive();   // G at the helm: step off the wheel and go ashore in one press
     onFoot=true; resetFootHealth(); footLand=best.island||best.harbor||best;
-    footPos.copy(player.pos); clampToIsland(footPos,footLand,0.82); footPos.y=best.top+EYE;
+    footPos.copy(player.pos); clampToIsland(footPos,footLand,0.82); footPos.y=groundHeightAt(footPos,footLand)+EYE;
     flashPrompt('Ashore'+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.','ok'); updateMode();
   } else flashPrompt('Sail right up alongside an island or harbor, then press G to go ashore.','bad');
 }
@@ -4940,6 +4955,18 @@ function footWalkBlocked(x,z){
     return Math.hypot(x-u.pos.x,z-u.pos.z)<radius;
   });
 }
+// tanks/soldiers driving around an island shouldn't be able to drive through a building —
+// but the 620-instanced jungle canopy per island has no per-tree collision data, and shouldn't:
+// blocking on every tree would make islands nearly unnavigable and cost far more than it's worth.
+function landUnitWalkBlocked(x,z,island,vehicleMargin){
+  if(!island) return false;
+  return landUnits.some(u=>{
+    if(u.dead||!STRUCTS[u.kind]||WALKABLE_STRUCTURE_KINDS.has(u.kind))return false;
+    if(u.island!==island)return false;
+    const radius=Math.max(2.2,(u.footprint||8)*.46)+(vehicleMargin||0);   // per-structure radius (same sizing as footWalkBlocked) plus extra clearance for a bigger vehicle
+    return Math.hypot(x-u.pos.x,z-u.pos.z)<radius;
+  });
+}
 function deckWalkBlocked(x,z){
   const blocks=player&&player.build&&player.build.group.userData.walkBlocks||[];
   return blocks.some(b=>b.r!=null?Math.hypot(x-b.x,z-b.z)<b.r+.48:
@@ -4959,7 +4986,7 @@ function updateFoot(dt){
   }
   const surfaceAfter=footSurfaceAt(footPos,0);
   footLand=landIdentity(surfaceAfter);
-  footPos.y=footLand?(landTop(surfaceAfter||footLand)+EYE):(0.45+EYE);
+  footPos.y=footLand?(groundHeightAt(footPos,surfaceAfter||footLand)+EYE):(0.45+EYE);
   if(landCampaignMode||playerShipLost) player.pos.copy(footPos).setY(0);  // minimap, sky and objectives follow the soldier, not the hidden anchor
   // handheld weapon — fire the currently equipped small arm
   if(footGunCd>0) footGunCd-=dt;
@@ -5393,8 +5420,11 @@ function moveLandUnitToward(u,target,dt,stop){
   if(!target||u.kind!=='tank'&&u.kind!=='soldier')return;
   const to=target.clone().sub(u.pos);to.y=0;const d=to.length();if(d<stop||d<1)return;
   const sp=u.kind==='tank'?(u.tank&&u.tank.speed?u.tank.speed*.7:10):7.2;
-  to.normalize();u.pos.addScaledVector(to,sp*dt);if(u.island)clampToIsland(u.pos,u.island,0.9);
-  u.pos.y=u.kind==='tank'?2:1.4;u.group.position.copy(u.pos);u.group.rotation.y=Math.atan2(to.x,to.z);
+  to.normalize();
+  const nx=u.pos.x+to.x*sp*dt, nz=u.pos.z+to.z*sp*dt;
+  if(!landUnitWalkBlocked(nx,nz,u.island,u.kind==='tank'?2:0)){ u.pos.x=nx; u.pos.z=nz; }
+  if(u.island)clampToIsland(u.pos,u.island,0.9);
+  u.pos.y=groundHeightAt(u.pos,u.island);u.group.position.copy(u.pos);u.group.rotation.y=Math.atan2(to.x,to.z);
 }
 function groundAdvanceTarget(u,foe){
   const command=landUnits.find(x=>!x.dead&&x.team===foe&&x.kind==='command')||landUnits.find(x=>!x.dead&&x.team===foe);
@@ -6035,7 +6065,7 @@ function resumeWar(){
     // the insertion always drops you at the command post; put the captain back where he actually was
     if(s.px!=null){ const p=new THREE.Vector3(s.px,0,s.pz), isl=islandOfPos(p);
       if(isl&&isl.owner===0){ footLand=isl; footPos.copy(p); clampToIsland(footPos,isl,0.9);
-        footPos.y=(isl.top||2.1)+EYE; player.pos.copy(footPos).setY(0); player.heading=s.hd||0; camYaw.v=player.heading; } }
+        footPos.y=groundHeightAt(footPos,isl)+EYE; player.pos.copy(footPos).setY(0); player.heading=s.hd||0; camYaw.v=player.heading; } }
   }
   else {
     landCampaignMode=false;
