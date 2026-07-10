@@ -1403,7 +1403,8 @@ function buildLand(kind,team,pos,type){
     needsPower:!!(STRUCTS[kind]&&STRUCTS[kind].power),footprint:(STRUCTS[kind]&&STRUCTS[kind].footprint)||4,light:g.userData.light,
     ammoLeft:kind==='silo'?6:kind==='rocket'?10:kind==='supergun'?3:kind==='fortress'?8:null };
   if(kind==='nukesilo')u.fireT=200;
-  u[kind]=true;return u;
+  if(!u[kind]) u[kind]=true;   // kind flag — but never clobber a field the builder already filled (u.tank holds the TANKS def)
+  return u;
 }
 
 // =====================================================================
