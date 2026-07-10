@@ -5529,6 +5529,7 @@ function drawMinimap(){
 function tacticalSilos(){return landUnits.filter(u=>!u.dead&&u.team===0&&u.nukesilo);}
 function toggleTacticalMap(force){
   if(phase!=='play')return;
+  if(contentFilterOn()&&!tacticalOpen){ flashPrompt('Strategic weapons are disabled in kid-safe mode'); return; }
   tacticalOpen=force==null?!tacticalOpen:!!force;
   const panel=document.getElementById('tactical');panel.style.display=tacticalOpen?'flex':'none';
   if(tacticalOpen){
@@ -6871,6 +6872,7 @@ const ZH_PATTERNS = (() => {
 
 // ---------- i18n: review-pass supplements (strings the generated dictionaries missed) ----------
 Object.assign(ZH_EXACT,{
+  'Strategic weapons are disabled in kid-safe mode':'家长模式下已停用战略武器',
   'Threat clear — resuming patrol.':'威胁解除——恢复巡逻。',
   'Engaging enemy contact!':'发现敌舰，正在交战！',
   'All mounts are full — press E to step onto the deck, then F places it anywhere':'炮位都装满了——按 E 走上甲板，再按 F 就能装在任意空地',
