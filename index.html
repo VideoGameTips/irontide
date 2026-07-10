@@ -1164,10 +1164,10 @@ function islandGeometry(rx,rz,h,seed,bottomMul=1){
     p.setX(i,x*rx*edge*bank); p.setZ(i,z*rz*edge*bank); }
   geo.computeVertexNormals(); return geo;
 }
-function buildIsland(pos,r,name,preset){   // preset {rx,rz,angle} restores a saved island's exact footprint
+function buildIsland(pos,r,name,preset){   // preset {rx,rz,angle,seed} restores a saved island's exact footprint
   const g=new THREE.Group(); g.position.copy(pos);
   const isBase=name==='Northwatch'||name==='Southhaven';
-  const seed=Math.random()*20, long=isBase?1.28:1.2+Math.random()*0.42, short=isBase?0.95:0.92+Math.random()*0.16;
+  const seed=preset&&preset.seed!=null?preset.seed:Math.random()*20, long=isBase?1.28:1.2+Math.random()*0.42, short=isBase?0.95:0.92+Math.random()*0.16;
   const alongX=isBase||Math.random()<0.5,
     rx=preset?preset.rx:r*(alongX?long:short),
     rz=preset?preset.rz:r*(alongX?short:long),
@@ -1212,7 +1212,7 @@ function buildIsland(pos,r,name,preset){   // preset {rx,rz,angle} restores a sa
   const capRing=new THREE.Mesh(new THREE.RingGeometry(7,10,28),capMat); capRing.rotation.x=-Math.PI/2; capRing.position.y=5; capRing.scale.setScalar(capScale); g.add(capRing);
   const beaconMat=new THREE.MeshStandardMaterial({color:0xb8c0c8,emissive:0xb8c0c8,emissiveIntensity:1.1});
   const beacon=new THREE.Mesh(new THREE.SphereGeometry(2,10,8),beaconMat); beacon.position.y=24; g.add(beacon);
-  scene.add(g); islands.push({name:name||ISLAND_NAMES[islandNameIndex++%ISLAND_NAMES.length],pos:pos.clone(),r,rx,rz,angle,top:2.1,
+  scene.add(g); islands.push({name:name||ISLAND_NAMES[islandNameIndex++%ISLAND_NAMES.length],pos:pos.clone(),r,rx,rz,angle,seed,top:2.1,
     group:g,owner:null,captureTeam:null,capture:0,capturable:true,capRing,capScale,beacon,serviceT:0});
   return islands[islands.length-1];
 }
@@ -1232,6 +1232,21 @@ function insideIslandRange(pos,o,pad=0){ return islandNorm(pos,o,pad)<1; }
 function islandEdgeDistance(pos,o){
   const q=islandLocal(pos,o),d=Math.hypot(q.x,q.z); if(d<0.001)return -Math.min(o.rx||o.r,o.rz||o.r);
   const n=islandNorm(pos,o); return d-d/n;
+}
+// analytic terrain height — mirrors islandGeometry()'s edge-noise layers (beach/grass/mound) without touching a mesh
+function islandEdgeMul(a,seed){ return 1+Math.sin(a*3+seed)*0.105+Math.sin(a*5-seed*1.7)*0.055+Math.sin(a*7+seed*0.4)*0.025; }
+function islandLayerNorm(q,o,mul,seedOff){
+  const rx=(o.rx||o.r)*mul, rz=(o.rz||o.r)*mul, seed=o.seed||0;
+  const a=Math.atan2(q.z/rz,q.x/rx), edge=islandEdgeMul(a,seed+seedOff);
+  return Math.hypot(q.x/(rx*edge),q.z/(rz*edge));
+}
+function islandSurfaceY(pos,o){    // null = open water at this (x,z); otherwise the terrain top height there
+  if(!o) return null;
+  const q=islandLocal(pos,o);
+  if(o.r>30 && islandLayerNorm(q,o,0.43,0.5)<1) return 3.8;   // central jungle mound
+  if(islandLayerNorm(q,o,0.84,0.15)<1) return 2.1;            // grass table
+  if(islandLayerNorm(q,o,1,0)<1) return 1.3;                  // beach
+  return null;
 }
 function islandPoint(o,a,f=1,y=0){
   const p=islandWorld(o,Math.cos(a)*(o.rx||o.r)*f,Math.sin(a)*(o.rz||o.r)*f); p.y=y; return p;
@@ -4484,7 +4499,7 @@ function spawnShell(w,pos,dir,team,owner,enemyArc,velOverride){
   const sh={ mesh:m, pos:m.position, vel, dmg:w.dmg, team, splash:w.splash||0, homing:!!w.homing, water:w.kind==='torpedo',
     arc:!!lob||!!velOverride, owner, life:w.life||9, col, aa:!!w.aa, strategic:!!w.strategic, nuclear:!!w.nuclear,
     hp:w.hp||0, fixedTarget:w.targetPos?w.targetPos.clone():null, spareHarbors:!!w.spareHarbors,
-    turn:w.turn||2.4, maxDist:w.range||0, dist:0 };
+    turn:w.turn||2.4, maxDist:w.range||0, dist:0, spawnIsl:islandOfPos(pos) };  // spawnIsl exempts shore weapons from detonating on their own launch island
   if(w.nuclear){const mark=teamMarker(team,12);mark.position.y=7;m.add(mark);}
   // flame streak / tracer trail — white-hot core sheathed in an orange glow (skip torpedoes — they're in the water)
   if(w.kind!=='torpedo'){
@@ -5064,6 +5079,11 @@ function updateShells(dt){
     }
     if(!hit&&s.mesh.position.y<4)for(const m of mines){if(m.team===s.team||m.arm>0)continue;
       if(s.mesh.position.distanceTo(m.pos)<3.2){hitSpark(m.pos.clone().setY(1));detonateMine(m);hit=true;break;}}
+    if(!hit && s.mesh.position.y<6){
+      const isl=islandOfPos(s.mesh.position);
+      if(isl && isl!==s.spawnIsl){ const surf=islandSurfaceY(s.mesh.position,isl);   // spawnIsl exemption: a shell never detonates on the island it launched from
+        if(surf!=null && s.mesh.position.y<surf){ boom(s.mesh.position.clone(),s.heavy?1.2:0.7);
+          if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true; } } }
     if(!hit && s.mesh.position.y<0.3){ splashAt(s.mesh.position.clone(),s.strategic?8:1);if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true;}
     if(hit||s.life<=0) removeShellAt(i);
   }
@@ -5825,7 +5845,7 @@ function saveWar(){ if(!warSavable()) return;
       weather:{type:weather.type,tod:weather.tod,t:weather.t,sea:weather.sea},
       fh:{x:friendlyHarbor.pos.x,z:friendlyHarbor.pos.z,hp:friendlyHarbor.hp,maxhp:friendlyHarbor.maxhp,up:friendlyHarbor.up},
       eh:{x:enemyHarbor.pos.x,z:enemyHarbor.pos.z,hp:enemyHarbor.hp,maxhp:enemyHarbor.maxhp,up:enemyHarbor.up},
-      islands:islands.map(i=>({name:i.name,x:i.pos.x,z:i.pos.z,r:i.r,rx:i.rx,rz:i.rz,angle:i.angle,owner:i.owner,cap:i.capturable})),
+      islands:islands.map(i=>({name:i.name,x:i.pos.x,z:i.pos.z,r:i.r,rx:i.rx,rz:i.rz,angle:i.angle,seed:i.seed,owner:i.owner,cap:i.capturable})),
       units:landUnits.filter(u=>!u.dead).map(u=>({k:u.kind,t:u.team,x:u.pos.x,y:u.pos.y,z:u.pos.z,hp:u.hp,
         tt:u.tank?_idOf(TANKS,u.tank):null, isl:islands.indexOf(u.island), am:u.ammoLeft==null?null:u.ammoLeft})),
       shipId:_idOf(SHIPS,player.def)||'destroyer', hp:player.hp, px:player.pos.x, pz:player.pos.z, hd:player.heading,
@@ -5857,7 +5877,7 @@ function resumeWar(){
   enemyHarbor  =buildHarbor(1,new THREE.Vector3(s.eh.x,0,s.eh.z));
   Object.assign(friendlyHarbor.up,s.fh.up||{}); friendlyHarbor.hp=s.fh.hp; friendlyHarbor.maxhp=s.fh.maxhp;
   Object.assign(enemyHarbor.up,s.eh.up||{});   enemyHarbor.hp=s.eh.hp;   enemyHarbor.maxhp=s.eh.maxhp;
-  (s.islands||[]).forEach(si=>{ const isl=buildIsland(new THREE.Vector3(si.x,0,si.z),si.r,si.name,{rx:si.rx,rz:si.rz,angle:si.angle}); isl.capturable=si.cap!==false; });
+  (s.islands||[]).forEach(si=>{ const isl=buildIsland(new THREE.Vector3(si.x,0,si.z),si.r,si.name,{rx:si.rx,rz:si.rz,angle:si.angle,seed:si.seed}); isl.capturable=si.cap!==false; });
   (s.units||[]).forEach(su=>{ const u=buildAndPushLand(su.k,su.t,new THREE.Vector3(su.x,su.y,su.z),su.y,(su.isl>=0?islands[su.isl]:null)||undefined,su.tt||undefined);
     if(su.hp!=null)u.hp=su.hp; if(su.am!=null)u.ammoLeft=su.am; });
   (s.islands||[]).forEach((si,i)=>{ if(si.owner!=null&&islands[i]) setIslandOwner(islands[i],si.owner,true); });
