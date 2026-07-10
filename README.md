@@ -35,6 +35,7 @@
 index.html        整个游戏（唯一正本）
 vendor/three.js   本地 three.js r128，断网和国内网络都能开
 server/           可选的 WebSocket 中继服务器（多人游戏用，尚未完成）
+docs/             设计文档（DIRECTION.md：穿透/打击感/组装/成就/故事的方向规划）
 ```
 
 ## 给原作者的话
