@@ -831,14 +831,28 @@ function _voice(t){ if(SFX.voices>14) return false; SFX.voices++; setTimeout(()=
 function _noise(dur){ const s=SFX.ctx.createBufferSource(); s.buffer=SFX.noiseBuf; return s; }   // reuses the shared buffer
 function sfxFire(kind,pos){
   if(!SFX.on||!SFX.ctx) return; const now=performance.now(); if(now-SFX.lastGun<26) return;   // global rate cap
-  const heavy=kind==='cannon', mid=kind==='missile'||kind==='bomb'||kind==='torpedo';
+  const heavy=kind==='cannon';
   const ctx=SFX.ctx, t0=ctx.currentTime;
-  if(mid){ // missiles / torpedoes — a launch whoosh
-    const g0=_dg(pos,440)*0.3; if(g0<=0.02||!_voice(0.22)) return; SFX.lastGun=now;
-    const s=_noise(0.22), f=ctx.createBiquadFilter(), g=ctx.createGain();
-    f.type='bandpass'; f.frequency.setValueAtTime(500,t0); f.frequency.exponentialRampToValueAtTime(1600,t0+0.2);
-    g.gain.setValueAtTime(g0,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.22);
-    s.connect(f); f.connect(g); g.connect(SFX.master); s.start(); s.stop(t0+0.22); return;
+  if(kind==='torpedo'){ // underwater launch — duller and lower than a missile, no bright top end
+    const g0=_dg(pos,440)*0.26; if(g0<=0.02||!_voice(0.24)) return; SFX.lastGun=now;
+    const s=_noise(0.24), f=ctx.createBiquadFilter(), g=ctx.createGain();
+    f.type='bandpass'; f.frequency.setValueAtTime(220,t0); f.frequency.exponentialRampToValueAtTime(700,t0+0.22); f.Q.value=0.9;
+    g.gain.setValueAtTime(g0,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.24);
+    s.connect(f); f.connect(g); g.connect(SFX.master); s.start(); s.stop(t0+0.24); return;
+  }
+  if(kind==='missile'){ // sharp ignition whoosh — brighter and quicker than a torpedo launch
+    const g0=_dg(pos,440)*0.32; if(g0<=0.02||!_voice(0.2)) return; SFX.lastGun=now;
+    const s=_noise(0.2), f=ctx.createBiquadFilter(), g=ctx.createGain();
+    f.type='bandpass'; f.frequency.setValueAtTime(700,t0); f.frequency.exponentialRampToValueAtTime(2200,t0+0.18); f.Q.value=0.8;
+    g.gain.setValueAtTime(g0,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.2);
+    s.connect(f); f.connect(g); g.connect(SFX.master); s.start(); s.stop(t0+0.2); return;
+  }
+  if(kind==='bomb'){ // no propulsion of its own — a short release clunk, not a whoosh
+    const g0=_dg(pos,440)*0.22; if(g0<=0.02||!_voice(0.1)) return; SFX.lastGun=now;
+    const s=_noise(0.08), f=ctx.createBiquadFilter(), g=ctx.createGain();
+    f.type='lowpass'; f.frequency.setValueAtTime(900,t0); f.frequency.exponentialRampToValueAtTime(200,t0+0.08);
+    g.gain.setValueAtTime(g0,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.09);
+    s.connect(f); f.connect(g); g.connect(SFX.master); s.start(); s.stop(t0+0.1); return;
   }
   // gunfire = 10% SNAP · 80% BLAST · 10% RECOIL
   const g0=_dg(pos,440)*(heavy?0.75:0.42); if(g0<=0.02||!_voice(heavy?0.4:0.16)) return;
@@ -4546,6 +4560,7 @@ function fireTurret(pl, aim){
   pl.recoil=0.5;
   muzzleFlash(muzzle);
 }
+const TRACER_COLOR_BY_KIND={ gun:0xffd860, cannon:0xff8a28, missile:0x6fd0ff, bomb:0xff7a52 };   // 4 categories, not 121 — kids track "what kind" not "which of 121"
 function spawnShell(w,pos,dir,team,owner,enemyArc,velOverride){
   while(shells.length>=MAX_SHELLS) removeShellAt(0);
   let geo, col=w.col||0xffe0a0;
@@ -4568,9 +4583,10 @@ function spawnShell(w,pos,dir,team,owner,enemyArc,velOverride){
   if(w.nuclear){const mark=teamMarker(team,12);mark.position.y=7;m.add(mark);}
   // flame streak / tracer trail — white-hot core sheathed in an orange glow (skip torpedoes — they're in the water)
   if(w.kind!=='torpedo'){
-    const heavy = w.kind==='cannon'||w.kind==='bomb'||w.kind==='missile'||w.splash;
+    const heavy = w.kind==='cannon'||w.kind==='bomb'||w.kind==='missile'||w.splash;   // controls trail thickness/opacity (visual mass), independent of its color
+    const trailCol = TRACER_COLOR_BY_KIND[w.kind]!=null ? TRACER_COLOR_BY_KIND[w.kind] : (heavy?0xff8a28:0xffd860);
     const trail=new THREE.Mesh(new THREE.CylinderGeometry(heavy?0.26:0.11, 0.015, 1, 6),
-      new THREE.MeshBasicMaterial({color:heavy?0xff8a28:0xffd860,transparent:true,opacity:heavy?0.8:0.65,blending:THREE.AdditiveBlending,depthWrite:false}));
+      new THREE.MeshBasicMaterial({color:trailCol,transparent:true,opacity:heavy?0.8:0.65,blending:THREE.AdditiveBlending,depthWrite:false}));
     const core=new THREE.Mesh(new THREE.CylinderGeometry(heavy?0.09:0.04, 0.008, 1, 5),
       new THREE.MeshBasicMaterial({color:0xfff4d8,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false}));
     core.scale.y=0.55; trail.add(core);                       // hot core rides the front half of the streak
