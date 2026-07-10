@@ -148,7 +148,25 @@
   #shop{position:fixed;top:0;right:0;bottom:0;width:300px;z-index:15;background:rgba(9,16,24,.94);
     border-left:1px solid #21384e;padding:16px;display:none;overflow-y:auto;}
   #shop h2{font-size:15px;letter-spacing:2px;color:#9fc6e8;margin-bottom:3px;}
-  #shop .hint{font-size:11px;color:#6b7d92;margin-bottom:14px;line-height:1.5;}
+  #shop .hint{font-size:11px;color:#6b7d92;margin-bottom:10px;line-height:1.5;}
+  /* the wallet lives next to the price tags — the top-left HUD figure is a screen away */
+  #shopHead{position:sticky;top:-16px;z-index:3;margin:0 -16px 8px;padding:8px 16px;
+    background:rgba(9,16,24,.97);border-bottom:1px solid #21384e;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  #shopBal{font-size:19px;color:#ffe08a;letter-spacing:1px;text-shadow:0 0 8px rgba(255,200,80,.35);}
+  #shopPause{font-size:11px;color:#8fc9e9;background:#10222f;border:1px solid #2a4660;border-radius:20px;padding:3px 10px;white-space:nowrap;}
+  #shopToast{display:none;margin:0 0 10px;padding:8px 11px;border-radius:8px;font-size:12px;line-height:1.45;
+    border:1px solid #2a4660;background:#0e1a26;color:#cfe6fb;animation:toastIn .18s ease-out;}
+  #shopToast.ok{border-color:#3fae78;background:#10281c;color:#a6f2c3;}
+  #shopToast.bad{border-color:#a8503f;background:#2a1512;color:#ffb3a4;}
+  @keyframes toastIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
+  .witem .st{display:none;margin-top:5px;font-size:10px;letter-spacing:1px;color:#8ff0b4;}
+  .witem.sel .st{display:block;}
+  /* the install action lives inside the panel — a phone has no F key, and no room beside it */
+  #shopInstall{display:none;position:sticky;bottom:-16px;z-index:3;width:calc(100% + 32px);margin:8px -16px 0;
+    padding:14px 12px;border:none;border-top:1px solid #3fae78;background:#123726;color:#a6f2c3;
+    font:600 14px/1.3 'Segoe UI',system-ui,sans-serif;letter-spacing:1px;cursor:pointer;}
+  #shopInstall:hover{background:#164a32;}
+  #shopInstall:active{background:#1d6142;}
   .witem{padding:10px;margin-bottom:8px;border:1px solid #21384e;border-radius:8px;cursor:pointer;background:#0e1a26;transition:.12s;}
   .witem:hover{border-color:#3d6a90;}
   .witem.sel{border-color:#5fd0ff;background:#13283a;box-shadow:0 0 10px rgba(95,208,255,.3);}
@@ -244,9 +262,12 @@
 
 <!-- SHOP -->
 <div id="shop">
+  <div id="shopHead"><span id="shopBal">$0</span><span id="shopPause">⏸ war paused</span></div>
   <h2>ARMORY</h2>
-  <div class="hint">Click to select, then close (Tab) and aim at a glowing mount on deck, press <b>F</b> to install.</div>
+  <div class="hint">Click a weapon, then press <b>F</b> to install it.</div>
+  <div id="shopToast"></div>
   <div id="shopList"></div>
+  <button id="shopInstall"></button>
 </div>
 
 <!-- HARBOR UPGRADES -->
@@ -2018,10 +2039,10 @@ function updateTankInteriorView(){
   if(active){drivingTank.group.visible=false;tankHiddenExterior=drivingTank.group;}
   if(tankInteriorView)tankInteriorView.visible=active;
 }
-function equipGun(id){ equippedGun=id; ownedGuns.add(id); refreshViewGun(); flashPrompt('Equipped '+HANDHELD[id].name); }
+function equipGun(id){ equippedGun=id; ownedGuns.add(id); refreshViewGun(); flashPrompt('Equipped '+HANDHELD[id].name,'ok'); }
 function buyGun(id){ const W=HANDHELD[id];
   if(ownedGuns.has(id)){ equipGun(id); sfxClick(); buildShopUI(); return; }
-  const cost=priceOf(W.cost); if(money<cost){ flashPrompt('Not enough funds'); return; }
+  const cost=priceOf(W.cost); if(money<cost){ flashPrompt('Not enough funds','bad'); return; }
   money-=cost; ownedGuns.add(id); equipGun(id); sfxClick(); buildShopUI(); updateHUD();
 }
 function cycleGun(){ if(!onFoot) return; const owned=Object.keys(HANDHELD).filter(k=>ownedGuns.has(k));
@@ -3825,12 +3846,15 @@ function buildShopUI(){
       b.onclick=()=>{ SHOP_SHOW_ALL[key]=!SHOP_SHOW_ALL[key]; buildShopUI(); }; pane.appendChild(b); }
   };
   // --- deck guns (select, then F installs) ---
-  fillPane('guns', mkPane('guns',T('Click to select, then press F to mount it — at the helm it lands on a free mount.','点选武器后按 F 安装——掌舵时自动装到空炮位。')), WEAPONS, id=>{
+  fillPane('guns', mkPane('guns',T('Click to select, then '+installHint()+' to mount it — at the helm it lands on a free mount.','点选武器后'+installHint()+'安装——掌舵时自动装到空炮位。')), WEAPONS, id=>{
     const w=WEAPONS[id];
     const d=document.createElement('div'); d.className='witem'; d.dataset.id=id;
     d.innerHTML=`<div class="wn"><span>${catTr(typeof WEAPONS_ZH!=='undefined'?WEAPONS_ZH:null,id,'name',w.name)}</span><span class="wc">$${priceOf(w.cost)}</span></div>
-      <div class="wd">${describe(w)}</div>`;
-    d.onclick=()=>{ if(money>=priceOf(w.cost)){ selectedWeapon=id; refreshShop(); } };
+      <div class="wd">${describe(w)}</div><div class="st">${T('✓ SELECTED','✓ 已选中')}</div>`;
+    d.onclick=()=>{ const c=priceOf(w.cost), nm=trName(w.name);
+      if(money<c){ shopMsg(T('❌ Not enough funds — '+w.name+' costs $'+c+', you have $'+money,'❌ 资金不足——'+nm+' 要 $'+c+'，你只有 $'+money),'bad'); return; }
+      selectedWeapon=id; refreshShop(); sfxClick();
+      shopMsg(T('✓ '+w.name+' selected ($'+c+') — '+installHint()+' to mount it on deck','✓ 已选中 '+nm+'（$'+c+'）——'+installHint()+'就装到甲板上'),'ok'); };
     return d;
   });
   // --- Hangar (buy instantly; parks on deck) ---
@@ -3878,6 +3902,14 @@ function describe(w){
   return `${k} · ${w.dmg}${T(' dmg',' 伤害')} · ${(1/w.cd).toFixed(1)}${T('/s','/秒')}${w.splash?T(' · splash',' · 溅射'):''}`;
 }
 function refreshShop(){
+  shopBalance();
+  const inst=document.getElementById('shopInstall');
+  if(inst){
+    const w=selectedWeapon?WEAPONS[selectedWeapon]:null;
+    inst.style.display=w?'block':'none';
+    if(w) inst.textContent=T('🔧 Install '+w.name+' — $'+priceOf(w.cost),'🔧 安装 '+trName(w.name)+' — $'+priceOf(w.cost));
+    inst.onclick=()=>tryPlace();
+  }
   document.querySelectorAll('.witem').forEach(el=>{
     if(el.dataset.gun){ const id=el.dataset.gun, owned=ownedGuns.has(id);
       el.classList.toggle('sel', id===equippedGun);
@@ -3893,7 +3925,8 @@ function toggleShop(){
   if(harborOpen) toggleHarbor(); if(buildOpen) toggleBuild();
   shopOpen=!shopOpen;
   document.getElementById('shop').style.display=shopOpen?'block':'none';
-  if(shopOpen){ if(document.pointerLockElement) document.exitPointerLock(); }
+  if(shopOpen){ if(document.pointerLockElement) document.exitPointerLock(); shopBalance();
+    const t=document.getElementById('shopToast'); if(t) t.style.display='none'; }
   updateMode();
 }
 // ---------- HARBOR upgrade panel ----------
@@ -3928,7 +3961,7 @@ function toggleHarbor(){
 }
 function buyUpgrade(k){
   const u=HARBOR_UP[k], lvl=fU(k); if(lvl>=u.max) return;
-  const cost=upgCost(k); if(money<cost){ flashPrompt('Not enough funds'); return; }
+  const cost=upgCost(k); if(money<cost){ flashPrompt('Not enough funds','bad'); return; }
   money-=cost; friendlyHarbor.up[k]=lvl+1;
   applyUpgrade(k);
   refreshHarbor(); if(k==='discount') buildShopUI(); else refreshShop(); updateHUD();
@@ -3977,7 +4010,7 @@ function buildStructure(k){
   if(!footLand){ flashPrompt('Swim to dry land before building '+STRUCTS[k].name); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('This position is not under friendly control'); return; }
   const s=STRUCTS[k], cost=priceOf(s.cost);
-  if(money<cost){ flashPrompt('Not enough funds'); return; }
+  if(money<cost){ flashPrompt('Not enough funds','bad'); return; }
   if(k==='nukesilo'&&landUnits.some(u=>!u.dead&&u.team===0&&u.nukesilo)){flashPrompt('Only one operational R-36M silo is permitted per side');return;}
   const isl=footLand&&footLand.capRing?footLand:null;
   if(!isl){flashPrompt('These enormous structures require a proper island');return;}
@@ -4043,11 +4076,17 @@ function freeMountLocal(w){   // first hull mount not already crowded by an inst
   return null;
 }
 function tryPlace(){
-  if(phase!=='play'||gamePaused()||manning||piloting) return;
+  if(phase!=='play'||manning||piloting) return;
+  // F pressed inside the armory means "install this one". Every reason it might fail is
+  // reported in the panel first; the panel only closes once the install is going ahead.
+  const fromShop=shopOpen;
+  if(fromShop&&!selectedWeapon){ shopMsg(T('Click a weapon first, then '+installHint()+' to install it','先点选一门武器，再'+installHint()+'安装它'),'bad'); return; }
+  if(!fromShop&&gamePaused()) return;   // the harbor / build / map / chat panels still hold the war
   if(!selectedWeapon){ flashPrompt('Pick a weapon in the Armory (Tab)'); return; }
   const w=WEAPONS[selectedWeapon]; const cost=priceOf(w.cost);
-  if(placed.length>=player.def.mounts){ flashPrompt('Gun limit reached — this hull mounts only '+player.def.mounts+' guns'); return; }
-  if(money<cost){ flashPrompt('Not enough funds'); return; }
+  if(placed.length>=player.def.mounts){ flashPrompt('Gun limit reached — this hull mounts only '+player.def.mounts+' guns','bad'); return; }
+  if(money<cost){ flashPrompt('Not enough funds','bad'); return; }
+  if(fromShop) toggleShop();   // checks passed — get the panel out of the way and mount it
   let px,pz,mountPos=null;
   if(driving){                          // at the helm: F drops the new gun onto the next free hull mount
     mountPos=freeMountLocal(w);
@@ -4069,6 +4108,9 @@ function tryPlace(){
   (t.userData.yawG||t).add(gunner);
   placed.push({ def:w, group:t, yaw:0, pitch:0.1, cd:0, gunner });
   refreshShop(); updateHUD(); sfxClick();
+  const live=placed.filter(p=>!p.ko).length;
+  flashPrompt(T('✅ '+w.name+' installed — '+live+'/'+player.def.mounts+' guns · $'+money+' left',
+               '✅ '+trName(w.name)+' 已装上——火炮 '+live+'/'+player.def.mounts+' · 还剩 $'+money),'ok');
 }
 function nearestPlane(){
   let best=null,bd=6;
@@ -4110,17 +4152,17 @@ function toggleMan(){
 // ---------- planes: buy / fly / land ----------
 function buyPlane(id){
   const p=PLANES[id]; const cost=priceOf(p.cost);
-  if(money<cost){ flashPrompt('Not enough funds'); return; }
+  if(money<cost){ flashPrompt('Not enough funds','bad'); return; }
   const spot=planeSpots.find(s=>!s.taken);
   if(!spot){ flashPrompt('No free flight spot on deck'); return; }
   money-=cost;
   const g=buildPlane(p); g.position.copy(spot.pos); g.rotation.y=0; player.build.group.add(g);
   planes.push({def:p,group:g,spot,parked:true,bombsLeft:p.bombs||0,gunAmmo:p.gunAmmo==null?null:p.gunAmmo});
-  spot.taken=true; refreshShop(); updateHUD(); sfxClick(); flashPrompt(p.name+' ready on deck — press E aboard it to fly');
+  spot.taken=true; refreshShop(); updateHUD(); sfxClick(); flashPrompt(p.name+' ready on deck — press E aboard it to fly','ok');
 }
 function buyTank(id){
   const T=TANKS[id]; const cost=priceOf(T.cost);
-  if(money<cost){ flashPrompt('Not enough funds'); return; }
+  if(money<cost){ flashPrompt('Not enough funds','bad'); return; }
   if(landCampaignMode){
     const surf=footSurfaceAt(footPos,0), isl=landIdentity(surf)||footLand;
     if(!onFoot||!isl){ flashPrompt('Stand on dry friendly ground to call in a tank'); return; }
@@ -4136,7 +4178,7 @@ function buyTank(id){
   if(!spot){ flashPrompt('No free deck slot — a bigger ship carries more tanks'); return; }
   money-=cost;
   buildDeckTank(spot.pos, id); spot.taken=true;
-  refreshShop(); updateHUD(); sfxClick(); flashPrompt(T.name+' loaded on deck — walk up and press E to crew it');
+  refreshShop(); updateHUD(); sfxClick(); flashPrompt(T.name+' loaded on deck — walk up and press E to crew it','ok');
 }
 function spinProp(pa,dt){
   const dead = piloting && piloting.plane===pa && !piloting.engineOn;   // engine out → prop windmills / stops
@@ -5501,7 +5543,22 @@ function updateCamera(){
   }
 }
 let promptT=0, promptMsg='';
-function flashPrompt(msg){ promptMsg=msg; promptT=2; }
+// While the armory is open the player's eyes are on the right-hand panel, not on the
+// prompt bar at the bottom of the world — so every prompt is mirrored into the panel.
+let _toastTimer=0;
+function shopMsg(msg,kind){
+  const el=document.getElementById('shopToast'); if(!el) return;
+  el.textContent=trText(msg); el.className=kind||''; el.style.display='block';
+  clearTimeout(_toastTimer); _toastTimer=setTimeout(()=>{ el.style.display='none'; },4000);
+}
+function shopBalance(){
+  const el=document.getElementById('shopBal'); if(el) el.textContent='$'+money;
+}
+// there is no F key on a phone, so every hint points at the panel's own Install button
+function installHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
+  ? T('tap Install below','点下方的安装按钮')
+  : T('press F (or click Install below)','按 F（或点下方的安装按钮）'); }
+function flashPrompt(msg,kind){ promptMsg=msg; promptT=2; if(shopOpen) shopMsg(msg,kind); }
 function updatePrompt(){
   const el=document.getElementById('prompt'); let msg='';
   const capIsl=!piloting&&player?islands.find(i=>i.capturable&&i.owner!==0&&
@@ -5554,6 +5611,7 @@ function critStatus(){
 }
 function updateHUD(){
   document.getElementById('money').textContent='$'+money;
+  if(shopOpen) shopBalance();   // island income keeps ticking; the panel's wallet must keep up
   const wg = weather.type==='storm'?'⛈️':weather.type==='fog'?'🌫️':weather.type==='overcast'?'☁️':(weather.day<0.32?'🌙':'☀️');
   const forceLabel=(window._MAP&&window._MAP.ground)?(T('Ground ','陆军 ')+landUnits.filter(u=>!u.dead&&u.team===0).length+'v'+landUnits.filter(u=>!u.dead&&u.team===1).length):(T('Fleet ','舰队 ')+(allies.length+1)+'v'+enemies.length);
   document.getElementById('score').textContent=wg+'  '+T('Sunk:','击沉:')+' '+sunk+'   ·   '+forceLabel+
@@ -5847,7 +5905,11 @@ function touchLabels(){
   L('tClose', T('✕ Close','✕ 关闭'), paused);
   ['tStick','tFire','tAct','tAct2','tShop','tMap'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.style.display=paused?'none':''; });
-  if(paused){ if(_stickId!=null) stickRelease(); mouseDownFire=false; return; }
+  if(paused){
+    if(_stickId!=null) stickRelease(); mouseDownFire=false;
+    // the armory is the one panel with an action to take from inside it
+    return;
+  }
   L('tShop', T('Shop','商店'), true);
   L('tMap',  T('Map','地图'), true);
   const act = driving?T('Leave helm','离开舵位')
@@ -6985,7 +7047,8 @@ function applyStaticI18n(){
   set('#tactical h2',T('☢ STRATEGIC MISSILE COMMAND','☢ 战略导弹指挥部'));
   set('#tacticalHint',T('Select a friendly R-36M silo, then select a target area. Press N to close.','先选中我方 R-36M 发射井，再选择目标区域。按 N 关闭。'));
   set('#shop h2',T('ARMORY','军械库'));
-  set('#shop .hint',T('Click to select, then close (Tab) and aim at a glowing mount on deck, press <b>F</b> to install.','点击选中武器，关闭商店（Tab）后站到甲板上，按 <b>F</b> 安装在脚前。'));
+  set('#shop .hint',T('Click a weapon, then '+installHint()+' to install it.','点一件武器，再'+installHint()+'安装。'));
+  set('#shopPause',T('⏸ war paused','⏸ 战斗已暂停'));
   set('#harbor h2',T('⚓ HARBOR COMMAND','⚓ 海港指挥部'));
   set('#harbor .hint',T('Spend funds to fortify and supply your harbor. Press <b>H</b> to close.','花钱加固和补给你的海港。按 <b>H</b> 关闭。'));
   set('#build h2',T('🏝️ ISLAND ENGINEERS','🏝️ 岛屿工程队'));
