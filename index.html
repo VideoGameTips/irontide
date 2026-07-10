@@ -229,6 +229,12 @@
   #bannerCard .bc-hint{margin-top:18px;font-size:11px;color:#6b7d92;letter-spacing:1px;}
   #bannerCard.danger .bc-title{color:#ff7a6a;animation:dangerPulse .5s ease-in-out infinite alternate;}
   @keyframes dangerPulse{from{text-shadow:0 0 6px rgba(255,90,70,.4);}to{text-shadow:0 0 22px rgba(255,90,70,.9);}}
+
+  /* ---- Damage numbers ---- */
+  #dmgNumbers{position:fixed;inset:0;pointer-events:none;z-index:16;overflow:hidden;}
+  .dmgNum{position:absolute;transform:translate(-50%,-50%);font:800 16px/1 system-ui,sans-serif;color:#fff;
+    text-shadow:0 1px 3px rgba(0,0,0,.85);white-space:nowrap;}
+  .dmgNum.crit{color:#ffd060;font-size:25px;text-shadow:0 1px 4px rgba(0,0,0,.9),0 0 10px rgba(255,208,96,.55);}
 </style>
 </head>
 <body>
@@ -246,6 +252,7 @@
   <div id="cross"></div>
   <div id="hitMarker"></div>
   <div id="bannerCard"><div class="bc-title"></div><div class="bc-sub"></div><div class="bc-hint"></div></div>
+  <div id="dmgNumbers"></div>
   <div id="topbar"><div id="money">$0</div>
     <div id="objective" style="text-align:center;font-size:13px;color:#cfe6fb;">
       <div style="color:#ff9a8a;letter-spacing:1px;">DESTROY THE ENEMY HARBOR</div>
@@ -5142,14 +5149,14 @@ function updateShells(dt){
     if(s.team===0){
       for(const e of enemies){ if(e.sinkT>0)continue; if(s.mesh.position.distanceTo(e.pos)< e.def.beam/2+2){ onShellHit(s,e.pos.clone(),e); hit=true; break; } }
       if(!hit) for(const ep of aiPlanes){ if(ep.team!==1||ep.hp<=0)continue; if(s.mesh.position.distanceTo(ep.pos)<3.2){ ep.hp-=s.dmg; hitSpark(s.mesh.position.clone());
-        const killed=ep.hp<=0; if(killed) killAIPlane(ep); if(playerCausedShell(s)) playerHitFeedback(ep.group,killed); hit=true; break; } }
+        const killed=ep.hp<=0; if(killed) killAIPlane(ep); if(playerCausedShell(s)) playerHitFeedback(ep.group,killed,ep,s.mesh.position,s.dmg); hit=true; break; } }
       if(!hit && s.mesh.position.y<20) for(const u of landUnits){ if(u.team!==1||u.dead)continue; if(s.mesh.position.distanceTo(u.pos)<Math.max(3.5,(u.footprint||4)*.38)){
-        if(s.strategic){blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);if(playerCausedShell(s))playerHitFeedback(u.group,false);}
-        else{u.hp-=s.dmg*wallShield(u);hitSpark(s.mesh.position.clone());if(s.splash)explodeAt(s.mesh.position.clone(),0,s.dmg,s.splash,s.owner);
-          const killed=u.hp<=0; if(killed)killLandUnit(u); if(playerCausedShell(s))playerHitFeedback(u.group,killed);}
+        if(s.strategic){blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);if(playerCausedShell(s))playerHitFeedback(u.group,false,u,s.mesh.position,s.dmg);}
+        else{const applied=s.dmg*wallShield(u);u.hp-=applied;hitSpark(s.mesh.position.clone());if(s.splash)explodeAt(s.mesh.position.clone(),0,s.dmg,s.splash,s.owner);
+          const killed=u.hp<=0; if(killed)killLandUnit(u); if(playerCausedShell(s))playerHitFeedback(u.group,killed,u,s.mesh.position,applied);}
         hit=true;break;} }
       if(!hit && enemyHarbor && enemyHarbor.hp>0 && s.mesh.position.distanceTo(enemyHarbor.pos)<enemyHarbor.r){ if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors);else{damageHarbor(enemyHarbor,s.dmg);hitSpark(s.mesh.position.clone());}
-        if(playerCausedShell(s)) playerHitFeedback(null,false); hit=true; }
+        if(playerCausedShell(s)) playerHitFeedback(null,false,enemyHarbor,s.mesh.position,s.dmg); hit=true; }
     }
     else {
       if(onFoot&&footHP>0&&s.mesh.position.distanceTo(footPos)<2.2){ damageFoot(s.dmg,s.mesh.position); hitSpark(s.mesh.position.clone()); hit=true; }
@@ -5180,10 +5187,10 @@ function updateShells(dt){
 }
 function onShellHit(s,pos,target){
   const byPlayer=playerCausedShell(s), root=target&&target.build?target.build.group:null;
-  if(s.strategic){ blastAll(pos,s.dmg,s.splash,true,s.spareHarbors); if(byPlayer) playerHitFeedback(root,false); }
-  else if(s.splash){ explodeAt(pos,s.team,s.dmg,s.splash,s.owner); if(byPlayer) playerHitFeedback(root,false); }
+  if(s.strategic){ blastAll(pos,s.dmg,s.splash,true,s.spareHarbors); if(byPlayer) playerHitFeedback(root,false,target,pos,s.dmg); }
+  else if(s.splash){ explodeAt(pos,s.team,s.dmg,s.splash,s.owner); if(byPlayer) playerHitFeedback(root,false,target,pos,s.dmg); }
   else { const hpBefore=target.hp; damageTarget(target,s.dmg,s.owner,pos); boom(pos, 0.7);
-    if(byPlayer) playerHitFeedback(root, hpBefore>0 && target.hp<=0); }
+    if(byPlayer) playerHitFeedback(root, hpBefore>0 && target.hp<=0, target, pos, s.dmg); }
 }
 function keepOffIslands(pos,margin,heading,halfLen){   // push a ship out of any island / harbor footprint
   // heading+halfLen (optional) sample the bow/stern too, not just the center — a ship driven
@@ -5205,7 +5212,47 @@ function sfxHit(big){ if(!SFX.on||!SFX.ctx||!_voice(0.16)) return; const ctx=SFX
   const o=ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(big?1500:1200,t0); o.frequency.exponentialRampToValueAtTime(big?820:700,t0+0.12);
   const g=ctx.createGain(); g.gain.setValueAtTime(0.14,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.14);
   o.connect(g); g.connect(SFX.master); o.start(); o.stop(t0+0.15); }
-function playerHitFeedback(root,killed){ showHitMarker(!!killed); sfxHit(!!killed); if(root) flashHitTarget(root); }
+function playerHitFeedback(root,killed,target,pos,dmg){
+  showHitMarker(!!killed); sfxHit(!!killed); if(root) flashHitTarget(root);
+  if(pos!=null && dmg!=null) showDamageNumber(target||root||pos, pos, dmg, killed);
+}
+// ===== DAMAGE NUMBERS — merge same-target hits within 0.5s, cap concurrent floaters, DOM pool =====
+const DMG_NUM_CAP=8, DMG_NUM_MERGE_MS=500, DMG_NUM_LIFE_MS=900;
+let _dmgNumbers=new Map();   // target/root/pos identity -> {el,amount,crit,worldPos,mergeUntil,expireAt,createdAt,floatT}
+function showDamageNumber(key,worldPos,dmg,crit){
+  const container=document.getElementById('dmgNumbers'); if(!container) return;
+  const now=performance.now(), existing=_dmgNumbers.get(key);
+  if(existing && now<existing.mergeUntil){
+    existing.amount+=dmg; existing.crit=existing.crit||!!crit;
+    existing.mergeUntil=now+DMG_NUM_MERGE_MS; existing.expireAt=now+DMG_NUM_LIFE_MS; existing.floatT=0;
+    existing.worldPos.copy(worldPos); return;
+  }
+  if(_dmgNumbers.size>=DMG_NUM_CAP){   // evict the stalest floater to make room
+    let oldestKey=null,oldestT=Infinity;
+    for(const [k,v] of _dmgNumbers){ if(v.createdAt<oldestT){oldestT=v.createdAt;oldestKey=k;} }
+    if(oldestKey){ _dmgNumbers.get(oldestKey).el.remove(); _dmgNumbers.delete(oldestKey); }
+  }
+  const el=document.createElement('div'); el.className='dmgNum'; container.appendChild(el);
+  _dmgNumbers.set(key,{el,amount:dmg,crit:!!crit,worldPos:worldPos.clone(),
+    mergeUntil:now+DMG_NUM_MERGE_MS,expireAt:now+DMG_NUM_LIFE_MS,createdAt:now,floatT:0});
+}
+function updateDamageNumbers(dt){
+  if(!_dmgNumbers.size) return;
+  const now=performance.now();
+  for(const [key,e] of _dmgNumbers){
+    if(now>e.expireAt){ e.el.remove(); _dmgNumbers.delete(key); continue; }
+    e.floatT+=dt;
+    const p=e.worldPos.clone(); p.y+=e.floatT*1.6;
+    const proj=p.project(camera);
+    if(proj.z>1||proj.z<-1){ e.el.style.display='none'; continue; }
+    e.el.style.display='block';
+    e.el.style.left=((proj.x*0.5+0.5)*innerWidth)+'px';
+    e.el.style.top=((1-(proj.y*0.5+0.5))*innerHeight)+'px';
+    e.el.className='dmgNum'+(e.crit?' crit':'');
+    e.el.style.opacity=Math.max(0,Math.min(1,(e.expireAt-now)/300));
+    e.el.textContent=Math.max(1,Math.round(e.amount));
+  }
+}
 let _hitFlashes=[];
 function flashHitTarget(root){
   root.traverse(ch=>{ if(!ch.isMesh||!ch.material||!ch.material.emissive) return;
@@ -6232,6 +6279,7 @@ function loop(){
     else { sfxEngine(); updatePrompt(); updateCamera(); updateHUD(); }   // audio ramps down; prompts/HUD/camera stay correct in menus
     updateMountPreview();                   // shop stays open while this runs, so the ghost/ring must update even while paused
     updateBanners(dt);
+    updateDamageNumbers(dt);
     updateTutorial(dt);                     // tutorial keeps ticking so menu steps can complete while paused
     if(TOUCH&&_touchWired) touchLabels();   // context buttons follow whatever the captain is doing
     if(chatOpen&&_chatOpenAt&&performance.now()-_chatOpenAt>9000){
