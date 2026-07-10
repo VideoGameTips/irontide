@@ -8,7 +8,9 @@
 
 ## 玩
 
-在浏览器里打开 `index.html` 就行，不需要任何构建步骤。
+**在线试玩：https://game.boobank.com/irontide/**
+
+或者把仓库下下来，在浏览器里打开 `index.html` 就行，不需要任何构建步骤。
 
 ## 这个 fork 改了什么
 
