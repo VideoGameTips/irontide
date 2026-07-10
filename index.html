@@ -5573,7 +5573,7 @@ function shipWayback(near){
   if(near) return isTouch() ? T('   ·   tap Re-board','   ·   点「回船」按钮上舰')
                             : T('   ·   press G to board','   ·   按 G 上舰');
   const dx=player.pos.x-footPos.x, dz=player.pos.z-footPos.z, d=Math.hypot(dx,dz);
-  const rel=Math.atan2(dx,dz)-camYaw.v;                       // +z is forward in this world
+  const rel=camYaw.v-Math.atan2(dx,dz);   // +z is forward, +x is the captain's LEFT — hence the flip
   const arrow=BEARING_ARROWS[((Math.round(rel/(Math.PI/4))%8)+8)%8];
   const m=Math.round(d);
   return isTouch()
@@ -5692,7 +5692,7 @@ function drawMinimap(){
     const seen=m.team===0||sonarPulse>0||m.pos.distanceTo(activePlayerWorldPos())<70;if(!seen)return;
     const [mx,my]=to(m.pos.x,m.pos.z);g.fillStyle=m.team===0?'#68dcff':'#ff7373';g.fillRect(mx-1.8,my-1.8,3.6,3.6);});
   // your own ship, drawn as a landmark whenever you are not standing on it
-  if(away && player.hp>0 && !playerShipLost && inR(player.pos.x,player.pos.z)){
+  if(away && !landCampaignMode && player.hp>0 && !playerShipLost && inR(player.pos.x,player.pos.z)){
     const [sx,sy]=to(player.pos.x,player.pos.z);
     g.strokeStyle='#7fd0a0'; g.lineWidth=2; g.beginPath(); g.arc(sx,sy,5.5,0,6.2832); g.stroke();
     g.fillStyle='#7fd0a0'; dot(sx,sy,2.2);
