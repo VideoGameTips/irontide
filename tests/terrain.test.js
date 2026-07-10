@@ -15,7 +15,7 @@ global.THREE = { Vector3 };
 
 const {
   islandLocal, islandWorld, islandNorm, insideIslandRange, islandEdgeDistance,
-  islandEdgeMul, islandLayerNorm, islandSurfaceY, islandPoint,
+  islandEdgeMul, islandLayerNorm, islandSurfaceY, islandPoint, groundedCorrection,
 } = require('../js/terrain.js');
 
 // A big island (r>30, so it has all three terrain layers) with a non-zero rotation,
@@ -103,4 +103,42 @@ test('islandPoint: lands at the expected distance from the island center along a
   const d = Math.hypot(p.x - o.pos.x, p.z - o.pos.z);
   assert.ok(Math.abs(d - 50) < 1e-6, `expected distance 50, got ${d}`);
   assert.equal(p.y, 3);
+});
+
+// ---- groundedCorrection (keepOffIslands' pure core — Wave B ship-bow-grounding fix) ----
+
+test('groundedCorrection: no obstacles nearby -> zero correction', () => {
+  const o = { pos: { x: 1000, z: 1000 }, r: 100, rx: 100, rz: 100, angle: 0 };
+  const r = groundedCorrection([{ x: 0, z: 0 }], [o], 4);
+  assert.equal(r.grounded, false);
+  assert.equal(r.dx, 0);
+  assert.equal(r.dz, 0);
+});
+
+test('groundedCorrection: a single center sample matches the old single-point clamp exactly', () => {
+  const o = { pos: { x: 0, z: 0 }, r: 100, rx: 100, rz: 100, angle: 0 };
+  const start = { x: 50, z: 0 };   // well inside the r=100 island
+  const r = groundedCorrection([start], [o], 4);
+  assert.equal(r.grounded, true);
+  const correctedX = start.x + r.dx, correctedZ = start.z + r.dz;
+  // must land exactly on the padded boundary (r+margin=104) along the same ray from center
+  assert.ok(Math.abs(Math.hypot(correctedX, correctedZ) - 104) < 1e-6);
+});
+
+test('groundedCorrection: bow sample grounds the ship even though its center is clear', () => {
+  const o = { pos: { x: 100, z: 0 }, r: 30, rx: 30, rz: 30, angle: 0 };
+  const center = { x: 0, z: 0 };                 // 100 units from the island center — nowhere near it
+  const bow = { x: 75, z: 0 };                   // but the bow, 75 units out along the heading, is INSIDE the island (r=30 around x=100 means it spans 70-130)
+  const r = groundedCorrection([center, bow], [o], 4);
+  assert.equal(r.grounded, true, 'a submerged bow must ground the ship even though the hull center is in open water');
+  assert.ok(r.dx < 0, 'correction should push back away from the island (negative x)');
+});
+
+test('groundedCorrection: clear samples produce no correction', () => {
+  const o = { pos: { x: 100, z: 0 }, r: 30, rx: 30, rz: 30, angle: 0 };
+  const center = { x: 0, z: 0 }, bow = { x: 20, z: 0 }, stern = { x: -20, z: 0 };   // all well clear of the island at x=100±34
+  const r = groundedCorrection([center, bow, stern], [o], 4);
+  assert.equal(r.grounded, false);
+  assert.equal(r.dx, 0);
+  assert.equal(r.dz, 0);
 });
