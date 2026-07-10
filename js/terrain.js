@@ -42,11 +42,27 @@ function islandSurfaceY(pos,o){    // null = open water at this (x,z); otherwise
 function islandPoint(o,a,f=1,y=0){
   const p=islandWorld(o,Math.cos(a)*(o.rx||o.r)*f,Math.sin(a)*(o.rz||o.r)*f); p.y=y; return p;
 }
+// Pushes a set of {x,z} sample points (e.g. a ship's center/bow/stern) out of every obstacle's
+// padded footprint, translating all samples together as a rigid body. Returns the net {dx,dz}
+// to apply to the ship's own position, plus whether any correction happened at all. Pure —
+// the caller (keepOffIslands in index.html) assembles the obstacle list from game state.
+function groundedCorrection(samples,obstacles,margin){
+  const pts=samples.map(p=>({x:p.x,z:p.z}));
+  let dx=0,dz=0,grounded=false;
+  obstacles.forEach(o=>{
+    pts.forEach(sp=>{
+      const q=islandLocal(sp,o),rx=(o.rx||o.r)+margin,rz=(o.rz||o.r)+margin,n=Math.hypot(q.x/rx,q.z/rz);
+      if(n<1){ const x=n>0.001?q.x/n:rx,z=n>0.001?q.z/n:0,p=islandWorld(o,x,z);
+        const ddx=p.x-sp.x,ddz=p.z-sp.z; dx+=ddx; dz+=ddz; sp.x+=ddx; sp.z+=ddz; grounded=true; }
+    });
+  });
+  return {dx,dz,grounded};
+}
 
 // Node test harness support: when required as a CommonJS module, export the same
 // functions instead of relying on them leaking onto a global (browser <script> tags
 // have no module system, so this block is a no-op there).
 if(typeof module!=='undefined' && module.exports){
   module.exports={ islandLocal, islandWorld, islandNorm, insideIslandRange, islandEdgeDistance,
-    islandEdgeMul, islandLayerNorm, islandSurfaceY, islandPoint };
+    islandEdgeMul, islandLayerNorm, islandSurfaceY, islandPoint, groundedCorrection };
 }

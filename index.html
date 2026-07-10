@@ -2462,7 +2462,7 @@ function updateClaude(dt){
 }
 // ===== SHIP COLLISIONS — hulls can't overlap; ramming detonates; AI steers clear =====
 function shipRadius(def){ return def.len*0.22 + def.beam*0.5; }
-function steerClearOfShips(me,myPos,myDef,desired){   // bend the desired heading away from nearby hulls
+function steerClearOfShips(me,myPos,myDef,desired){   // bend the desired heading away from nearby hulls (and islands)
   let adj=desired;
   const scan=(o,opos,odef)=>{ if(o===me) return;
     const dx=myPos.x-opos.x, dz=myPos.z-opos.z, d=Math.hypot(dx,dz);
@@ -2473,6 +2473,10 @@ function steerClearOfShips(me,myPos,myDef,desired){   // bend the desired headin
   if(player&&player.hp>0&&!player.submerged) scan(player,player.pos,player.def);
   allies.forEach(a=>{ if(a.sinkT===0) scan(a,a.pos,a.def); });
   enemies.forEach(e=>{ if(e.sinkT===0) scan(e,e.pos,e.def); });
+  islands.forEach(isl=>{ const n=islandNorm(myPos,isl); if(n<1.3){   // tightening keepOffIslands' bow/stern clamp makes AI grind against islands longer without this
+    const away=Math.atan2(myPos.x-isl.pos.x, myPos.z-isl.pos.z);
+    let diff=away-adj; while(diff>Math.PI)diff-=6.283; while(diff<-Math.PI)diff+=6.283;
+    adj+=diff*Math.min(0.8,1-n/1.3); } });
   return adj;
 }
 function shipCollisions(dt){
@@ -3717,7 +3721,7 @@ function updateAlly(a,dt){
   const turnRate=a.def.boss ? 0.24 : a.def.len>70?0.45:0.8; a.heading+=Math.max(-turnRate*dt,Math.min(turnRate*dt,dh));
   const sp=(a.def.boss?6.5:a.def.kind==='scout'?15:a.def.len>70?9:13)*engineFactor(a); a.pos.x+=Math.sin(a.heading)*sp*dt; a.pos.z+=Math.cos(a.heading)*sp*dt;
   a.vel=new THREE.Vector3(Math.sin(a.heading)*sp,0,Math.cos(a.heading)*sp);
-  keepOffIslands(a.pos, a.def.beam/2+4);
+  keepOffIslands(a.pos, a.def.beam/2+4, a.heading, a.build?a.build.halfLen:a.def.len/2);
   if(a.build){ a.build.group.position.set(a.pos.x, Math.sin(t2*0.8+a.pos.x)*0.3, a.pos.z);
     a.build.group.rotation.y=a.heading;a.build.group.rotation.z=Math.sin(t2*1.1+a.pos.z)*0.02;setShipWake(a.build,sp); }
   // fire the whole loadout at whatever targets present themselves
@@ -4997,6 +5001,7 @@ function updateSub(dt){
     if(player.air<=0){ player.submerged=false; flashPrompt('⚠ Out of air — surfacing!'); } }
   else player.air=Math.min(100, player.air+dt*10);                    // recharges on the surface
 }
+let _groundedWarned=false;   // debounces the "aground" prompt to once per grounding, not once per frame
 function updateDrive(dt){
   const def=player.def;
   if(keys['KeyW']) player.throttle=Math.min(1,(player.throttle||0)+dt*0.5);
@@ -5011,7 +5016,10 @@ function updateDrive(dt){
   player.pos.x+=Math.sin(player.heading)*player.speed*dt;
   player.pos.z+=Math.cos(player.heading)*player.speed*dt;
   const lim=4900; player.pos.x=Math.max(-lim,Math.min(lim,player.pos.x)); player.pos.z=Math.max(-lim,Math.min(lim,player.pos.z));
-  keepOffIslands(player.pos, player.build.halfBeam+4);
+  const grounded=keepOffIslands(player.pos, player.build.halfBeam+4, player.heading, player.build.halfLen);
+  if(grounded){ player.throttle=(player.throttle||0)*0.3;
+    if(!_groundedWarned){ _groundedWarned=true; flashPrompt(T('⚓ Aground! Reverse (S) to clear the shallows','⚓ 搁浅了!倒车(S)离开浅滩'),'bad'); } }
+  else _groundedWarned=false;
 }
 function updateManned(dt){
   const pl=manning;
@@ -5052,7 +5060,7 @@ function updateEnemy(e,dt){
   const sp=(e.def.boss?6.5:e.def.kind==='scout'?15:e.def.len>70?9:13)*engineFactor(e);
   e.pos.x+=Math.sin(e.heading)*sp*dt; e.pos.z+=Math.cos(e.heading)*sp*dt;
   e.vel=new THREE.Vector3(Math.sin(e.heading)*sp,0,Math.cos(e.heading)*sp);
-  keepOffIslands(e.pos, e.def.beam/2+4);
+  keepOffIslands(e.pos, e.def.beam/2+4, e.heading, e.build?e.build.halfLen:e.def.len/2);
   if(e.build){ e.build.group.position.set(e.pos.x, Math.sin(t2*0.8+e.pos.x)*0.3, e.pos.z);
     e.build.group.rotation.y=e.heading;
     e.build.group.rotation.z=Math.sin(t2*1.1+e.pos.z)*0.02;setShipWake(e.build,sp); }
@@ -5140,10 +5148,16 @@ function onShellHit(s,pos,target){
   else { const hpBefore=target.hp; damageTarget(target,s.dmg,s.owner,pos); boom(pos, 0.7);
     if(byPlayer) playerHitFeedback(root, hpBefore>0 && target.hp<=0); }
 }
-function keepOffIslands(pos,margin){ // push a ship out of any island / harbor footprint
+function keepOffIslands(pos,margin,heading,halfLen){   // push a ship out of any island / harbor footprint
+  // heading+halfLen (optional) sample the bow/stern too, not just the center — a ship driven
+  // straight at an island otherwise gets its prow stuck in the sand well before the hull stops.
   const obs=islands.slice(); if(enemyHarbor) obs.push({pos:enemyHarbor.pos,r:enemyHarbor.r}); if(friendlyHarbor) obs.push({pos:friendlyHarbor.pos,r:friendlyHarbor.r});
-  obs.forEach(o=>{ const q=islandLocal(pos,o),rx=(o.rx||o.r)+margin,rz=(o.rz||o.r)+margin,n=Math.hypot(q.x/rx,q.z/rz);
-    if(n<1){ const x=n>0.001?q.x/n:rx,z=n>0.001?q.z/n:0,p=islandWorld(o,x,z); pos.x=p.x; pos.z=p.z; } });
+  const samples=[{x:pos.x,z:pos.z}];
+  if(heading!=null && halfLen){ const fx=Math.sin(heading)*halfLen*0.75, fz=Math.cos(heading)*halfLen*0.75;
+    samples.push({x:pos.x+fx,z:pos.z+fz},{x:pos.x-fx,z:pos.z-fz}); }
+  const corr=groundedCorrection(samples,obs,margin);
+  pos.x+=corr.dx; pos.z+=corr.dz;
+  return corr.grounded;
 }
 function hitSpark(pos){ const s=new THREE.Mesh(new THREE.SphereGeometry(0.4,8,8), new THREE.MeshBasicMaterial({color:0xffe070,transparent:true,opacity:0.9})); s.position.copy(pos); scene.add(s); fx.push({mesh:s,life:0.18,fade:true,grow:true}); }
 // ===== PER-HIT FEEDBACK — hit marker + confirm sound + target flash, gated to shots the PLAYER personally caused =====
