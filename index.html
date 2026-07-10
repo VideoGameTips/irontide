@@ -1071,11 +1071,14 @@ function islandGeometry(rx,rz,h,seed,bottomMul=1){
     p.setX(i,x*rx*edge*bank); p.setZ(i,z*rz*edge*bank); }
   geo.computeVertexNormals(); return geo;
 }
-function buildIsland(pos,r,name){
+function buildIsland(pos,r,name,preset){   // preset {rx,rz,angle} restores a saved island's exact footprint
   const g=new THREE.Group(); g.position.copy(pos);
   const isBase=name==='Northwatch'||name==='Southhaven';
   const seed=Math.random()*20, long=isBase?1.28:1.2+Math.random()*0.42, short=isBase?0.95:0.92+Math.random()*0.16;
-  const alongX=isBase||Math.random()<0.5, rx=r*(alongX?long:short), rz=r*(alongX?short:long), angle=isBase?0:(Math.random()-0.5)*1.35;
+  const alongX=isBase||Math.random()<0.5,
+    rx=preset?preset.rx:r*(alongX?long:short),
+    rz=preset?preset.rz:r*(alongX?short:long),
+    angle=preset?preset.angle:(isBase?0:(Math.random()-0.5)*1.35);
   g.rotation.y=angle;
   const sand=surfaceMaterial(0xcdb98a,'ground',.98),grass=surfaceMaterial(0x55753f,'ground',.97),
     jung=surfaceMaterial(0x2f5a30,'ground',1),jung2=surfaceMaterial(0x3c6e38,'ground',1),
@@ -1400,7 +1403,8 @@ function buildLand(kind,team,pos,type){
     needsPower:!!(STRUCTS[kind]&&STRUCTS[kind].power),footprint:(STRUCTS[kind]&&STRUCTS[kind].footprint)||4,light:g.userData.light,
     ammoLeft:kind==='silo'?6:kind==='rocket'?10:kind==='supergun'?3:kind==='fortress'?8:null };
   if(kind==='nukesilo')u.fireT=200;
-  u[kind]=true;return u;
+  if(!u[kind]) u[kind]=true;   // kind flag — but never clobber a field the builder already filled (u.tank holds the TANKS def)
+  return u;
 }
 
 // =====================================================================
@@ -2651,6 +2655,18 @@ function buildMenu(){
       (nx?` &nbsp;·&nbsp; <span style="color:#5f7a90">${T(careerScore()+'/'+nx.score+' to '+nx.name,careerScore()+'/'+nx.score+' 分升'+trRank(nx.name))}</span>`:'');
     sub.after(d);
   }
+  // continue button — appears when a saved war exists (fresh menu only, not the respawn picker)
+  let rb=document.getElementById('resumeBtn');
+  if(!rb){ rb=document.createElement('button'); rb.id='resumeBtn';
+    rb.style.cssText='display:none;margin:0 auto 14px;padding:12px 34px;font-size:16px;letter-spacing:2px;'+
+      'background:#123726;border:1px solid #3fae78;color:#a6f2c3;border-radius:10px;cursor:pointer;box-shadow:0 0 16px rgba(63,174,120,.25);';
+    rb.onclick=()=>resumeWar();
+    const anchor=document.getElementById('career')||document.querySelector('#menu .sub');
+    if(anchor) anchor.after(rb);
+  }
+  const sv=loadSave();
+  rb.style.display=(sv&&phase==='select')?'block':'none';
+  if(sv) rb.textContent=T('▶ Continue last war — ','▶ 继续上次战局——')+campaignName(Math.min(sv.mapIdx,CAMPAIGN.length-1))+' · $'+sv.money;
   buildCampaignPicker();
   const wrap=document.getElementById('ships');
   wrap.innerHTML='';   // idempotent: buildMenu is re-run on language switch
@@ -2747,7 +2763,7 @@ function spawnInsertionPlane(pos,team=0){
   fx.push({mesh:g,life:7,max:7,vel:new THREE.Vector3(135,0,24),fade:true,op:1});
   for(let i=0;i<7;i++)mkParatrooper((i-3)*6);
 }
-function deployLandCampaignStart(){
+function deployLandCampaignStart(skipEscort){   // skipEscort: resuming a save whose escort already lives in landUnits
   landCampaignMode=true;
   if(player&&player.build&&player.build.group){ player.build.group.visible=false; player.build.group.position.set(0,-5000,0); }
   player.hp=player.maxhp; player.speed=0; player.throttle=0; player.submerged=false;
@@ -2757,9 +2773,11 @@ function deployLandCampaignStart(){
   const c=(cmds[0]?cmds[0].pos:footLand.pos).clone();
   footPos.copy(c).add(new THREE.Vector3(18,0,24)); clampToIsland(footPos,footLand,0.72); footPos.y=(footLand.top||2.1)+EYE;
   player.pos.copy(footPos).setY(0); player.heading=0; camYaw.v=0; camPitch.v=0.02;
-  const army=mapArmyProfile(0), soldiers=Math.max(5,Math.round(5*army.soldiers)), tanks=Math.max(1,Math.round(1.5*army.tanks));
-  for(let i=0;i<soldiers;i++){ const a=i/soldiers*6.28, p=islandPoint(footLand,a,0.18+Math.random()*0.24,2); buildAndPushLand('soldier',0,p,2,footLand); }
-  for(let i=0;i<tanks;i++){ const a=i/tanks*6.28+0.4, p=islandPoint(footLand,a,0.30+Math.random()*0.18,2); buildAndPushLand('tank',0,p,2,footLand); }
+  if(!skipEscort){
+    const army=mapArmyProfile(0), soldiers=Math.max(5,Math.round(5*army.soldiers)), tanks=Math.max(1,Math.round(1.5*army.tanks));
+    for(let i=0;i<soldiers;i++){ const a=i/soldiers*6.28, p=islandPoint(footLand,a,0.18+Math.random()*0.24,2); buildAndPushLand('soldier',0,p,2,footLand); }
+    for(let i=0;i<tanks;i++){ const a=i/tanks*6.28+0.4, p=islandPoint(footLand,a,0.30+Math.random()*0.18,2); buildAndPushLand('tank',0,p,2,footLand); }
+  }
   spawnInsertionPlane(footPos,0);
   flashPrompt('🪂 AIRBORNE ASSAULT — landed at '+(footLand.name||'the command center')+'. Secure every island.');
 }
@@ -2785,6 +2803,12 @@ function startGame(shipId){
     startTutorial();       // first-ever battle walks through W → mouse → first kill → armory (no-op once completed)
   }
   applySimpleHud();
+  wireGameInput();
+  updateMode();
+}
+let _inputWired=false;
+function wireGameInput(){   // shared by startGame and resumeWar; must only attach once per page load
+  if(_inputWired) return; _inputWired=true;
   const cv=document.getElementById('c');
   cv.addEventListener('click',()=>{ sfxResume(); if(phase==='play' && !gamePaused()) cv.requestPointerLock(); });
   document.addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv){
@@ -2792,7 +2816,6 @@ function startGame(shipId){
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v)); }});
   document.addEventListener('mousedown',e=>{ if(document.pointerLockElement===cv && e.button===0) mouseDownFire=true; });
   document.addEventListener('mouseup',e=>{ if(e.button===0) mouseDownFire=false; });
-  updateMode();
 }
 function chooseShip(shipId){
   if(phase==='respawn'&&shipId==='boss'&&friendlyBossUsed){
@@ -2818,6 +2841,7 @@ function showRespawnMenu(msg){
   const sub=document.querySelector('#menu .sub');
   menuSubEn=msg||'Pick a replacement. It redeploys from your harbor.';
   if(sub) sub.textContent=trText(menuSubEn);
+  const rb=document.getElementById('resumeBtn'); if(rb) rb.style.display='none';   // mid-war menu: no resume button
   document.getElementById('menu').style.display='flex';
   updateMode();
 }
@@ -3027,10 +3051,10 @@ function garrisonHarbor(c, team){
   for(let i=0;i<nS;i++){ const a=i/nS*6.28; buildAndPushLand('soldier',team, c.clone().add(new THREE.Vector3(Math.cos(a)*72,1.4,Math.sin(a)*72))); }
 }
 const STRUCT_KINDS=Object.keys(STRUCTS);
-function buildAndPushLand(kind,team,pos,yOverride,islOverride){
+function buildAndPushLand(kind,team,pos,yOverride,islOverride,typeOverride){
   pos.y = yOverride!=null ? yOverride : (kind==='coastal'?0 : STRUCT_KINDS.includes(kind)?2.0 : 1.4);
-  let type;
-  if(kind==='tank'){ const keys=Object.keys(TANKS); type=keys[Math.floor(Math.random()*keys.length)]; }
+  let type=typeOverride;
+  if(kind==='tank'&&!type){ const keys=Object.keys(TANKS); type=keys[Math.floor(Math.random()*keys.length)]; }
   const u=buildLand(kind,team,pos,type);u.island=islOverride||islandOfPos(pos);
   if(STRUCTS[kind])u.group.scale.setScalar(STRUCTS[kind].scale||2.4);
   landUnits.push(u); if(kind==='radar') _radar[team]++; return u; }
@@ -5530,6 +5554,7 @@ function updateMode(){
 // =====================================================================
 function endGame(win,msg){
   if(phase==='over')return; phase='over';
+  clearSave();   // the war is decided — nothing to resume
   const oldRank=careerRank();
   warRecord(win?'wins':'losses');
   const r=careerRank(), nx=nextRank();
@@ -5553,6 +5578,93 @@ function endGame(win,msg){
 // =====================================================================
 //  LOOP
 // =====================================================================
+// ---------- war save / resume ----------
+// Autosaves a snapshot of the war every 30s (and on tab hide/close): funds, campaign,
+// weather, both harbors, every island's exact footprint + owner, all living land units,
+// and the player's ship/loadout/parked aircraft/deck tanks. AI fleets are NOT serialized —
+// on resume they respawn at the theater's authored strength (simple and cheat-proof).
+const SAVE_KEY='ironTideSave';
+let _saveT=0;
+const _idOf=(cat,def)=>{ for(const k in cat) if(cat[k]===def) return k; return null; };
+function warSavable(){
+  if(phase!=='play'||!player||!friendlyHarbor||!enemyHarbor) return false;
+  return landCampaignMode ? true : (!playerShipLost&&!onFoot&&!piloting&&!drivingTank);   // only snapshot stable aboard-ship states
+}
+function saveWar(){ if(!warSavable()) return;
+  try{
+    const s={ v:1, mapIdx:currentMapIdx, money:money, sunk:sunk,
+      weather:{type:weather.type,tod:weather.tod,t:weather.t,sea:weather.sea},
+      fh:{x:friendlyHarbor.pos.x,z:friendlyHarbor.pos.z,hp:friendlyHarbor.hp,maxhp:friendlyHarbor.maxhp,up:friendlyHarbor.up},
+      eh:{x:enemyHarbor.pos.x,z:enemyHarbor.pos.z,hp:enemyHarbor.hp,maxhp:enemyHarbor.maxhp,up:enemyHarbor.up},
+      islands:islands.map(i=>({name:i.name,x:i.pos.x,z:i.pos.z,r:i.r,rx:i.rx,rz:i.rz,angle:i.angle,owner:i.owner,cap:i.capturable})),
+      units:landUnits.filter(u=>!u.dead).map(u=>({k:u.kind,t:u.team,x:u.pos.x,y:u.pos.y,z:u.pos.z,hp:u.hp,
+        tt:u.tank?_idOf(TANKS,u.tank):null, isl:islands.indexOf(u.island), am:u.ammoLeft==null?null:u.ammoLeft})),
+      shipId:_idOf(SHIPS,player.def)||'destroyer', hp:player.hp, px:player.pos.x, pz:player.pos.z, hd:player.heading,
+      guns:placed.map(p=>({id:_idOf(WEAPONS,p.def),x:p.group.position.x,y:p.group.position.y,z:p.group.position.z,free:!!p.free,ko:!!p.ko})).filter(g=>g.id),
+      planes:planes.filter(p=>p.parked).map(p=>({id:_idOf(PLANES,p.def),sp:planeSpots.indexOf(p.spot),b:p.bombsLeft,ga:p.gunAmmo})).filter(p=>p.id&&p.sp>=0),
+      tanks:playerTanks.filter(tk=>tk.onDeck&&tk.hp>0).map(tk=>({tt:Object.keys(TANKS).find(k=>TANKS[k].name===tk.name)||null})).filter(t=>t.tt),
+      owned:[...ownedGuns], eq:equippedGun,
+      fbu:friendlyBossUsed, ebu:enemyBossUsed,
+      eba:enemies.some(e=>e.boss&&e.sinkT===0&&!e.dead),
+      fba:allies.some(a=>a.boss&&a.sinkT===0&&!a.dead),
+      ground:!!(window._MAP&&window._MAP.ground) };
+    localStorage.setItem(SAVE_KEY,JSON.stringify(s));
+  }catch(e){}
+}
+function loadSave(){ try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); return (s&&s.v===1&&SHIPS[s.shipId])?s:null; }catch(e){ return null; } }
+function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+function resumeWar(){
+  const s=loadSave(); if(!s) return;
+  currentMapIdx=Math.max(0,Math.min(CAMPAIGN.length-1,s.mapIdx|0));
+  document.getElementById('menu').style.display='none';
+  document.getElementById('hud').style.display='block';
+  sfxResume(); phase='play';
+  const M=applyMap();
+  if(s.weather){ weather.type=s.weather.type||M.weather; if(s.weather.tod!=null)weather.tod=s.weather.tod; weather.t=s.weather.t||40; weather.sea=s.weather.sea||1; }
+  // world state comes from the snapshot, not the generator — no garrison/theater rolls here
+  friendlyHarbor=buildHarbor(0,new THREE.Vector3(s.fh.x,0,s.fh.z));
+  enemyHarbor  =buildHarbor(1,new THREE.Vector3(s.eh.x,0,s.eh.z));
+  Object.assign(friendlyHarbor.up,s.fh.up||{}); friendlyHarbor.hp=s.fh.hp; friendlyHarbor.maxhp=s.fh.maxhp;
+  Object.assign(enemyHarbor.up,s.eh.up||{});   enemyHarbor.hp=s.eh.hp;   enemyHarbor.maxhp=s.eh.maxhp;
+  (s.islands||[]).forEach(si=>{ const isl=buildIsland(new THREE.Vector3(si.x,0,si.z),si.r,si.name,{rx:si.rx,rz:si.rz,angle:si.angle}); isl.capturable=si.cap!==false; });
+  (s.units||[]).forEach(su=>{ const u=buildAndPushLand(su.k,su.t,new THREE.Vector3(su.x,su.y,su.z),su.y,(su.isl>=0?islands[su.isl]:null)||undefined,su.tt||undefined);
+    if(su.hp!=null)u.hp=su.hp; if(su.am!=null)u.ammoLeft=su.am; });
+  (s.islands||[]).forEach((si,i)=>{ if(si.owner!=null&&islands[i]) setIslandOwner(islands[i],si.owner,true); });
+  buildTreeField();
+  money=s.money|0; sunk=s.sunk|0;
+  makePlayerShip(s.shipId);
+  // swap the fresh starter guns for the exact saved loadout
+  while(placed.length){ const pl=placed.pop(); destroyObject3D(pl.group); }
+  (s.guns||[]).forEach(gd=>{ const w=WEAPONS[gd.id]; if(!w) return;
+    const t=buildTurret(w); t.position.set(gd.x,gd.y,gd.z); player.build.group.add(t);
+    const gunner=buildSailor('gunner'); gunner.scale.setScalar(.85); gunner.position.set(0,(w.size||1)*.35,-.45); (t.userData.yawG||t).add(gunner);
+    placed.push({def:w,group:t,yaw:0,pitch:.1,cd:0,gunner,free:!!gd.free,ko:!!gd.ko}); });
+  (s.planes||[]).forEach(pd=>{ const def=PLANES[pd.id], spot=planeSpots[pd.sp]; if(!def||!spot||spot.taken) return;
+    const g=buildPlane(def); g.position.copy(spot.pos); g.rotation.y=0; player.build.group.add(g);
+    planes.push({def,group:g,spot,parked:true,bombsLeft:pd.b||0,gunAmmo:pd.ga==null?null:pd.ga}); spot.taken=true; });
+  (s.tanks||[]).forEach(td=>{ const spot=tankSpots.find(sp=>!sp.taken); if(!spot||!TANKS[td.tt]) return;
+    buildDeckTank(spot.pos,td.tt); spot.taken=true; });
+  ownedGuns.clear(); (s.owned&&s.owned.length?s.owned:['pistol']).forEach(g=>{ if(HANDHELD[g]) ownedGuns.add(g); });
+  if(!ownedGuns.has('pistol')) ownedGuns.add('pistol');
+  equippedGun=HANDHELD[s.eq]?s.eq:'pistol';
+  player.hp=Math.max(1,Math.min(s.hp,player.maxhp));
+  player.pos.set(s.px,0,s.pz); player.heading=s.hd||0;
+  friendlyBossUsed=!!s.fbu; enemyBossUsed=!!s.ebu;
+  if(s.ground){ deployLandCampaignStart(true); }
+  else {
+    landCampaignMode=false;
+    if(s.eba){ enemyBossUsed=false; spawnBoss(1); }                       // flagships that were afloat come back
+    if(s.fba&&s.shipId!=='boss'){ friendlyBossUsed=false; spawnBoss(0); }
+    for(let i=0;i<(M.enemies||0);i++) spawnEnemy();                       // escort fleets respawn at authored strength
+    for(let i=0;i<(M.allies||0);i++) spawnAlly();
+    startDrive();
+  }
+  buildShopUI(); applySimpleHud(); wireGameInput(); updateHUD(); updateMode();
+  flashPrompt(T('▶ War resumed — welcome back, Captain!','▶ 战局已恢复——欢迎回来，舰长！'));
+}
+addEventListener('beforeunload',()=>saveWar());
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveWar(); });
+
 // ---------- first-battle tutorial: one big hint at a time, condition-driven, shown once ----------
 const TUT_DONE_KEY='ironTideTutorialDone';
 let tutSteps=null, tutIdx=-1, tutHold=0, tutCamBase=0, tutPlacedBase=0, tutSunkBase=0, _tutLast='';
@@ -5596,7 +5708,8 @@ function loop(){
   requestAnimationFrame(loop);
   const dt=Math.min(0.05, clock.getDelta());
   if(phase==='play'){
-    if(!gamePaused()){ t2+=dt; update(dt,t2); updateHUD(); }
+    if(!gamePaused()){ t2+=dt; update(dt,t2); updateHUD();
+      _saveT+=dt; if(_saveT>=30){ _saveT=0; saveWar(); } }               // autosave the war twice a minute
     else { sfxEngine(); updatePrompt(); updateCamera(); updateHUD(); }   // audio ramps down; prompts/HUD/camera stay correct in menus
     updateTutorial(dt);                     // tutorial keeps ticking so menu steps can complete while paused
     if(chatOpen&&_chatOpenAt&&performance.now()-_chatOpenAt>9000){
