@@ -4834,23 +4834,25 @@ function bailoutOrBoard(){
   else flashPrompt('P = parachute from aircraft, or request a replacement ship at harbor after yours is sunk.');
 }
 function toggleFoot(){
-  if(phase!=='play'||gamePaused()||manning||driving||piloting) return;
+  if(phase!=='play'||gamePaused()||manning||piloting) return;
   if(landCampaignMode){ flashPrompt('No ship on this theater — this is an airborne ground assault. Capture the command posts.'); return; }
   if(playerShipLost){ flashPrompt('Your ship is gone — return to friendly harbor and press P for a replacement.'); return; }
   if(onFoot){ // re-board if standing near the ship
-    if(Math.hypot(footPos.x-player.pos.x, footPos.z-player.pos.z) < player.build.halfLen+14){
-      onFoot=false; walkPos.set(0,deckEyeY(), player.build.halfLen*0.55); flashPrompt('Back aboard.'); updateMode();
-    } else flashPrompt('Walk back to your ship to climb aboard.');
+    if(Math.hypot(footPos.x-player.pos.x, footPos.z-player.pos.z) < boardRange()){
+      onFoot=false; walkPos.set(0,deckEyeY(), player.build.halfLen*0.55); flashPrompt('Back aboard.','ok'); updateMode();
+    } else flashPrompt('Walk back to your ship to climb aboard.','bad');
     return;
   }
+  if(player.submerged){ flashPrompt('Surface first (C), then press G to go ashore.','bad'); return; }
   // disembark onto the nearest land the ship is alongside
   let best=null,bd=1e9;
   landSpots().forEach(o=>{ const d=islandEdgeDistance(player.pos,o); if(d<bd){bd=d;best=o;} });
   if(best && bd<80){
+    if(driving) stopDrive();   // G at the helm: step off the wheel and go ashore in one press
     onFoot=true; resetFootHealth(); footLand=best.island||best.harbor||best;
     footPos.copy(player.pos); clampToIsland(footPos,footLand,0.82); footPos.y=best.top+EYE;
-    flashPrompt('Ashore'+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.'); updateMode();
-  } else flashPrompt('Sail right up alongside an island or harbor, then press G to go ashore.');
+    flashPrompt('Ashore'+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.','ok'); updateMode();
+  } else flashPrompt('Sail right up alongside an island or harbor, then press G to go ashore.','bad');
 }
 const WALKABLE_STRUCTURE_KINDS=new Set(['airstrip','helipad','dock']);
 function harborWalkBlocked(x,z,h){
@@ -5559,19 +5561,41 @@ function installHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
   ? T('tap Install below','点下方的安装按钮')
   : T('press F (or click Install below)','按 F（或点下方的安装按钮）'); }
 function flashPrompt(msg,kind){ promptMsg=msg; promptT=2; if(shopOpen) shopMsg(msg,kind); }
+// Walking inland, the only way back aboard is to find the ship again — so say where it is.
+// The arrow points relative to the way the captain is facing, not to the compass.
+const BEARING_ARROWS=['↑','↗','→','↘','↓','↙','←','↖'];
+const isTouch=()=>typeof TOUCH!=='undefined'&&TOUCH;   // phones get button names, desktops get key names
+// the prompt used +18 while toggleFoot demanded +14: a four-metre ring where the game told you
+// to press G and G refused. One radius now answers both questions.
+function boardRange(){ return (player&&player.build?player.build.halfLen:20)+16; }
+function shipWayback(near){
+  if(landCampaignMode||playerShipLost||!player||!player.build) return '';
+  if(near) return isTouch() ? T('   ·   tap Re-board','   ·   点「回船」按钮上舰')
+                            : T('   ·   press G to board','   ·   按 G 上舰');
+  const dx=player.pos.x-footPos.x, dz=player.pos.z-footPos.z, d=Math.hypot(dx,dz);
+  const rel=camYaw.v-Math.atan2(dx,dz);   // +z is forward, +x is the captain's LEFT — hence the flip
+  const arrow=BEARING_ARROWS[((Math.round(rel/(Math.PI/4))%8)+8)%8];
+  const m=Math.round(d);
+  return isTouch()
+    ? T('   ·   '+arrow+' ship '+m+'m away — walk to it and tap Re-board',
+        '   ·   '+arrow+' 军舰在 '+m+' 米外——走过去点「回船」按钮上舰')
+    : T('   ·   '+arrow+' ship '+m+'m away — walk to it and press G',
+        '   ·   '+arrow+' 军舰在 '+m+' 米外——走过去按 G 上舰');
+}
 function updatePrompt(){
   const el=document.getElementById('prompt'); let msg='';
   const capIsl=!piloting&&player?islands.find(i=>i.capturable&&i.owner!==0&&
     ((onFoot&&footLand===i)||insideIslandRange(player.pos,i,65))):null;
+  const capMsg=()=>{ if(!capIsl) return ''; const iNm=isZh()?trName(capIsl.name):capIsl.name.toUpperCase();
+    return capIsl.contested?T('🏝 '+iNm+' CONTESTED — clear enemy ships and defenders','🏝 '+iNm+' 争夺中——清除敌舰和守军'):
+      capIsl.captureTeam===0?T('🏝 SECURING '+iNm+' — ','🏝 正在占领 '+iNm+'——')+Math.floor(capIsl.capture/ISLAND_CAPTURE_TIME*100)+'%':T('🏝 HOLD POSITION TO CAPTURE '+iNm,'🏝 停在这里即可占领 '+iNm); };
   if(promptT>0){ promptT-=0.016; msg=promptMsg; }
-  else if(capIsl){ const iNm=isZh()?trName(capIsl.name):capIsl.name.toUpperCase();
-    msg=capIsl.contested?T('🏝 '+iNm+' CONTESTED — clear enemy ships and defenders','🏝 '+iNm+' 争夺中——清除敌舰和守军'):
-      capIsl.captureTeam===0?T('🏝 SECURING '+iNm+' — ','🏝 正在占领 '+iNm+'——')+Math.floor(capIsl.capture/ISLAND_CAPTURE_TIME*100)+'%':T('🏝 HOLD POSITION TO CAPTURE '+iNm,'🏝 停在这里即可占领 '+iNm); }
+  else if(capIsl && !onFoot && !drivingTank){ msg=capMsg(); }   // ashore it becomes a suffix, never a replacement
   else if(drivingTank){ const t=drivingTank; msg=T('Tank ','坦克 ')+Math.max(0,Math.ceil(t.hp/t.maxhp*100))+T('% — W/S drive · Click fire · R repair · ','% — W/S 驾驶 · 点击开火 · R 修理 · ')+(t.onDeck?T('G land ashore','G 开上岸'):(playerShipLost?T('Ship lost','船已沉没'):T('G re-embark','G 回到船上')))+T(' · T view · E dismount',' · T 视角 · E 下车')+tankPartSummary(t); }
-  else if(onFoot){ const near=!landCampaignMode&&Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<player.build.halfLen+18, hp=' · HP '+Math.ceil(footHP)+'%', ftk=nearestFieldTank();
+  else if(onFoot){ const near=!landCampaignMode&&Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<boardRange(), hp=' · HP '+Math.ceil(footHP)+'%', ftk=nearestFieldTank();
     const gunNm=trName((HANDHELD[equippedGun]||HANDHELD.pistol).name);
     if(playerShipLost) msg=(nearFriendlyHarborForReplacement()?T('Harbor reached — press P for a replacement ship','已到海港——按 P 领取新船'):T('Ship lost — swim/walk back to your harbor','船沉了——游泳/走路回到我方海港'))+hp+' · WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm;
-    else msg=(ftk?T('Press E to crew '+(ftk.name||'tank')+' · ','按 E 进入'+trName(ftk.name||'坦克')+' · '):'')+(landCampaignMode?T('Airborne assault','空降突击'):(footLand?T('Ashore','登岸'):T('Swimming','游泳中')))+hp+' — WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm+T(' · Q switch',' · Q 换枪')+(footLand?T(' · B build',' · B 建造'):'') + (near?T('   ·   G re-board','   ·   G 回船'):''); }
+    else msg=(ftk?T('Press E to crew '+(ftk.name||'tank')+' · ','按 E 进入'+trName(ftk.name||'坦克')+' · '):'')+(landCampaignMode?T('Airborne assault','空降突击'):(footLand?T('Ashore','登岸'):T('Swimming','游泳中')))+hp+' — WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm+T(' · Q switch',' · Q 换枪')+(footLand?T(' · B build',' · B 建造'):'') + shipWayback(near) + (capIsl?'   ·   '+capMsg():''); }
   else if(driving){ msg=T('Steering — W/S throttle · A/D rudder','掌舵中 — W/S 油门 · A/D 转舵') + (player.def.kind==='sub'?T('   ·   C dive/surface','   ·   C 下潜/上浮'):'') + (selectedWeapon?T('   ·   F install '+WEAPONS[selectedWeapon].name,'   ·   F 安装'+trName(WEAPONS[selectedWeapon].name)):'') + T('   ·   T view   ·   E to step away','   ·   T 视角   ·   E 离开舵位'); }
   else if(piloting){
     if(piloting.phase==='takeoff') msg=T('Taking off…','正在起飞…');
@@ -5632,7 +5656,13 @@ function updateHUD(){
 function drawMinimap(){
   const cv=document.getElementById('minimap'); if(!cv||!player||!player.pos) return;
   const g=cv.getContext('2d'), S=cv.width, R=S/2;
-  const range=1700, sc=R/range, px=player.pos.x, pz=player.pos.z;
+  // centre on whatever the captain is actually controlling — ashore, in a tank or in the air,
+  // a map of the ship's surroundings tells you nothing about where you are
+  const me=activePlayerWorldPos(), away=(onFoot||drivingTank||piloting);
+  // a 1700m radar is useless on foot: the ship you are walking back to would sit four pixels
+  // from the centre. Zoom to the scale of whatever you are moving at.
+  const range=onFoot?320:drivingTank?600:piloting?2400:1700;
+  const sc=R/range, px=me.x, pz=me.z;
   const to=(x,z)=>[R+(x-px)*sc, R+(z-pz)*sc];
   const inR=(x,z)=>((x-px)*(x-px)+(z-pz)*(z-pz))<range*range;
   const dot=(x,y,r)=>{ g.beginPath(); g.arc(x,y,r,0,6.2832); g.fill(); };
@@ -5661,9 +5691,17 @@ function drawMinimap(){
   mines.forEach(m=>{if(!inR(m.pos.x,m.pos.z))return;
     const seen=m.team===0||sonarPulse>0||m.pos.distanceTo(activePlayerWorldPos())<70;if(!seen)return;
     const [mx,my]=to(m.pos.x,m.pos.z);g.fillStyle=m.team===0?'#68dcff':'#ff7373';g.fillRect(mx-1.8,my-1.8,3.6,3.6);});
+  // your own ship, drawn as a landmark whenever you are not standing on it
+  if(away && !landCampaignMode && player.hp>0 && !playerShipLost && inR(player.pos.x,player.pos.z)){
+    const [sx,sy]=to(player.pos.x,player.pos.z);
+    g.strokeStyle='#7fd0a0'; g.lineWidth=2; g.beginPath(); g.arc(sx,sy,5.5,0,6.2832); g.stroke();
+    g.fillStyle='#7fd0a0'; dot(sx,sy,2.2);
+    g.font='9px system-ui'; g.fillText('⚓', sx-4.5, sy-7);
+  }
   g.restore();
-  // player arrow (points along heading)
-  const hx=Math.sin(player.heading||0), hz=Math.cos(player.heading||0), perpx=-hz, perpz=hx;
+  // you (points along your heading — the ship's heading when you're aboard)
+  const hd=away?camYaw.v:(player.heading||0);
+  const hx=Math.sin(hd), hz=Math.cos(hd), perpx=-hz, perpz=hx;
   g.fillStyle='#ffffff'; g.beginPath();
   g.moveTo(R+hx*8, R+hz*8); g.lineTo(R-hx*4+perpx*4.5, R-hz*4+perpz*4.5); g.lineTo(R-hx*4-perpx*4.5, R-hz*4-perpz*4.5);
   g.closePath(); g.fill();
@@ -7019,6 +7057,9 @@ const ZH_PATTERNS = (() => {
 // ---------- i18n: review-pass supplements (strings the generated dictionaries missed) ----------
 Object.assign(ZH_EXACT,{
   'Strategic weapons are disabled in kid-safe mode':'家长模式下已停用战略武器',
+  'Surface first (C), then press G to go ashore.':'先按 C 上浮，再按 G 登岸。',
+  // point the stranded captain at the ⚓ marker the minimap now draws
+  'Walk back to your ship to climb aboard.':'走回军舰旁边才能上舰——小地图上的 ⚓ 就是你的船。',
   'Threat clear — resuming patrol.':'威胁解除——恢复巡逻。',
   'Engaging enemy contact!':'发现敌舰，正在交战！',
   'All mounts are full — press E to step onto the deck, then F places it anywhere':'炮位都装满了——按 E 走上甲板，再按 F 就能装在任意空地',
