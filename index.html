@@ -219,6 +219,16 @@
   #hitMarker.big::before,#hitMarker.big::after{background:#ffd060;}
   #hitMarker.show{animation:hitFlash .25s ease-out;}
   @keyframes hitFlash{0%{opacity:1;transform:translate(-50%,-50%) scale(1.35);}100%{opacity:0;transform:translate(-50%,-50%) scale(0.9);}}
+
+  /* ---- Full-screen banner (briefing card / boss warning) ---- */
+  #bannerCard{position:fixed;inset:0;z-index:25;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;pointer-events:none;opacity:0;background:rgba(4,9,15,0);transition:opacity .25s ease-out,background .25s ease-out;}
+  #bannerCard.show{opacity:1;background:rgba(4,9,15,.55);pointer-events:auto;cursor:pointer;}
+  #bannerCard .bc-title{font-size:30px;letter-spacing:3px;color:#9fc6e8;text-shadow:0 2px 12px rgba(0,0,0,.6);}
+  #bannerCard .bc-sub{margin-top:10px;font-size:16px;color:#cfe6fb;max-width:640px;line-height:1.5;}
+  #bannerCard .bc-hint{margin-top:18px;font-size:11px;color:#6b7d92;letter-spacing:1px;}
+  #bannerCard.danger .bc-title{color:#ff7a6a;animation:dangerPulse .5s ease-in-out infinite alternate;}
+  @keyframes dangerPulse{from{text-shadow:0 0 6px rgba(255,90,70,.4);}to{text-shadow:0 0 22px rgba(255,90,70,.9);}}
 </style>
 </head>
 <body>
@@ -235,6 +245,7 @@
 <div id="hud">
   <div id="cross"></div>
   <div id="hitMarker"></div>
+  <div id="bannerCard"><div class="bc-title"></div><div class="bc-sub"></div><div class="bc-hint"></div></div>
   <div id="topbar"><div id="money">$0</div>
     <div id="objective" style="text-align:center;font-size:13px;color:#cfe6fb;">
       <div style="color:#ff9a8a;letter-spacing:1px;">DESTROY THE ENEMY HARBOR</div>
@@ -2970,7 +2981,9 @@ function startGame(shipId){
     landCampaignMode=false;
     for(let i=0;i<M.enemies;i++) spawnEnemy();
     for(let i=0;i<M.allies;i++) spawnAlly();   // NPC starting fleets per map
-    if(M.boss) spawnBoss(1);
+    showBanner(T('OPERATION '+(currentMapIdx+1),'第 '+(currentMapIdx+1)+' 号作战')+' · '+campaignName(currentMapIdx),
+      campaignTheme(currentMapIdx)+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:3});
+    if(M.boss) spawnBoss(1,true);
     if(shipId==='boss')friendlyBossUsed=true;else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
     flashPrompt('⚔ '+M.name.toUpperCase()+' — '+M.theme);
     startDrive();          // spawn already at the helm: W moves the ship within seconds of clicking a card
@@ -2991,6 +3004,8 @@ function wireGameInput(){   // shared by startGame and resumeWar; must only atta
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v)); }});
   document.addEventListener('mousedown',e=>{ if(document.pointerLockElement===cv && e.button===0) mouseDownFire=true; });
   document.addEventListener('mouseup',e=>{ if(e.button===0) mouseDownFire=false; });
+  const bc=document.getElementById('bannerCard'); if(bc) bc.addEventListener('click',e=>{ e.stopPropagation(); skipBanner(); });
+  document.addEventListener('keydown',()=>{ if(_bannerT>0) skipBanner(); });
 }
 function chooseShip(shipId){
   if(phase==='respawn'&&shipId==='boss'&&friendlyBossUsed){
@@ -3498,7 +3513,7 @@ function spawnAlly(near){
   if(typeof comms==='function'&&!def.support&&Math.random()<0.6) comms(a.callsign,a.role==='capture'?'On station — moving to take an island.':'Reporting for duty — weapons hot.','#a8d4f0');
   allies.push(a);
 }
-function spawnBoss(team){
+function spawnBoss(team,announce){
   if((team===0&&friendlyBossUsed)||(team===1&&enemyBossUsed))return null;
   const def={...SHIPS.boss},build=buildAIShipModel(def,team),h=team===0?friendlyHarbor:enemyHarbor;
   const pos=new THREE.Vector3(team===0?-320:320,0,h.pos.z+(team===0?-360:360));keepOffIslands(pos,def.beam/2+10);
@@ -3508,6 +3523,8 @@ function spawnBoss(team){
   arsenal.forEach(i=>ship.loadout.push(AI_WEAPS[i]));
   (team===0?allies:enemies).push(ship);
   if(team===0)friendlyBossUsed=true;else enemyBossUsed=true;
+  if(team===1&&announce){ showBanner(T('⚠ WARNING','⚠ 警告'),
+    T('Enemy flagship LEVIATHAN approaching','敌方旗舰"利维坦"正在逼近'), {dur:2.2,tone:'danger'}); sfxAlarm(); }
   return ship;
 }
 function nearestEnemyShipTo(pos){ let b=null,bd=1e9; enemies.forEach(e=>{ if(e.sinkT>0)return; const d=e.pos.distanceTo(pos); if(d<bd){bd=d;b=e;} }); return b; }
@@ -5684,6 +5701,21 @@ function installHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
   ? T('tap Install below','点下方的安装按钮')
   : T('press F (or click Install below)','按 F（或点下方的安装按钮）'); }
 function flashPrompt(msg,kind){ promptMsg=msg; promptT=2; if(shopOpen) shopMsg(msg,kind); }
+// ===== BANNER CARD — full-screen briefing card / boss warning, queued so only one shows at a time =====
+let _bannerQueue=[],_bannerT=0;
+function showBanner(title,sub,opts){ opts=opts||{}; _bannerQueue.push({title,sub,dur:opts.dur||2.6,tone:opts.tone||'brief'}); }
+function skipBanner(){ if(_bannerT>0){ _bannerT=0; const el=document.getElementById('bannerCard'); if(el) el.classList.remove('show'); } }
+function updateBanners(dt){
+  const el=document.getElementById('bannerCard'); if(!el) return;
+  if(_bannerT>0){ _bannerT-=dt; if(_bannerT<=0) el.classList.remove('show'); return; }
+  if(!_bannerQueue.length) return;
+  const b=_bannerQueue.shift();
+  el.querySelector('.bc-title').textContent=b.title;
+  el.querySelector('.bc-sub').innerHTML=b.sub;   // b.sub is always built from our own campaign/flavor strings, never user input
+  el.querySelector('.bc-hint').textContent=T('click or press any key to skip','点击或按任意键跳过');
+  el.className='show '+b.tone;
+  _bannerT=b.dur;
+}
 // Walking inland, the only way back aboard is to find the ship again — so say where it is.
 // The arrow points relative to the way the captain is facing, not to the compass.
 const BEARING_ARROWS=['↑','↗','→','↘','↓','↙','←','↖'];
@@ -6176,6 +6208,7 @@ function loop(){
       _saveT+=dt; if(_saveT>=30){ _saveT=0; saveWar(); } }               // autosave the war twice a minute
     else { sfxEngine(); updatePrompt(); updateCamera(); updateHUD(); }   // audio ramps down; prompts/HUD/camera stay correct in menus
     updateMountPreview();                   // shop stays open while this runs, so the ghost/ring must update even while paused
+    updateBanners(dt);
     updateTutorial(dt);                     // tutorial keeps ticking so menu steps can complete while paused
     if(TOUCH&&_touchWired) touchLabels();   // context buttons follow whatever the captain is doing
     if(chatOpen&&_chatOpenAt&&performance.now()-_chatOpenAt>9000){
