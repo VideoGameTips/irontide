@@ -397,6 +397,7 @@ function surfaceMaterial(color,kind='metal',roughness=.55,metalness=0){
   return new THREE.MeshStandardMaterial({color,map:surfaceMap(kind),roughness,metalness});
 }
 const SILVER = c=>surfaceMaterial(c||0xc2c6cc,'metal',0.42,0.72);
+const PAINT  = c=>surfaceMaterial(c||0x6a6a4a,'paint',0.86,0.04);   // matte painted steel (tanks, painted hull/plane bodies) — no chrome sheen
 function mkBox(w,h,d,m){ const x=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m.isMaterial?m:SILVER(m)); x.castShadow=x.receiveShadow=true; return x; }
 function mkCyl(rt,rb,h,m,seg=14){ const x=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), m.isMaterial?m:SILVER(m)); x.castShadow=true; return x; }
 
@@ -504,6 +505,42 @@ function shipWake(s,def,dt,spd){   // foam trail behind a moving hull
   const stern=Math.max(6,def.len*0.42);
   spawnWake(p.x-Math.sin(hd)*stern, p.z-Math.cos(hd)*stern, def.beam*1.3, 0.4);
 }
+function bowSpray(s,def,dt,spd){   // white spray + bow wave peeling off a fast hull
+  if(spd<9) return;
+  s._sprayT=(s._sprayT||0)-dt; if(s._sprayT>0) return; s._sprayT=0.11;
+  const p=(s===player)?player.pos:s.pos, hd=(s===player)?player.heading:s.heading;
+  const bow=def.len*0.46, bx=p.x+Math.sin(hd)*bow, bz=p.z+Math.cos(hd)*bow;
+  spawnWake(bx,bz,def.beam*1.05,0.5);                                  // foam wave riding the bow
+  if(fx.length>MAX_FX-16) return;
+  const n=spd>16?2:1;
+  for(let i=0;i<n;i++){ const side=i?1:-1;
+    const sp=_spr(softFoamTex(),false); sp.material.color.setHex(0xecf7ff); sp.scale.setScalar(0.9+Math.random()*0.7);
+    sp.position.set(bx+Math.cos(hd)*side*def.beam*0.4, 0.8, bz-Math.sin(hd)*side*def.beam*0.4); scene.add(sp);
+    fx.push({mesh:sp,life:0.5+Math.random()*0.25,max:0.75,op:0.6,fade:true,grow:true,growRate:1.4,grav:true,
+      vel:new THREE.Vector3(Math.sin(hd)*spd*0.18+Math.cos(hd)*side*2, 4+Math.random()*3, Math.cos(hd)*spd*0.18-Math.sin(hd)*side*2)}); }
+}
+function damageSmoke(s,dt){   // wounded hulls trail smoke — thin haze → black column as HP falls
+  if(!s.def||s.sinkT>0||s.proxy) return;
+  const hp=(s===player?player.hp:s.hp), mx=(s===player?player.maxhp:s.maxhp);
+  const dmg=1-hp/mx; if(dmg<0.45) return;
+  const sev=Math.min(1,(dmg-0.45)/0.55);
+  s._dmgT=(s._dmgT||0)-dt; if(s._dmgT>0) return; s._dmgT=0.13-0.07*sev;
+  if(fx.length>MAX_FX-24) return;
+  const base=(s===player?player.pos:s.pos);
+  const p=base.clone().setY((s.def.deckY||3)+1).add(new THREE.Vector3((Math.random()-0.5)*s.def.beam*0.7,0,(Math.random()-0.5)*s.def.len*0.45));
+  const sm=_spr(smokeTex(),false), g=0.4-0.32*sev;                    // darker as damage rises
+  sm.scale.setScalar(1.6+2.4*sev+Math.random()); sm.position.copy(p); scene.add(sm);
+  fx.push({mesh:sm,life:1.4+1.6*sev,max:3.4,op:0.3+0.3*sev,fade:true,grow:true,growRate:1.6,srot:(Math.random()-0.5)*0.7,
+    vel:new THREE.Vector3((Math.random()-0.5)*1.2,2.4+2*sev,(Math.random()-0.5)*1.2),drag:0.4,
+    c0:new THREE.Color(g,g,g),c1:new THREE.Color(0.42,0.42,0.44)}); }
+function crippledPlaneSmoke(p,dt){   // trailing smoke off a crippled AI aircraft (distinct from the piloted-plane planeSmoke)
+  if(!p||p.hp<=0||p.hp>=p.maxhp*0.4) return;
+  p._smkT=(p._smkT||0)-dt; if(p._smkT>0) return; p._smkT=0.07;
+  if(fx.length>MAX_FX-18) return;
+  const sm=_spr(smokeTex(),false); sm.material.color.setHex(0x2a2a2a); sm.scale.setScalar(1+Math.random()*0.8);
+  sm.position.copy(p.pos); scene.add(sm);
+  fx.push({mesh:sm,life:0.8+Math.random()*0.5,max:1.3,op:0.42,fade:true,grow:true,growRate:2,
+    vel:new THREE.Vector3(0,1.2,0)}); }
 function updateGraphics(dt,t){
   if(!skyGroup) return;
   skyGroup.position.set(player&&player.pos?player.pos.x:0, 0, player&&player.pos?player.pos.z:0);
@@ -536,9 +573,10 @@ function updateGraphics(dt,t){
   if(_foamRings) for(let i=0;i<_foamRings.length;i++) _foamRings[i].material.opacity=0.13+0.07*Math.sin(t*1.4+i*1.7);
   // ship wakes + spinning masthead radar: player + on-screen fleet
   const rspin=(b)=>{ if(b&&b.group&&b.group.userData.radarBar) b.group.userData.radarBar.rotation.y+=dt*2.4; };
-  if(player&&player.def){ shipWake(player,player.def,dt,player.speed||0); rspin(player.build); }
-  allies.forEach(a=>{ if(a.sinkT===0&&!a.proxy&&a.vel){ shipWake(a,a.def,dt,a.vel.length()); rspin(a.build); } });
-  enemies.forEach(e=>{ if(e.sinkT===0&&!e.proxy&&e.vel){ shipWake(e,e.def,dt,e.vel.length()); rspin(e.build); } });
+  if(player&&player.def){ const sp=player.speed||0; shipWake(player,player.def,dt,sp); bowSpray(player,player.def,dt,Math.abs(sp)); damageSmoke(player,dt); rspin(player.build); }
+  allies.forEach(a=>{ if(a.sinkT===0&&!a.proxy){ const sp=a.vel?a.vel.length():0; shipWake(a,a.def,dt,sp); bowSpray(a,a.def,dt,sp); damageSmoke(a,dt); rspin(a.build); } });
+  enemies.forEach(e=>{ if(e.sinkT===0&&!e.proxy){ const sp=e.vel?e.vel.length():0; shipWake(e,e.def,dt,sp); bowSpray(e,e.def,dt,sp); damageSmoke(e,dt); rspin(e.build); } });
+  for(let i=0;i<aiPlanes.length;i++){ const pl=aiPlanes[i]; if(pl.hp>0&&pl.hp<pl.maxhp*0.4&&!pl.proxy) crippledPlaneSmoke(pl,dt); }
   for(const w of wakes){ if(w.life<=0){ if(w.mesh.visible) w.mesh.visible=false; continue; }
     w.life-=dt; const k=1-Math.max(0,w.life)/w.max;
     w.mesh.scale.setScalar(w.s0*(0.7+k*2.4));
@@ -796,10 +834,41 @@ function addNavalHardware(g,def,L,B,deckY,enemy){
 }
 function addShipGraphicDetails(g,def,L,B,deckY,enemy){
   const dark=SILVER(0x353b42),glass=new THREE.MeshStandardMaterial({color:0x142633,metalness:.35,roughness:.2}),
-    accent=new THREE.MeshStandardMaterial({color:enemy?0x8c3030:0x315f87,roughness:.65});
+    accent=new THREE.MeshStandardMaterial({color:enemy?0x8c3030:0x315f87,roughness:.65}),
+    lineM=new THREE.MeshBasicMaterial({color:0x26313a,transparent:true,opacity:.48}),
+    paleM=new THREE.MeshBasicMaterial({color:0xd7dde1,transparent:true,opacity:.55});
+  // Subtle deck seams and hatch plates break up the "one big slab" look without adding moving cost.
+  if(def.kind!=='sub'){
+    const deckLines=Math.min(10,Math.max(4,Math.floor(def.len/11)));
+    for(let i=1;i<deckLines;i++){
+      const z=-L+i*(2*L/deckLines);
+      const seam=mkBox(B*1.55,.018,.08,lineM);seam.position.set(0,deckY+.62,z);g.add(seam);
+    }
+    const sideLines=Math.min(5,Math.max(2,Math.floor(def.beam/3)));
+    for(let i=1;i<sideLines;i++)for(const sx of[-1,1]){
+      const x=sx*i*(B*.72/sideLines);
+      const seam=mkBox(.055,.02,L*1.48,lineM);seam.position.set(x,deckY+.63,-L*.03);g.add(seam);
+    }
+    for(let i=0;i<Math.min(5,Math.floor(def.len/16));i++){
+      const hatch=mkBox(Math.min(2.2,B*.32),.045,Math.min(3.1,L*.13),lineM);
+      hatch.position.set((i%2?1:-1)*B*.28,deckY+.66,-L*.58+i*L*.28);g.add(hatch);
+      const handle=mkBox(Math.min(1.3,B*.18),.052,.07,paleM);handle.position.set(hatch.position.x,deckY+.7,hatch.position.z);g.add(handle);
+    }
+  }
   // Portholes and hull identification stripe make the scale readable at close range.
   if(def.kind!=='sub')for(const sx of[-1,1])for(let i=-2;i<=2;i++){const p=new THREE.Mesh(new THREE.CircleGeometry(.16,8),glass);
     p.rotation.y=sx*Math.PI/2;p.position.set(sx*(B+.03),deckY-1.25,i*L*.29);g.add(p);}
+  // Rust streaks and welded plates give the hull more weight, especially in low light.
+  if(def.kind!=='sub')for(const sx of[-1,1]){
+    const plateCount=Math.min(8,Math.max(3,Math.floor(def.len/13)));
+    for(let i=0;i<plateCount;i++){
+      const z=-L*.72+i*(L*1.44/Math.max(1,plateCount-1)), y=deckY-1.15-(i%3)*.38;
+      const plate=mkBox(.035,.85+(i%2)*.35,L*.075,new THREE.MeshBasicMaterial({color:enemy?0x4f2523:0x38454d,transparent:true,opacity:.32}));
+      plate.position.set(sx*(B+.055),y,z);g.add(plate);
+      if(i%2===0){const rust=mkBox(.04,.72,.07,new THREE.MeshBasicMaterial({color:0x7a3c1c,transparent:true,opacity:.38}));
+        rust.position.set(sx*(B+.065),deckY-.62,z+L*.03);g.add(rust);}
+    }
+  }
   const badge=mkBox(Math.max(1.2,B*.32),.12,.7,accent);badge.position.set(0,deckY+.25,-L*.92);g.add(badge);
   // Radar yardarms, navigation lamps and lifeboats.
   if(def.kind!=='sub'){const yard=mkBox(Math.min(B*1.1,8),.12,.12,dark);yard.position.set(0,deckY+7,L*.02);g.add(yard);
@@ -946,6 +1015,18 @@ function buildShip(def, enemy){
 // ---- instanced jungle trees: thousands of trees rendered in ONE draw call ----
 const _treePlacements=[];   // world-space {x,y,z,s,ry}; filled by buildIsland, baked by buildTreeField
 let treeMesh=null;
+function islandPalette(name){
+  const m=(window._MAP&&window._MAP.name)||'', n=name||'';
+  if(/Hiroshima|Volcano|Caldera/.test(m)||/Hypocenter|Ash|Basalt|Lava|Caldera|Cinder|Obsidian/.test(n))
+    return {sand:0x9d8a6b,grass:0x5a5a4e,jung:0x373b31,jung2:0x4b4a3a,bush:0x3b4035,rock:0x4a4a46,bag:0x8c7d5a};
+  if(/Chernobyl|Frozen/.test(m)||/Reactor|Pripyat|Red Forest|Exclusion|Cooling/.test(n))
+    return {sand:0x9fa083,grass:0x58684a,jung:0x354330,jung2:0x6f7f3d,bush:0x46583a,rock:0x70776b,bag:0x8b855d};
+  if(/Desert|Omaha|100% Land|Landing/.test(m)||/Beach|Dune|Range|Flats|Armor Course|Dog Green|Easy Red|Fox Green/.test(n))
+    return {sand:0xd7c18a,grass:0x8a8150,jung:0x5e6a3b,jung2:0x7a8143,bush:0x6a7040,rock:0x7a7364,bag:0xa8955d};
+  if(/Night|Ghost|Blackwater|Fogbound/.test(m))
+    return {sand:0xa99e80,grass:0x435a42,jung:0x263c2e,jung2:0x34513c,bush:0x2d4634,rock:0x5a6162,bag:0x8c8156};
+  return {sand:0xcdb98a,grass:0x55753f,jung:0x2f5a30,jung2:0x3c6e38,bush:0x33602c,rock:0x6a6a66,bag:0x9a8a5a};
+}
 function mergeGeoms(geos){
   let total=0; geos.forEach(g=>total+=g.attributes.position.count);
   const pos=new Float32Array(total*3), nor=new Float32Array(total*3), col=new Float32Array(total*3);
@@ -998,13 +1079,17 @@ function buildIsland(pos,r,name){
   const seed=Math.random()*20, long=isBase?1.28:1.2+Math.random()*0.42, short=isBase?0.95:0.92+Math.random()*0.16;
   const alongX=isBase||Math.random()<0.5, rx=r*(alongX?long:short), rz=r*(alongX?short:long), angle=isBase?0:(Math.random()-0.5)*1.35;
   g.rotation.y=angle;
-  const sand=surfaceMaterial(0xcdb98a,'ground',.98),grass=surfaceMaterial(0x55753f,'ground',.97),
-    jung=surfaceMaterial(0x2f5a30,'ground',1),jung2=surfaceMaterial(0x3c6e38,'ground',1),
-    bushM=surfaceMaterial(0x33602c,'ground',1),trunkM=surfaceMaterial(0x66472a,'ground',1),
-    rockM=surfaceMaterial(0x6a6a66,'concrete',1),concM=surfaceMaterial(0x787b70,'concrete',.95),
-    bagM=surfaceMaterial(0x9a8a5a,'ground',1);
+  const pal=islandPalette(name);
+  const sand=surfaceMaterial(pal.sand,'ground',.98),grass=surfaceMaterial(pal.grass,'ground',.97),
+    jung=surfaceMaterial(pal.jung,'ground',1),jung2=surfaceMaterial(pal.jung2,'ground',1),
+    bushM=surfaceMaterial(pal.bush,'ground',1),trunkM=surfaceMaterial(0x66472a,'ground',1),
+    rockM=surfaceMaterial(pal.rock,'concrete',1),concM=surfaceMaterial(0x787b70,'concrete',.95),
+    bagM=surfaceMaterial(pal.bag,'ground',1);
   const darkM=new THREE.MeshStandardMaterial({color:0x15190f,roughness:1});
   const beach=new THREE.Mesh(islandGeometry(rx,rz,2.2,seed,1.15), sand); beach.position.y=0.2; beach.receiveShadow=true; g.add(beach);
+  const shallows=new THREE.Mesh(new THREE.RingGeometry(.78,1.08,48),
+    new THREE.MeshBasicMaterial({color:0xbcefff,transparent:true,opacity:.18,side:THREE.DoubleSide,depthWrite:false}));
+  shallows.rotation.x=-Math.PI/2; shallows.position.y=.42; shallows.scale.set(rx*1.08,rz*1.08,1); g.add(shallows);
   const top=new THREE.Mesh(islandGeometry(rx*0.84,rz*0.84,1.6,seed+0.15,1.08), grass); top.position.y=1.3; top.receiveShadow=true; g.add(top);
   if(r>30){ const mound=new THREE.Mesh(islandGeometry(rx*0.43,rz*0.43,2.6,seed+0.5,1.28), jung); mound.position.y=2.5; mound.receiveShadow=true; g.add(mound); }
   const rnd=(sp)=>{ const a=Math.random()*6.28, rr=Math.sqrt(Math.random())*sp; return [Math.cos(a)*rx*rr, Math.sin(a)*rz*rr]; };
@@ -1023,6 +1108,15 @@ function buildIsland(pos,r,name){
   for(let i=0;i<Math.min(6,Math.floor(r/16));i++){ const [x,z]=rnd(0.8);
     if(Math.random()<0.6){ const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(0.7+Math.random()*1.1), rockM); rock.position.set(x,2.0,z); rock.rotation.set(Math.random(),Math.random(),Math.random()); g.add(rock); }
     else { const log=mkCyl(0.25,0.28,2.2+Math.random()*1.6,trunkM); log.rotation.z=Math.PI/2; log.rotation.y=Math.random()*6.28; log.position.set(x,2.05,z); g.add(log); } }
+  // shoreline rock teeth and tiny sandbars make island silhouettes less perfectly smooth.
+  const shoreN=Math.min(14,Math.max(3,Math.floor(r/38)));
+  for(let i=0;i<shoreN;i++){
+    const a=i/shoreN*6.28+Math.random()*0.28, rr=0.9+Math.random()*0.08, x=Math.cos(a)*rx*rr, z=Math.sin(a)*rz*rr;
+    if(Math.random()<0.62){ const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(0.45+Math.random()*0.85), rockM);
+      rock.position.set(x,1.05+Math.random()*0.35,z); rock.scale.y=0.45+Math.random()*0.5; rock.rotation.set(Math.random(),Math.random()*6.28,Math.random()); g.add(rock); }
+    else { const bar=mkBox(3.2+Math.random()*4,.05,.55+Math.random()*0.55,new THREE.MeshBasicMaterial({color:0xe7d8a8,transparent:true,opacity:.8}));
+      bar.position.set(x,.72,z); bar.rotation.y=-a+Math.PI/2+(Math.random()-.5)*.4; g.add(bar); }
+  }
   // bunkers (sandbagged emplacements) on bigger islands
   for(let i=0;i<Math.floor(r/50);i++){ const [x,z]=rnd(0.5); const bk=new THREE.Group(); bk.position.set(x,2.0,z); bk.rotation.y=Math.random()*6.28;
     const body=mkBox(4,1.8,3.2,concM); body.position.y=0.9; bk.add(body);
@@ -1159,7 +1253,7 @@ function buildLand(kind,team,pos,type){
   let range=110,dmg=10,hp=70,fireRate=2.0;
   if(kind==='tank'){
     const T=(typeof type==='object'?type:TANKS[type])||TANKS.sherman;
-    const body=SILVER(T.col), trackM=SILVER(0x2a2e22);
+    const body=PAINT(T.col), trackM=surfaceMaterial(0x2a2e22,'metal',0.85,0.55);   // matte-painted hull; grimy low-sheen tracks
     const hull=mkBox(T.hullW,T.hullH,T.hullL,body); hull.position.y=0.6+T.hullH/2; hull.castShadow=true; g.add(hull);
     for(const sx of [-1,1]){ const tr=mkBox(0.7,0.9,T.hullL*1.05,trackM); tr.position.set(sx*(T.hullW/2),0.55,0); g.add(tr);
       for(let i=0;i<4;i++){ const w=mkCyl(0.34,0.34,0.32,SILVER(0x16180f),8); w.rotation.z=Math.PI/2; w.position.set(sx*(T.hullW/2),0.45,(i-1.5)*(T.hullL*0.24)); g.add(w); } }
@@ -2194,6 +2288,39 @@ function controlledIslandCount(team){ return islands.reduce((n,i)=>n+(i.capturab
 // ===== WAR PACING — escalating enemy offensives, rotating bonus objectives, deck rearm =====
 let offensiveT=160+Math.random()*80, offensiveN=0, sessPlanes=0;
 let sideOb=null, sideObT=25;
+let _eventT=45, _eventCount=0;   // dynamic mid-battle events ticker
+// ===== LIVING BATTLES — occasional dramatic events that keep a fight from going flat =====
+function turnWeather(){
+  if(typeof weather!=='object' || (window._MAP&&window._MAP.weatherLock)) return;
+  const opts=['clear','overcast','fog','storm'].filter(w=>w!==weather.type);
+  const w=opts[Math.floor(Math.random()*opts.length)]; weather.type=w; weather.t=70+Math.random()*40;
+  const label={clear:'skies clearing',overcast:'cloud rolling in',fog:'a fog bank closing in',storm:'a storm bearing down'}[w]||w;
+  flashPrompt('⛅ Weather shifting — '+label);
+  if(typeof comms==='function') comms('WEATHER',label.charAt(0).toUpperCase()+label.slice(1)+' — adjust your gunnery.','#a8c8e0');
+}
+function dropSupplyCrates(){
+  if(!player||!player.pos) return;
+  const c=2+Math.floor(Math.random()*2);
+  for(let i=0;i<c;i++){ const a=Math.random()*6.28, r=55+Math.random()*80;
+    spawnSalvage(player.pos.clone().add(new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r))); }
+  flashPrompt('📦 Supply drop — salvage crates in the water nearby');
+  if(typeof comms==='function') comms('COMMAND','Air-dropped supplies near your position — go collect them.','#8fd0a0');
+}
+function fireDynamicEvent(ground){
+  const pool=['supply'];
+  if(!ground && enemies.length<11) pool.push('reinforce');
+  if(!ground && allies.length<9) pool.push('convoy');
+  if(!(window._MAP&&window._MAP.weatherLock)) pool.push('weather');
+  const ev=pool[Math.floor(Math.random()*pool.length)];
+  if(ev==='reinforce'){ const n=1+Math.floor(Math.random()*2); for(let i=0;i<n;i++) spawnEnemy();
+    flashPrompt('⚠ Dominion reinforcements — '+n+' hull'+(n>1?'s':'')+' inbound!'); if(typeof sfxAlarm==='function') sfxAlarm();
+    if(typeof comms==='function') comms('RADAR','New surface contacts bearing from the enemy line.','#ff9a6a'); }
+  else if(ev==='convoy'){ const n=1+Math.floor(Math.random()*2); for(let i=0;i<n;i++) spawnAlly();
+    flashPrompt('📻 Friendly squadron joining the line');
+    if(typeof comms==='function') comms('COMMAND','Reinforcements dispatched to your position, Admiral.','#8fd0a0'); }
+  else if(ev==='weather') turnWeather();
+  else dropSupplyCrates();
+}
 function updateWarPacing(dt){
   const ground=window._MAP&&window._MAP.ground;
   // land victory: on an all-ground theater, seizing every island wins the war
@@ -2207,6 +2334,9 @@ function updateWarPacing(dt){
     const n=Math.min(3+Math.floor(offensiveN/2),6);
     if(enemies.length<12){ for(let i=0;i<n;i++) spawnEnemy();
       flashPrompt('⚠ ENEMY OFFENSIVE — '+n+' warships inbound!'); sfxAlarm(); } }
+  // dynamic mid-battle events — reinforcements, friendly squadrons, supply drops, weather turns
+  _eventT-=dt;
+  if(_eventT<=0){ _eventT=55+Math.random()*45; _eventCount++; fireDynamicEvent(ground); }
   // rotating side objectives with cash rewards
   if(sideOb){ sideOb.t-=dt;
     if(sideObProgress()>=sideOb.goal){ money+=sideOb.pay; updateHUD(); refreshShop(); sfxClick();
@@ -2519,6 +2649,75 @@ function buildCampaignPicker(){
     box.appendChild(c);
   });
 }
+// =====================================================================
+//  CAMPAIGN NARRATIVE — a prologue, then one chronicle beat per theater.
+//  LORE.beats[i] is the story shown after winning CAMPAIGN[i].
+// =====================================================================
+const LORE = {
+  intro:`They call this sea the Iron Tide — a hundred years of war have sunk so much steel into it that the water runs the colour of rust. The old nations drowned long ago; what remains are the Free Isles, a scattering of harbours that kept their freedom by keeping their guns loaded. Now the Dominion pours out of the red east, swallowing island after island under Grand Marshal Varga's black-and-crimson banners.<br><br>Southhaven is the last free deepwater port — and this morning Fleet Admiral Kessler pinned a captain's bars to your coat and handed you the keys to a single warship. "One hull," she said. "That's how every fleet starts. Take her to the training bay and don't come back until you can shoot straight. The Dominion won't wait for you to learn."<br><br>Choose your command, Captain. The tide is turning — and it is coming for us.`,
+  beats:[
+    /* 1 Training Bay */      `The gunnery drills are over. Your shells fall where you aim them now and your crew moves like one body. Kessler watched the whole thing from the seawall with something close to approval. "Good," is all she says — then the warmth is gone from her face. "Because it stopped being a drill an hour ago. Dominion marines just put boots on the northern beach."`,
+    /* 2 The Landing */       `You threw the raiders back into the surf before they could dig in. The beach is yours, littered with abandoned Dominion kit. But a captured scout coughs up a warning between breaths: the landing was only a probe. The real fleet is massing off the coast — and it is already under way.`,
+    /* 3 Coastal Skirmish */  `Three Dominion hulls burn on the horizon — your first true fleet action, and you won it. By nightfall the word is all over Southhaven's docks: the new captain can fight. Kessler gives you a proper squadron and taps the chart. "Southhaven Shoals. They mean to bottle us in and starve the harbour. Break their blockade."`,
+    /* 4 Southhaven Shoals */ `The blockade is broken and the shipping lanes breathe again; grain and shells flow back into Southhaven's holds. But the Dominion does not retreat — it reorganises. Recon flights return with photographs of a fortified reef bristling with shore batteries. "The Broken Reef," Kessler mutters. "They've turned a wreck-field into a fortress."`,
+    /* 5 The Broken Reef */   `You threaded the wrecks under a storm of shore fire and silenced every battery. Salvage crews are already stripping the Dominion guns for scrap and secrets — and among the wreckage they find charts marking a channel called the Iron Straits. The throat of the whole archipelago. Whoever holds it holds the sea.`,
+    /* 6 Iron Straits */      `The Iron Straits are yours. For the first time the Free Isles hold more water than they have lost. Varga's reply comes by wireless, in the clear, meant for you alone: "Enjoy the daylight, Captain. My fleets move best in the dark." That night, the running lights on the horizon wink out one by one.`,
+    /* 7 Nightfall Passage */ `You fought them blind — by muzzle-flash and radar ghost — and came out the far side of the darkness still afloat. So the Dominion trades the night for something worse: a grey wall of fog rolls in off the Fogbound Marches, and something very large is moving inside it.`,
+    /* 8 Fogbound Marches */  `Gun by gun you dragged the Dominion's marsh squadron out of the fog until the last struck its colours. In a flooded hold your boarding party finds one word repeated on every order — LEVIATHAN. Not a class. A ship: the Dominion's first dreadnought, big enough to make its own weather. It waits in the deep water your charts simply call the Leviathan's Grave.`,
+    /* 9 Leviathan's Grave */ `The Leviathan is down. It cost everything you had and half of what you didn't, but the Dominion's flagship lies on the floor of the sea that named the graveyard. Southhaven celebrates for a night. Kessler does not. "One Leviathan," she says quietly, unrolling a far larger map. "Varga has a shipyard that builds them. And now he knows your name."`,
+    /* 10 Dawn Patrol */      `You take the war east at first light. The dawn patrol was meant to be quiet — a look across the border into Dominion water. It was not. But you scattered the picket line and, for the first time in a generation, planted the Free Isles' flag on the far shore. The offensive has begun.`,
+    /* 11 The Gauntlet */     `They funnelled you into a killing ground between two fortified capes and threw hull after hull into your path. You ran the gauntlet and broke out the far side — engines smoking, magazines nearly dry, but through. The Dominion's inner line is cracked, and there is clear water ahead. For now.`,
+    /* 12 Typhoon Run */      `You chased them into the teeth of a typhoon because they were certain you wouldn't follow. You did. Fighting the sea and the enemy at once, you sank what the storm didn't. Somewhere in the shrieking wind Varga's voice crackles over the radio — no longer taunting. "You are not supposed to be here yet."`,
+    /* 13 Blackwater Ambush */`It was a perfect trap: a whole squadron and a flagship hidden in the black water, sprung at exactly the right moment. It should have worked. Instead you turned the ambush inside out and left the trappers as the trapped. The Dominion stops trying to be clever — and starts trying to be overwhelming.`,
+    /* 14 Island Hopping */   `Island by island, beach by beach, you take back the chain the Dominion spent years occupying. It is slow, ugly, close-quarters work — but every command post you raise flies your flag, and every one is a knife laid against Varga's supply lines. The occupied isles are becoming a front of their own.`,
+    /* 15 Midnight Raid */    `You hit their forward anchorage at the blackest hour, before the moon, and were gone before the alarms finished sounding. Half their fuel reserve went up with the depot. A fleet that cannot refuel cannot run — and Varga's is beginning to limp. He orders every hull he has left to concentrate.`,
+    /* 16 The Iron Armada */  `Eleven Dominion warships in line abreast — the Iron Armada, sent to finish you in a single stroke. You met it head-on and left a debris field. There is open talk on Southhaven's docks now that this war can actually be won, and Kessler begins using a word she never allowed herself before: victory.`,
+    /* 17 Shattered Coast */  `The Dominion scatters into the maze of the Shattered Coast — a thousand channels and dead ends — hoping to bleed you in the reefs. You hunted them down channel by channel instead. There is nowhere left in these waters to hide, so they run north, into the ice.`,
+    /* 18 Frozen Straits */   `You followed them into the freezing fog off the ice shelf, where the sea itself tries to kill you and the enemy is only the second most dangerous thing in the water. You came through frostbitten and victorious. Beyond the ice lies the Dominion's own coastline. The invasion is nearly at its door.`,
+    /* 19 The Reckoning */    `No fog, no ice, no trick — just two fleets in open water settling it the old way. The Reckoning. When the smoke cleared, the Free Isles' colours still flew. Varga has spent his professional navy. What is left, they whisper, is worse: the ships that no longer answer the radio.`,
+    /* 20 Ghost Fleet */      `Outnumbered, alone and hunted, you fought the hulls the Dominion had already written off as lost — the Ghost Fleet, crewed by men with nothing left to lose. It was the hardest fight of the war. You are still afloat; they are not. Ahead, the sky turns the colour of ash.`,
+    /* 21 Volcano Bay */      `Under a sky raining ash, in a bay lit red from below, you burned the last of the Dominion's home squadrons. The volcano's glow throws the next objective into silhouette — Varga's fortress island, the Last Bastion, its walls thick with every gun he has left.`,
+    /* 22 Last Bastion */     `You put your marines ashore beneath the fortress guns and took the Last Bastion wall by wall, room by room. Varga's flag comes down off the citadel. But the man himself is gone — slipped out to sea in the dark aboard something new. "This is not a surrender," his final transmission says. "It is a beginning. The long night is coming, Admiral."`,
+    /* 23 The Long Night */   `He was not speaking in metaphor. The Dominion had one card left — smoke and ash enough to blot out the sun and fight the war it always wanted, in endless darkness. You fought through the first night that never ends and proved you do not need the daylight either. But the long night stretches on past the horizon.`,
+    /* 24 Hurricane Alley */  `The endless smoke breeds endless storms, and Varga runs for the worst of them — Hurricane Alley, one wall of weather after another. You chased him storm to storm, taking losses to the sea you could not afford, and never once let him break contact. He is cornered now. And cornered men build monsters.`,
+    /* 25 Twin Leviathans */  `Not one dreadnought this time. Two. The Twin Leviathans came out of the storm side by side, and for a long while it looked like the end of you. It was the end of them. Both hulls, gone. The Dominion has nothing larger left to build — nothing, Kessler warns, except everything it has, all at once.`,
+    /* 26 The Crucible */     `Fog and fleets and flagships, flung at you together in one grinding engagement without end — the Crucible, meant to melt your navy down to nothing. You held. Barely, but you held. On the far side, the last Dominion fleets pull back for one final concentration. The war is almost over. So is your ammunition.`,
+    /* 27 Steel Rain */       `Twelve hulls, and a sky so thick with shells the crews called it steel rain. You sailed into it and out the other side. The Dominion navy, as a fighting force, no longer exists — only fragments now, running for the edge of the map and the open ocean beyond it.`,
+    /* 28 Endless Horizon */  `You chased the last runners to the very edge of the charts, across water no Free Isles hull had ever sailed — the Endless Horizon. You caught them there and finished it. There is nothing ahead now but Varga himself, gathering every ship that still floats for a final blockade of his own retreat.`,
+    /* 29 Final Blockade */   `The whole surviving Dominion navy, chained together into one last wall between you and Varga's flagship. You broke it. The blockade is scrap, the path is open, and one battle remains in this entire war. Varga knows it too. "Come to Ragnarök Reef, Admiral," he signals. "Let us end the tide where it began."`,
+    /* 30 Ragnarök Reef */    `Night, storm, and the Dominion's very last Leviathan — on the reef where the first shots of this hundred-year war were fired. You met Grand Marshal Varga hull to hull and put his flagship on the bottom beside all the others. The Dominion is broken. But a single lifeboat slips away into the dark, and the sea is very wide.`,
+    /* 31 The Last Tide */    `This is where it ends — the last holdouts, the last guns, the last tide of a war a century long. When the water finally goes quiet, the flag flying over every island from Southhaven to the Endless Horizon is yours. Kessler finds you on the bridge, watching a sea that isn't burning for the first time in living memory. "They named it the Iron Tide because it only ever brought steel and drowning men," she says. "You gave it back something else." Behind you, the sun comes up over free water. The war is over. You won it.`,
+  ]
+};
+function storyOverlay(){
+  let o=document.getElementById('story');
+  if(!o){ o=document.createElement('div'); o.id='story';
+    o.style.cssText='display:none;position:fixed;inset:0;z-index:200;background:rgba(4,10,16,.88);align-items:center;justify-content:center;padding:22px;';
+    o.innerHTML='<div id="storyPanel" style="max-width:690px;width:100%;max-height:86vh;overflow:auto;background:linear-gradient(180deg,#0e1a24,#0a121a);border:1px solid #26425c;border-radius:14px;box-shadow:0 24px 90px rgba(0,0,0,.65);padding:26px 30px 24px;">'+
+      '<div id="storyTitle" style="color:#ffd060;letter-spacing:3px;font-size:14px;text-align:center;margin-bottom:16px"></div>'+
+      '<div id="storyBody" style="color:#cfe0ee;font-size:14px;line-height:1.75"></div>'+
+      '<div style="text-align:center;margin-top:22px"><button id="storyBtn" style="cursor:pointer;background:#13283a;color:#cfe6fb;border:1px solid #3579a8;border-radius:8px;padding:9px 26px;font-size:13px;letter-spacing:2px">CONTINUE</button></div>'+
+    '</div>';
+    document.body.appendChild(o);
+  }
+  return o;
+}
+function showStory(title, bodyHTML, btnLabel, onClose){
+  const o=storyOverlay();
+  o.querySelector('#storyTitle').innerHTML=title;
+  o.querySelector('#storyBody').innerHTML=bodyHTML;
+  const b=o.querySelector('#storyBtn'); b.textContent=btnLabel||'CONTINUE';
+  b.onclick=()=>{ o.style.display='none'; if(onClose) onClose(); };
+  o.style.display='flex'; o.querySelector('#storyPanel').scrollTop=0;
+}
+function showWarLog(){
+  const beaten=career.completed?CAMPAIGN.length:Math.max(0,mapsUnlocked()-1);
+  let html='<div style="font-style:italic;color:#9fc6e8;margin-bottom:8px">'+LORE.intro+'</div>';
+  if(beaten<=0){ html+='<div style="color:#7e93a8;text-align:center;margin-top:14px">— Your chronicle is unwritten. Win a theater to begin. —</div>'; }
+  for(let i=0;i<beaten;i++){ html+='<div style="margin-top:18px;padding-top:14px;border-top:1px solid #1c3145"><div style="color:#ffd060;font-size:12px;letter-spacing:2px;margin-bottom:6px">'+(i+1)+'. '+CAMPAIGN[i].name.toUpperCase()+'</div><div>'+LORE.beats[i]+'</div></div>'; }
+  if(career.completed) html+='<div style="text-align:center;color:#8ff0b4;margin-top:20px;letter-spacing:3px">— THE END —</div>';
+  showStory('⚓ WAR LOG', html, 'CLOSE');
+}
 function buildMenu(){
   // career banner — rank, perks and lifetime record under the subtitle
   const sub=document.querySelector('#menu .sub');
@@ -2531,6 +2730,11 @@ function buildMenu(){
       ` &nbsp;·&nbsp; ${career.sunk} ships · ${career.planes} aircraft · ${career.islands} islands · ${career.wins}W/${career.losses}L`+
       (nx?` &nbsp;·&nbsp; <span style="color:#5f7a90">${careerScore()}/${nx.score} to ${nx.name}</span>`:'');
     sub.after(d);
+    const log=document.createElement('div');
+    log.style.cssText='text-align:center;margin:-6px 0 14px;';
+    log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">📖 WAR LOG</span>';
+    d.after(log);
+    log.querySelector('#warlogBtn').onclick=showWarLog;
   }
   buildCampaignPicker();
   const wrap=document.getElementById('ships');
@@ -2547,6 +2751,8 @@ function buildMenu(){
     div.onclick=()=>chooseShip(id);
     wrap.appendChild(div);
   });
+  // first-ever launch: run the prologue once
+  if(!career.seenIntro) showStory('⚓ IRON TIDE', LORE.intro, 'BEGIN', ()=>{ career.seenIntro=true; saveCareer(); });
 }
 function installBossStarterGuns(build){
   const half=Math.floor(build.mounts.length/2),slots=[0,1,2,3,4,5,half,half+1,half+2,half+3,half+4,half+5];
@@ -2648,7 +2854,9 @@ function startGame(shipId){
     if(M.boss) spawnBoss(1);
     if(shipId==='boss')friendlyBossUsed=true;else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
     flashPrompt('⚔ '+M.name.toUpperCase()+' — '+M.theme);
+    deployNemesis();                          // named Dominion captain for this theater (if any)
   }
+  _eventT=38+Math.random()*22; _eventCount=0;  // arm the dynamic mid-battle events ticker
   const cv=document.getElementById('c');
   cv.addEventListener('click',()=>{ sfxResume(); if(phase==='play' && !shopOpen && !harborOpen) cv.requestPointerLock(); });
   document.addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv){
@@ -3208,6 +3416,59 @@ function spawnBoss(team){
   (team===0?allies:enemies).push(ship);
   if(team===0)friendlyBossUsed=true;else enemyBossUsed=true;
   return ship;
+}
+// =====================================================================
+//  NEMESIS — named Dominion captains tied to campaign theaters. Some ride
+//  their own flagship (hull); the boss-theater ones are pinned to the Leviathan.
+// =====================================================================
+const NEMESIS = {
+  2:  {name:'Cmdr. Skarr',        title:'the Coastal Wolf',            hull:'destroyer',  hpMul:1.6, guns:[1,0,3,4],     standoff:120, bounty:1200, taunt:'So Southhaven sends a cadet. I will send you home in pieces.',            defeat:'The Wolf... run to ground. Impossible.'},
+  3:  {name:'Capt. Dross',        title:'the Blockade-Breaker',        hull:'cruiser',    hpMul:1.7, guns:[1,1,0,5],     standoff:170, bounty:1500, taunt:'This harbour is mine to starve, Captain. Turn back while you float.',        defeat:'The lanes are... open. Kessler will pay for this.'},
+  4:  {name:'Gunmaster Holt',     title:'the Reefwarden',              hull:'battleship', hpMul:1.8, guns:[1,1,0,0,5],   standoff:210, bounty:1800, taunt:'Every gun on this reef is ranged on you. By all means — come closer.',       defeat:'My batteries... silenced. The reef is lost.'},
+  6:  {name:'Nightcaptain Vex',   title:'the Shadow of the Straits',   hull:'destroyer',  hpMul:1.7, guns:[1,0,3,4,5],   standoff:100, bounty:1600, taunt:'You cannot fight what you cannot see. The dark belongs to me.',              defeat:'Even shadows... burn. Varga, forgive me.'},
+  7:  {name:'Marsh-Capt. Grull',  title:'the Fogwolf',                 hull:'cruiser',    hpMul:1.8, guns:[1,1,4,5],     standoff:150, bounty:1800, taunt:'Into the fog, then. They never find the ones I take.',                       defeat:'The fog... clears. You should not have found me.'},
+  8:  {name:'Capt. Idris Corvo',  title:'master of the Leviathan',     boss:true, hpMul:1.15,                                          bounty:6000, taunt:'You face the LEVIATHAN now, child. Nothing floats that I cannot sink.',       defeat:'The great ship... goes down. But Varga will build more.'},
+  12: {name:'Baron Kessig',       title:'the Ambusher',                hull:'cruiser',    hpMul:1.9, guns:[1,1,0,5,4],   standoff:130, bounty:2200, taunt:'The trap sprang the moment you set your heading. Far too late now.',         defeat:'Outfoxed... by a Free Isles dog. Unthinkable.'},
+  15: {name:'Admiral Torvald',    title:'lord of the Iron Armada',     hull:'battleship', hpMul:2.0, guns:[1,1,1,0,5],   standoff:200, bounty:3000, taunt:'Eleven hulls answer my flag, and you bring... that? Charge, then.',           defeat:'My armada... a reef of scrap. The war turns here.'},
+  19: {name:'The Revenant',       title:'captain of the Ghost Fleet',  hull:'dreadnought',hpMul:2.1, guns:[1,1,0,0,5,4], standoff:160, bounty:3400, taunt:'We answer to no radio and fear no death. We are already lost.',              defeat:'Back... to the deep. Where the lost belong.'},
+  23: {name:'Stormlord Bane',     title:'who rides the hurricane',     hull:'battleship', hpMul:2.1, guns:[1,1,0,5,5],   standoff:190, bounty:3600, taunt:'The storm is my ally, Admiral. It will drown you long before I must.',       defeat:'Even the hurricane... could not save me from you.'},
+  24: {name:'The Vukovic Twins',  title:'admirals of the Twin Leviathans', boss:true, hpMul:1.2,                                       bounty:9000, taunt:'One Leviathan broke you once. Now face two — and the brothers Vukovic.',    defeat:'Brother... they are both gone. It is over.'},
+  28: {name:'Grand Capt. Mordent',title:"Varga's right hand",          hull:'dreadnought',hpMul:2.2, guns:[1,1,1,0,5],   standoff:210, bounty:4200, taunt:'You will not reach the Marshal. I am the last wall — and I do not fall.',     defeat:'Forgive me, Marshal... the wall... is broken.'},
+  29: {name:'Grand Marshal Varga',title:'warlord of the Dominion',     boss:true, hpMul:1.3,                                          bounty:30000,taunt:'So the cadet became an Admiral. Come then — let us end the tide where it began. FIRE!', defeat:'A hundred years... undone by a single hull. The tide... is yours.'},
+  30: {name:'Admiral Rook',       title:'the Last Loyalist',           hull:'dreadnought',hpMul:2.2, guns:[1,1,0,0,5,4], standoff:180, bounty:5000, taunt:'Varga is gone, but the Dominion is not. Over my sinking deck, Admiral.',    defeat:'The last of us... falls. The Iron Tide is free.'},
+};
+function nemesisLabel(text){
+  const c=document.createElement('canvas'); c.width=512; c.height=128; const g=c.getContext('2d');
+  g.font='bold 46px system-ui,Arial,sans-serif'; g.textAlign='center'; g.textBaseline='middle';
+  g.lineWidth=8; g.strokeStyle='rgba(12,2,2,0.9)'; g.strokeText(text,256,64);
+  g.fillStyle='#ff8a6a'; g.fillText(text,256,64);
+  const tex=new THREE.CanvasTexture(c);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,fog:false}));
+  const w=Math.min(72,text.length*4.2+24); sp.scale.set(w,w*0.25,1); return sp;
+}
+function attachNemesisLabel(s,nem){
+  const lab=nemesisLabel(nem.name); lab.position.set(0,(s.def.deckY||6)+(s.def.boss?30:15),0);
+  s.build.group.add(lab); s.nameplate=lab;
+}
+function spawnNemesis(nem){
+  const def={...SHIPS[nem.hull||'cruiser']}, build=buildAIShipModel(def,1);
+  const z=(enemyHarbor?enemyHarbor.pos.z:0)+120+Math.random()*120;
+  const pos=new THREE.Vector3((Math.random()-0.5)*360,0,z); keepOffIslands(pos,def.beam/2+10);
+  const hp=Math.round(def.hp*(nem.hpMul||1.5));
+  const e={ build, hp, maxhp:hp, def, pos, team:1, heading:0, fireT:1+Math.random()*2, sinkT:0, turnT:0,
+    standoff:(nem.standoff||150)+(Math.random()-0.5)*30, orbitDir:Math.random()<0.5?1:-1,
+    loadout:(nem.guns||[1,0,5,4]).map(i=>AI_WEAPS[i]), upgT:1e9, planeT:14+Math.random()*10, nemesis:nem };
+  attachNemesisLabel(e,nem); enemies.push(e); return e;
+}
+// Spawn / pin the current theater's nemesis, then radio the taunt a beat later.
+function deployNemesis(){
+  if(currentSandboxIdx>=0) return;
+  const nem=NEMESIS[currentMapIdx]; if(!nem) return;
+  if(nem.boss){ const b=enemies.find(e=>e.def.boss&&e.sinkT===0); if(!b) return;
+    b.hp=b.maxhp=Math.round(b.maxhp*(nem.hpMul||1)); b.nemesis=nem; attachNemesisLabel(b,nem); }
+  else spawnNemesis(nem);
+  setTimeout(()=>{ if(phase!=='play')return; if(typeof comms==='function') comms(nem.name.toUpperCase(),nem.taunt,'#ff8a6a');
+    flashPrompt('☠ NEMESIS — '+nem.name+', '+nem.title); if(typeof sfxAlarm==='function') sfxAlarm(); }, 2600);
 }
 function nearestEnemyShipTo(pos){ let b=null,bd=1e9; enemies.forEach(e=>{ if(e.sinkT>0)return; const d=e.pos.distanceTo(pos); if(d<bd){bd=d;b=e;} }); return b; }
 function nearestBlue(pos){ // for enemy *navigation*: nearest of player + allies (a dived sub is invisible)
@@ -4333,7 +4594,10 @@ function damageTarget(t,dmg,owner,hitPos){
   if(t===player){ player.hp-=dmg; damageCompartment(player,dmg,hitPos); applyCrit(player,dmg); if(player.hp<=0){ player.hp=0; playerSunk(); } updateHUD(); return; }
   t.hp-=dmg; damageCompartment(t,dmg,hitPos); applyCrit(t,dmg); if(t.hp<=0 && t.sinkT===0){ t.hp=0; t.sinkT=0.001; spawnSalvage(t.pos.clone());
     const bounty=t.def.boss?30000:t.def.hp>400?700:t.def.hp>250?500:350;
-    sunk++;warRecord('sunk');money+=bounty;if(t.def.boss){warRecord('bosses');flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');}updateHUD();refreshShop(); }
+    sunk++;warRecord('sunk');money+=bounty;if(t.def.boss){warRecord('bosses');flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');}
+    if(t.nemesis){ const n=t.nemesis; if(!t.def.boss){ money+=n.bounty||1500; flashPrompt('☠ '+n.name.toUpperCase()+' DEFEATED — $'+(n.bounty||1500)+' BOUNTY'); }
+      else flashPrompt('☠ '+n.name.toUpperCase()+' DEFEATED'); if(typeof comms==='function') comms(n.name.toUpperCase(),n.defeat,'#ffd060'); }
+    updateHUD();refreshShop(); }
 }
 function strategicBlastFx(pos,rad){
   boom(pos,Math.min(30,3+rad*.15));
@@ -4734,7 +4998,24 @@ function keepOffIslands(pos,margin){ // push a ship out of any island / harbor f
   obs.forEach(o=>{ const q=islandLocal(pos,o),rx=(o.rx||o.r)+margin,rz=(o.rz||o.r)+margin,n=Math.hypot(q.x/rx,q.z/rz);
     if(n<1){ const x=n>0.001?q.x/n:rx,z=n>0.001?q.z/n:0,p=islandWorld(o,x,z); pos.x=p.x; pos.z=p.z; } });
 }
-function hitSpark(pos){ const s=new THREE.Mesh(new THREE.SphereGeometry(0.4,8,8), new THREE.MeshBasicMaterial({color:0xffe070,transparent:true,opacity:0.9})); s.position.copy(pos); scene.add(s); fx.push({mesh:s,life:0.18,fade:true,grow:true}); }
+function hitSpark(pos){
+  const s=new THREE.Mesh(new THREE.SphereGeometry(0.42,8,8), new THREE.MeshBasicMaterial({color:0xfff0a0,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false}));
+  s.position.copy(pos); scene.add(s); fx.push({mesh:s,life:0.16,max:0.16,op:.95,fade:true,grow:true,growRate:10});
+  if(fx.length>MAX_FX-18)return;
+  const n=3+Math.floor(Math.random()*3);
+  for(let i=0;i<n;i++){
+    const e=_spr(emberTex(),true); e.scale.setScalar(.32+Math.random()*.28); e.position.copy(pos); scene.add(e);
+    fx.push({mesh:e,life:.28+Math.random()*.18,max:.46,op:.95,fade:true,grav:true,
+      vel:new THREE.Vector3((Math.random()-.5)*10,3+Math.random()*7,(Math.random()-.5)*10),
+      c0:new THREE.Color(0xffffc8),c1:new THREE.Color(0xff5a20)});
+  }
+  if(Math.random()<.45){
+    const chip=mkBox(.18,.14,.28,new THREE.MeshBasicMaterial({color:0x34383c,transparent:true,opacity:.8}));
+    chip.position.copy(pos);scene.add(chip);
+    fx.push({mesh:chip,life:.45,max:.45,op:.8,fade:true,grav:true,spin:8,
+      vel:new THREE.Vector3((Math.random()-.5)*7,3+Math.random()*5,(Math.random()-.5)*7)});
+  }
+}
 
 // ---------- auto-gunner: crew operate unmanned turrets ----------
 function autoGun(pl,dt){
@@ -5408,6 +5689,13 @@ function endGame(win,msg){
     `<br>Ships sunk ${career.sunk} · Aircraft ${career.planes} · Islands ${career.islands} · Leviathans ${career.bosses} · Wars ${career.wins}W/${career.losses}L` +
     (nx?`<br><span style="color:#6b7d92">Next rank: ${nx.name} at ${nx.score} points (you have ${careerScore()})</span>`:'<br><span style="color:#ffd060">Highest rank achieved.</span>')+
     unlockMsg;
+  // campaign win: append this theater's chronicle beat to the victory screen
+  if(win && currentSandboxIdx<0 && LORE.beats[currentMapIdx]){
+    document.getElementById('overText').innerHTML +=
+      `<br><br><span style="display:block;max-width:620px;margin:8px auto 0;padding-top:14px;border-top:1px solid #21384e;text-align:left;color:#cfe0ee;font-size:13px;line-height:1.7;font-style:italic">`+
+      `<span style="display:block;color:#ffd060;font-style:normal;letter-spacing:2px;font-size:12px;margin-bottom:7px;text-align:center">⚓ CHRONICLE — ${CAMPAIGN[currentMapIdx].name.toUpperCase()}</span>`+
+      `${LORE.beats[currentMapIdx]}</span>`;
+  }
 }
 
 // =====================================================================
