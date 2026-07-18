@@ -907,7 +907,7 @@ function updateLightning(dt){
 // =====================================================================
 //  SOUND — fully synthesized via WebAudio (no asset files)
 // =====================================================================
-const SFX={ctx:null,master:null,on:true,voices:0,lastGun:0,osc:null,gain:null};
+const SFX={ctx:null,master:null,on:true,voices:0,lastGun:0,osc:null,gain:null,rainLevel:0,rainTarget:0,rainPhase:0};
 function sfxInit(){
   if(SFX.ctx) return;
   try{ SFX.ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
@@ -1144,7 +1144,15 @@ function sfxFire(weapon,pos){
     const s=_noise(dur), f=ctx.createBiquadFilter(), g=ctx.createGain();
     f.type=kind==='bomb'?'lowpass':'bandpass'; f.frequency.setValueAtTime(kind==='torpedo'?210:kind==='bomb'?680:420,t0); f.frequency.exponentialRampToValueAtTime(kind==='torpedo'?620:kind==='bomb'?140:1500+Math.min(500,damage*6),t0+dur*.9);
     g.gain.setValueAtTime(g0,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
-    s.connect(f); f.connect(g); g.connect(SFX.master); s.start(); s.stop(t0+dur); return;
+    s.connect(f); f.connect(g); g.connect(SFX.master); s.start(); s.stop(t0+dur);
+    if(kind==='missile'){ // ignition bite + rising booster, so missiles stop sounding like generic wind
+      const crack=_noise(.055),cf=ctx.createBiquadFilter(),cg=ctx.createGain();cf.type='highpass';cf.frequency.value=1700;
+      cg.gain.setValueAtTime(g0*.95,t0);cg.gain.exponentialRampToValueAtTime(.001,t0+.05);crack.connect(cf);cf.connect(cg);cg.connect(SFX.master);crack.start(t0);crack.stop(t0+.06);
+      const o=ctx.createOscillator(),og=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(90,t0+.02);o.frequency.exponentialRampToValueAtTime(310,t0+.22);
+      og.gain.setValueAtTime(.0001,t0+.02);og.gain.exponentialRampToValueAtTime(g0*.28,t0+.055);og.gain.exponentialRampToValueAtTime(.001,t0+.24);
+      o.connect(og);og.connect(SFX.master);o.start(t0+.02);o.stop(t0+.25);
+    }
+    return;
   }
   // gunfire = 10% SNAP · 80% BLAST · 10% RECOIL
   const aa=tone.role==='aa', mg=tone.role==='mg', auto=tone.role==='autocannon';
@@ -1205,13 +1213,37 @@ function sfxSplash(pos){
   g.gain.setValueAtTime(g0,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+dur);
   s.connect(f); f.connect(g); g.connect(SFX.master); s.start(); s.stop(t0+dur);
 }
-function sfxAlarm(){ if(!SFX.on||!SFX.ctx||!_voice(0.34)) return; const ctx=SFX.ctx, t0=ctx.currentTime;
-  const o=ctx.createOscillator(); o.type='square'; o.frequency.value=560; const g=ctx.createGain();
-  g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(0.1,t0+0.03); g.gain.linearRampToValueAtTime(0,t0+0.3);
-  o.connect(g); g.connect(SFX.master); o.start(); o.stop(t0+0.32); }
+function sfxSonar(pos){
+  if(!SFX.on||!SFX.ctx||!_voice(1.1))return;const ctx=SFX.ctx,t0=ctx.currentTime,g0=_dg(pos,1200)*0.42;if(g0<=.015)return;
+  for(let i=0;i<3;i++){
+    const t=t0+i*.34,o=ctx.createOscillator(),f=ctx.createBiquadFilter(),g=ctx.createGain();
+    o.type='sine';o.frequency.setValueAtTime(i?620:520,t);o.frequency.exponentialRampToValueAtTime(i?430:360,t+.28);
+    f.type='bandpass';f.frequency.value=i?610:500;f.Q.value=9;
+    g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(g0*(i?0.18:0.34),t+.018);g.gain.exponentialRampToValueAtTime(.001,t+.42);
+    o.connect(f);f.connect(g);g.connect(SFX.master);o.start(t);o.stop(t+.46);
+  }
+  const hull=_noise(.7),hf=ctx.createBiquadFilter(),hg=ctx.createGain();
+  hf.type='lowpass';hf.frequency.setValueAtTime(180,t0);hf.frequency.exponentialRampToValueAtTime(55,t0+.65);
+  hg.gain.setValueAtTime(g0*.08,t0+.05);hg.gain.exponentialRampToValueAtTime(.001,t0+.7);
+  hull.connect(hf);hf.connect(hg);hg.connect(SFX.master);hull.start(t0);hull.stop(t0+.72);
+}
+function sfxAlarm(){ // police-siren style alert: urgent two-tone sweep for warnings/reinforcements
+  if(!SFX.on||!SFX.ctx||!_voice(1.45)) return; const ctx=SFX.ctx, t0=ctx.currentTime, dur=1.25;
+  const main=ctx.createOscillator(),alt=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
+  main.type='sawtooth';alt.type='triangle';f.type='bandpass';f.frequency.value=980;f.Q.value=2.2;
+  g.gain.setValueAtTime(.0001,t0);g.gain.linearRampToValueAtTime(.13,t0+.04);g.gain.setTargetAtTime(.11,t0+.08,.12);g.gain.exponentialRampToValueAtTime(.001,t0+dur);
+  const steps=[0,.28,.56,.84,1.12];
+  steps.forEach((off,i)=>{const hi=i%2===0;main.frequency.linearRampToValueAtTime(hi?760:430,t0+off+.02);main.frequency.linearRampToValueAtTime(hi?430:760,t0+off+.26);alt.frequency.linearRampToValueAtTime(hi?960:540,t0+off+.02);alt.frequency.linearRampToValueAtTime(hi?540:960,t0+off+.26);});
+  main.connect(f);alt.connect(f);f.connect(g);g.connect(SFX.master);main.start(t0);alt.start(t0);main.stop(t0+dur);alt.stop(t0+dur);
+  const pulse=_noise(dur),pf=ctx.createBiquadFilter(),pg=ctx.createGain();
+  pf.type='bandpass';pf.frequency.value=1350;pf.Q.value=.9;pg.gain.setValueAtTime(.035,t0);pg.gain.exponentialRampToValueAtTime(.001,t0+dur);
+  pulse.connect(pf);pf.connect(pg);pg.connect(SFX.master);pulse.start(t0);pulse.stop(t0+dur);
+}
 function sfxClick(){ if(!SFX.on||!SFX.ctx||!_voice(0.08)) return; const ctx=SFX.ctx, t0=ctx.currentTime;
-  const o=ctx.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(880,t0); o.frequency.exponentialRampToValueAtTime(440,t0+0.06);
-  const g=ctx.createGain(); g.gain.setValueAtTime(0.08,t0); g.gain.exponentialRampToValueAtTime(0.001,t0+0.07); o.connect(g); g.connect(SFX.master); o.start(); o.stop(t0+0.08); }
+  const tick=_noise(.035),tf=ctx.createBiquadFilter(),tg=ctx.createGain();tf.type='bandpass';tf.frequency.value=1850;tf.Q.value=5;
+  tg.gain.setValueAtTime(.09,t0);tg.gain.exponentialRampToValueAtTime(.001,t0+.032);tick.connect(tf);tf.connect(tg);tg.connect(SFX.master);tick.start(t0);tick.stop(t0+.04);
+  const o=ctx.createOscillator(),g=ctx.createGain(); o.type='square'; o.frequency.setValueAtTime(210,t0+.012); o.frequency.exponentialRampToValueAtTime(85,t0+.075);
+  g.gain.setValueAtTime(.0001,t0+.012);g.gain.linearRampToValueAtTime(.045,t0+.02);g.gain.exponentialRampToValueAtTime(.001,t0+.08); o.connect(g); g.connect(SFX.master); o.start(t0+.012); o.stop(t0+.085); }
 function sfxEngine(){   // called each frame — picks the right continuous layer for what you're driving/flying
   if(!SFX.ctx||!SFX.gain) return;
   let rumble=0,rf=50, wind=0,wf=900, whine=0,whf=400, rotorNoise=0,rlf=11;
@@ -1244,9 +1276,12 @@ function sfxEngine(){   // called each frame — picks the right continuous laye
   const storm=(phase==='play'&&typeof weather==='object'&&weather.type==='storm')?1:0;
   if(SFX.rainGain){
     const sea=(typeof weather==='object'&&weather.sea)?weather.sea:1;
-    _ramp(SFX.rainGain.gain, storm*(0.03+Math.min(.025,sea*.007)));
-    _ramp(SFX.rainLowGain.gain, storm*(0.008+Math.min(.018,sea*.004)));
-    _ramp(SFX.rainFilt.frequency, storm?5200+Math.random()*900:2600);
+    const target=storm?1:0, rate=storm?0.018:0.032;SFX.rainLevel+=(target-SFX.rainLevel)*rate;SFX.rainPhase+=0.016;
+    const breathe=storm?(0.78+0.22*Math.sin(SFX.rainPhase*0.65)):1; // soft → loud → soft, never instant full rain
+    const lvl=Math.max(0,Math.min(1,SFX.rainLevel))*breathe;
+    _ramp(SFX.rainGain.gain, lvl*(0.03+Math.min(.025,sea*.007)));
+    _ramp(SFX.rainLowGain.gain, lvl*(0.008+Math.min(.018,sea*.004)));
+    _ramp(SFX.rainFilt.frequency, lvl?4200+lvl*1500+Math.random()*500:2600);
   }
 }
 
@@ -4470,6 +4505,7 @@ function sonarPing(){
   const ring=new THREE.Mesh(new THREE.RingGeometry(8,10,48),new THREE.MeshBasicMaterial({color:0x62d7ff,transparent:true,opacity:0.8,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2;ring.position.copy(p).setY(1);scene.add(ring);
   fx.push({mesh:ring,life:1.4,max:1.4,op:0.8,fade:true,grow:true,growRate:3.4});
+  sfxSonar(p);
   flashPrompt('◉ SONAR PING — contacts revealed for 4 seconds');
 }
 function updateFogOfWar(dt){
