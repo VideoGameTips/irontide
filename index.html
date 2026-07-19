@@ -5936,14 +5936,15 @@ function update(dt,t){
   enemies.forEach(e=>updateEnemy(e,dt));
   for(let i=enemies.length-1;i>=0;i--){ if(enemies[i].dead){ destroyShipVisual(enemies[i]); enemies.splice(i,1); } }
   const enemyReinforceRate=(0.18/2.25)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1); // scaled by the theater's intensity
-  if(!(window._MAP&&window._MAP.ground) && Math.random()<dt*enemyReinforceRate) spawnEnemy();
+  const enemyFleetCap=Math.round(18*((window._MAP&&window._MAP.reinforce!=null)?Math.min(2,window._MAP.reinforce):1));   // hard ceiling — long battles no longer snowball into unbounded fleets
+  if(!(window._MAP&&window._MAP.ground) && enemies.length<enemyFleetCap && Math.random()<dt*enemyReinforceRate) spawnEnemy();
   updateWarPacing(dt);   // escalating enemy offensives + rotating bonus objectives + parked-plane rearm
   // --- friendly fleet — identical NPC reinforcement and destruction rules ---
   allies.forEach(a=>updateAlly(a,dt));
   shipCollisions(dt);   // hulls repel, rams detonate
   for(let i=allies.length-1;i>=0;i--){ if(allies[i].dead){ destroyShipVisual(allies[i]); allies.splice(i,1); } }
   const allyReinforceRate=(0.18/2.25)*(1+hU(0,'fastBuild')*0.6+hU(0,'slots')*0.35);
-  if(!(window._MAP&&window._MAP.ground) && Math.random()<dt*allyReinforceRate) spawnAlly();
+  if(!(window._MAP&&window._MAP.ground) && allies.length<18 && Math.random()<dt*allyReinforceRate) spawnAlly();
   updateIslandControl(dt);
   // --- passive income ('Resource Storage' upgrade) ---
   if(fU('income')>0){ incomeAcc+=fU('income')*5*dt; if(incomeAcc>=1){ const g=Math.floor(incomeAcc); money+=g; incomeAcc-=g; updateHUD(); refreshShop(); } }
