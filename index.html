@@ -3676,7 +3676,7 @@ function makePlayerShip(shipId){
   placed.length=0; planes.length=0; crew.length=0; planeSpots.length=0;
   manning=null; piloting=null; driving=false; onFoot=false; drivingTank=null; mouseDownFire=false; playerShipLost=false; resetFootHealth();
   const build=buildShip(def,false);
-  player={ build, hp:def.hp, maxhp:def.hp, def, submerged:false, air:100, diveY:0 };
+  player={ build, hp:def.hp, maxhp:def.hp, def, shipId, submerged:false, air:100, diveY:0 };
   const spawnZ = friendlyHarbor ? friendlyHarbor.pos.z-240 : 0;
   player.pos=new THREE.Vector3(0,0,spawnZ); player.heading=Math.PI; player.throttle=0; player.speed=0;
   // helm / bridge station
@@ -3749,6 +3749,7 @@ function startGame(shipId){
   musicPlay('ambient');   // subtle background bed for the selected theater
   buildTheater();
   makePlayerShip(shipId);
+  applyShipWear(shipId);        // a ship that limped home battered still shows it next mission, until you win one healthy
   buildShopUI();
   if(M.ground) deployLandCampaignStart();
   else {
@@ -3769,6 +3770,20 @@ function startGame(shipId){
   document.addEventListener('mousedown',e=>{ if(document.pointerLockElement===cv && e.button===0) mouseDownFire=true; });
   document.addEventListener('mouseup',e=>{ if(e.button===0) mouseDownFire=false; });
   updateMode();
+}
+// ===== PERSISTENT BATTLE DAMAGE — a ship that limped home battered still shows the scars next mission =====
+function applyShipWear(shipId){
+  const w=career.shipWear&&career.shipWear[shipId]; if(!w||w<=0.05) return;
+  player.hp=Math.max(player.maxhp*0.6, player.maxhp*(1-w*0.4));   // never worse than 60% starting hull; severe wear dips into visibly-scarred territory
+  checkCripple(player,false);                                      // show the scars immediately (no detach — keep mounts intact)
+  flashPrompt('⚓ '+player.def.name+' returns to service still battle-scarred — '+Math.round(player.hp/player.maxhp*100)+'% hull. Bring her home healthy to repair her reputation.');
+}
+function recordShipWear(){
+  if(!player||!player.shipId||!player.maxhp||playerShipLost||landCampaignMode||player._convertedToAlly) return;
+  career.shipWear=career.shipWear||{};
+  const frac=1-Math.max(0,player.hp)/player.maxhp;
+  career.shipWear[player.shipId] = frac<0.1 ? 0 : frac;   // came home healthy → wipes the scars; else carries forward
+  saveCareer();
 }
 function chooseShip(shipId){
   if(phase==='respawn'&&shipId==='boss'&&friendlyBossUsed){
@@ -7136,6 +7151,7 @@ function updateMode(){
 function endGame(win,msg){
   if(phase==='over')return; phase='over';
   playEndMusic();                                   // the full naval score swells up when the battle ends — victory or defeat
+  if(win) recordShipWear();                          // note how battered the ship ended up, for next mission
   const oldRank=careerRank();
   warRecord(win?'wins':'losses');
   const r=careerRank(), nx=nextRank();
