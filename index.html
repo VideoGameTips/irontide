@@ -3368,6 +3368,28 @@ let walkPos=new THREE.Vector3();
 const EYE=0.85, WALK=9;   // half-height eye level — lower first-person camera
 let mouseDownFire=false;
 let fpv=false;            // V toggles first-person (cockpit) view in tanks & planes
+// ===== PHOTO MODE — a free-fly spectator camera for screenshots (L to toggle) =====
+let photoMode=false, photoPos=new THREE.Vector3();
+function togglePhotoMode(){
+  if(phase!=='play') return;
+  photoMode=!photoMode;
+  if(photoMode){
+    photoPos.copy(camera.position);
+    flashPrompt('📷 Photo mode — WASD fly · Space/Shift up-down · mouse look · L to exit');
+    setTimeout(()=>{ if(photoMode) document.getElementById('hud').style.display='none'; }, 1400);   // let the prompt read first
+  } else { document.getElementById('hud').style.display='block'; updateMode(); }
+}
+function updatePhotoMode(dt){
+  const yaw=camYaw.v, pitch=camPitch.v;
+  const f=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch));
+  const r=new THREE.Vector3(f.z,0,-f.x).normalize();
+  const mv=new THREE.Vector3();
+  if(keys['KeyW'])mv.add(f); if(keys['KeyS'])mv.sub(f);
+  if(keys['KeyD'])mv.add(r); if(keys['KeyA'])mv.sub(r);
+  if(keys['Space'])mv.y+=1; if(keys['ShiftLeft']||keys['ShiftRight'])mv.y-=1;
+  if(mv.lengthSq()>0) mv.normalize();
+  photoPos.addScaledVector(mv, 26*dt);
+}
 let backslashMoneyPresses=[];
 function backslashMoneyCode(){
   if(phase!=='play')return;
@@ -3438,6 +3460,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyQ') cycleGun();                        // Q cycles your owned small arms while ashore
   if(e.code==='KeyX') deleteTurret();                    // X scraps the deck gun you're standing next to
   if(e.code==='KeyI'&&!e.repeat) cycleGfxQuality();       // I cycles bloom/AO quality (a perf safety valve)
+  if(e.code==='KeyL'&&!e.repeat) togglePhotoMode();       // L toggles a free-fly spectator camera for screenshots
   if(e.code==='KeyK'&&!e.repeat) toggleSettings();
   if(e.code==='KeyO'&&!e.repeat) fleetOrderCmd();         // O cycles a fleet order (attack / capture / regroup)
   if(e.code==='KeyT'){ fpv=!fpv;   // T toggles first-person / cockpit view (V is taken by mines)
@@ -5914,6 +5937,8 @@ function update(dt,t){
   updateLightning(dt);
   updateGraphics(dt,t);
   // --- controls ---
+  if(photoMode){ updatePhotoMode(dt); }
+  else {
   if(driving){ updateDrive(dt); }
   if(piloting){ updatePilot(dt); }
   else if(drivingTank){ updateTank(dt); }
@@ -5921,13 +5946,17 @@ function update(dt,t){
   else if(onFoot){ updateFoot(dt); }
   else if(!driving){ updateWalk(dt); }
   updatePlayerTankAI(dt);
+  }
   // Once the captain parachutes, the former player hull belongs to an ally.  Do
   // not run player-only transforms/auto-turrets against that same model again.
   // View/viewmodel updates must ALWAYS run (even after bailing out, when the hull became an ally) —
   // they own the first-person handheld gun, the cockpit overlay, and the tank interior.
+  // (skipped in photo mode — a free spectator cam shouldn't carry a handheld gun or cockpit frame)
+  if(!photoMode){
   updateViewGun(dt);
   updateCockpitView();
   updateTankInteriorView();
+  } else if(viewGun) viewGun.visible=false;
   if(!player._convertedToAlly){
   if(player.def.kind==='sub') updateSub(dt);
   player.vel=new THREE.Vector3(Math.sin(player.heading)*(player.speed||0),0,Math.cos(player.heading)*(player.speed||0));
@@ -6914,6 +6943,12 @@ function damageHarbor(h,dmg){
 //  CAMERA / HUD
 // =====================================================================
 function updateCamera(){
+  if(photoMode){
+    const yaw=camYaw.v, pitch=camPitch.v;
+    const dir=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch));
+    camera.position.copy(photoPos); camera.lookAt(photoPos.clone().add(dir));
+    return;
+  }
   if(drivingTank){
     const tk=drivingTank, yaw=camYaw.v, pitch=Math.max(-0.4,Math.min(0.6,camPitch.v));
     const wp = tk.onDeck ? tk.group.getWorldPosition(new THREE.Vector3()) : tk.pos.clone();
