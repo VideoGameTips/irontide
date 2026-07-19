@@ -3610,6 +3610,23 @@ function showStory(title, bodyHTML, btnLabel, onClose){
   b.onclick=()=>{ o.style.display='none'; if(onClose) onClose(); };
   o.style.display='flex'; o.querySelector('#storyPanel').scrollTop=0;
 }
+// ===== SHIP ALMANAC — browse every hull's stats and story, incl. the legendary flagships =====
+function buildAlmanac(){
+  const keys=Object.keys(SHIPS);
+  const legendary=keys.filter(k=>/Legendary/.test(SHIPS[k].cls));
+  const standard=keys.filter(k=>!/Legendary/.test(SHIPS[k].cls));
+  const card=k=>{ const s=SHIPS[k];
+    return '<div style="margin-top:14px;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid #1c3145;border-radius:8px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">'+
+        '<span style="color:#ffd060;font-size:13px;letter-spacing:1px">'+s.name+'</span>'+
+        '<span style="color:#5f7a90;font-size:11px">'+s.cls+'</span></div>'+
+      '<div style="margin-top:4px;color:#7e93a8;font-size:11px">Length '+s.len+'m · Hull '+s.hp+' HP · '+Math.round(s.mounts*1.5)+' mounts · '+(s.kind==='carrier'?'Flat-top':s.kind==='sub'?'Submersible':'Surface')+'</div>'+
+      '<div style="margin-top:6px;font-size:13px;line-height:1.6;color:#cfe0ee">'+(s.desc||'')+'</div></div>'; };
+  let html='<div style="color:#9fc6e8;font-size:12px;text-align:center;margin-bottom:4px">'+keys.length+' hulls in commission — browse the fleet</div>';
+  if(legendary.length){ html+='<div style="margin-top:16px;text-align:center;color:#ff9a6a;letter-spacing:2px;font-size:11px">⚓ LEGENDARY FLAGSHIPS</div>'+legendary.map(card).join(''); }
+  html+='<div style="margin-top:'+(legendary.length?20:14)+'px;text-align:center;color:#8fb8d8;letter-spacing:2px;font-size:11px">STANDARD FLEET</div>'+standard.map(card).join('');
+  showStory('📖 SHIP ALMANAC', html, 'CLOSE');
+}
 function showWarLog(){
   const beaten=career.completed?CAMPAIGN.length:Math.max(0,mapsUnlocked()-1);
   let html='<div style="font-style:italic;color:#9fc6e8;margin-bottom:8px">'+LORE.intro+'</div>';
@@ -3632,9 +3649,11 @@ function buildMenu(){
     sub.after(d);
     const log=document.createElement('div');
     log.style.cssText='text-align:center;margin:-6px 0 14px;';
-    log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">📖 WAR LOG</span>';
+    log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">📖 WAR LOG</span>'+
+      ' <span id="almanacBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px;margin-left:8px">⚓ SHIP ALMANAC</span>';
     d.after(log);
     log.querySelector('#warlogBtn').onclick=showWarLog;
+    log.querySelector('#almanacBtn').onclick=buildAlmanac;
   }
   buildCampaignPicker();
   const wrap=document.getElementById('ships');
