@@ -5560,6 +5560,27 @@ function boardableEnemyShip(){
     if(d<reach+14&&d<bd){bd=d;best=e;}});
   return best;
 }
+// ===== CONTESTED BOARDING — capturing a crippled hull is no longer a free instant win: her
+// remaining crew fights back for a few seconds before she strikes her colours. =====
+let boarding=null;
+function startBoarding(e){
+  if(boarding||!e) return;
+  boarding={target:e,t:0,dur:4.5,nextHitT:0.8+Math.random()*0.6};
+  flashPrompt('⚔ BOARDING '+e.def.name.toUpperCase()+' — hold your ground, her crew is fighting back!');
+}
+function updateBoardingAction(dt){
+  const b=boarding; if(!b) return;
+  if(!onFoot||footHP<=0||b.target.sinkT>0||b.target.hp<=0||enemies.indexOf(b.target)<0||
+     footPos.distanceTo(b.target.pos)>(b.target.def.halfLen||b.target.def.len*.5)+20){
+    boarding=null; if(onFoot&&footHP>0) flashPrompt('Boarding broken off.'); return;
+  }
+  b.t+=dt; b.nextHitT-=dt;
+  if(b.nextHitT<=0){ b.nextHitT=0.75+Math.random()*0.85;
+    damageFoot(6+Math.random()*10, true);
+    if(onFoot) flashPrompt('⚔ Her crew fights back! '+Math.ceil(footHP)+'% health — '+Math.max(0,Math.ceil(b.dur-b.t))+'s to secure the deck');
+  }
+  if(onFoot && footHP>0 && b.t>=b.dur){ boarding=null; captureEnemyShip(b.target); }
+}
 function captureEnemyShip(e){
   if(!e)return false;
   // Replace the red contact marker without rebuilding the hull: the seized ship is
@@ -5580,7 +5601,7 @@ function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot 
 function toggleMan(){
   if(phase!=='play'||shopOpen||harborOpen) return;
   if(drivingTank){ dismountTank(); return; }
-  if(onFoot){ const prize=boardableEnemyShip();if(prize){captureEnemyShip(prize);return;} const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
+  if(onFoot){ const prize=boardableEnemyShip();if(prize){startBoarding(prize);return;} const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
     flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
   if(piloting){ if(piloting.plane.def.uav){returnFromUAV(false,'UAV recovered');return;} if(playerShipLost&&piloting.phase==='fly'){ flashPrompt('No deck left to land on — press P to parachute, then reach harbor.'); return; }
     if(piloting.phase==='fly') startLanding(); else if(piloting.phase==='landing'){ piloting.phase='fly'; flashPrompt('Landing aborted — climb away.'); updateMode(); } return; }
@@ -6373,6 +6394,7 @@ function update(dt,t){
   updateExtremeWeather(dt,t);
   updateGraphics(dt,t);
   if(MP.active){ mpBroadcastState(); mpTickPeers(dt); }
+  if(boarding) updateBoardingAction(dt);
   // --- controls ---
   if(photoMode){ updatePhotoMode(dt); }
   else {
