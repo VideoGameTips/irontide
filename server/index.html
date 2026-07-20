@@ -130,6 +130,31 @@
   #settingsList{display:flex;flex-direction:column;gap:7px}.setitem{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid #21384e;border-radius:7px;background:#0d1925;color:#d9e8f5;font-size:13px;cursor:pointer}.setitem b{color:#7fd0a0;font-size:11px;letter-spacing:1px}.setitem.off b{color:#ff9b88;}
   .dmgnum{position:fixed;z-index:12;pointer-events:none;font:bold 16px ui-monospace,monospace;color:#ffe08a;text-shadow:0 2px 3px #000;transition:opacity .12s;}
   .dmgnum.crit{font-size:20px;color:#ffb15f;text-shadow:0 0 8px rgba(255,120,30,.55),0 2px 3px #000;}
+  /* ---- Mobile touch controls ---- */
+  #touchControls{position:absolute;inset:0;display:none;pointer-events:none;z-index:13;touch-action:none;user-select:none;-webkit-user-select:none;}
+  body.touch-ready #touchControls{display:block;}
+  .touch-stick,.touch-look{position:absolute;border:1px solid rgba(150,210,245,.35);background:rgba(7,15,24,.22);box-shadow:0 0 18px rgba(0,0,0,.35);pointer-events:auto;touch-action:none;}
+  .touch-stick{left:22px;bottom:82px;width:132px;height:132px;border-radius:50%;}
+  .touch-stick .knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(127,210,255,.35);border:1px solid rgba(210,245,255,.75);box-shadow:0 0 16px rgba(95,208,255,.28);}
+  .touch-look{right:16px;bottom:92px;width:176px;height:176px;border-radius:18px;}
+  .touch-look:after{content:'LOOK';position:absolute;inset:auto 0 8px;text-align:center;font-size:10px;letter-spacing:2px;color:rgba(210,230,245,.45);}
+  #touchButtons{position:absolute;right:18px;bottom:282px;display:grid;grid-template-columns:repeat(3,58px);gap:8px;pointer-events:auto;}
+  .tbtn{height:48px;border-radius:11px;border:1px solid rgba(130,205,245,.48);background:rgba(8,18,28,.68);color:#eaf7ff;font:bold 10px ui-monospace,monospace;letter-spacing:.6px;text-shadow:0 1px 2px #000;box-shadow:0 3px 14px rgba(0,0,0,.34);touch-action:none;}
+  .tbtn.primary{height:58px;background:rgba(110,36,28,.78);border-color:rgba(255,140,110,.72);color:#ffe7dc;}
+  .tbtn.on{background:rgba(40,90,120,.86);border-color:#8bdcff;color:#fff;}
+  #touchUtility{position:absolute;left:18px;top:88px;display:flex;gap:7px;flex-wrap:wrap;width:min(330px,calc(100vw - 36px));pointer-events:auto;}
+  #touchUtility .tbtn{height:36px;min-width:58px;padding:0 8px;border-radius:18px;background:rgba(8,18,28,.55);font-size:9px;}
+  #touchHint{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);padding:5px 9px;border-radius:999px;background:rgba(6,14,22,.55);border:1px solid rgba(120,180,220,.25);font-size:10px;color:rgba(230,245,255,.74);letter-spacing:.7px;white-space:nowrap;}
+  @media (pointer:fine) and (min-width:900px){ body:not(.touch-forced) #touchControls{display:none!important;} }
+  @media (max-width:760px){
+    #minimap{width:132px;height:132px;top:56px;right:12px;}
+    #killfeed{display:none;}#score{font-size:10px;max-width:36vw;text-align:right;}#money{font-size:16px;}
+    #objective{font-size:10px!important;}#objective div:last-child{font-size:9px!important;}
+    #prompt{bottom:52px;max-width:82vw;font-size:12px;text-align:center;}
+    #shiphpwrap{left:18px;bottom:18px;width:185px;}#mode{display:none;}
+    #touchButtons{grid-template-columns:repeat(3,54px);right:12px;bottom:252px}.tbtn{height:44px;font-size:9px}.tbtn.primary{height:54px}
+    .touch-look{width:154px;height:154px;right:10px;bottom:82px}.touch-stick{width:118px;height:118px;left:16px;bottom:74px}
+  }
 </style>
 </head>
 <body>
@@ -164,6 +189,27 @@
     <input id="chatinput" maxlength="180" autocomplete="off" spellcheck="false" placeholder="Message or /command · Enter to send · Esc to close">
   </div>
   <canvas id="minimap" width="172" height="172"></canvas>
+  <div id="touchControls" aria-hidden="true">
+    <div id="touchUtility">
+      <button class="tbtn" data-act="shop">SHOP</button>
+      <button class="tbtn" data-act="harbor">HARBOR</button>
+      <button class="tbtn" data-act="build">BUILD</button>
+      <button class="tbtn" data-act="map">MAP</button>
+      <button class="tbtn" data-act="sonar">SONAR</button>
+      <button class="tbtn" data-act="mine">MINE</button>
+    </div>
+    <div id="touchMove" class="touch-stick"><div class="knob"></div></div>
+    <div id="touchLook" class="touch-look"></div>
+    <div id="touchButtons">
+      <button class="tbtn primary" data-act="fire">FIRE</button>
+      <button class="tbtn" data-act="action">E / USE</button>
+      <button class="tbtn" data-act="special">SPECIAL</button>
+      <button class="tbtn" data-act="view">VIEW</button>
+      <button class="tbtn" data-act="board">BOARD</button>
+      <button class="tbtn" data-act="bail">BAIL</button>
+    </div>
+    <div id="touchHint">left stick moves · right pad aims</div>
+  </div>
 </div>
 
 <div id="tactical">
@@ -729,9 +775,10 @@ function initGraphics(){
   rainGroup=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0xbfdcff,transparent:true,opacity:.48,depthWrite:false}));rainGroup.visible=false;scene.add(rainGroup);
 }
 function updateStormRain(dt){
-  if(!rainGroup||!camera)return;const storm=weather.type==='storm';rainGroup.visible=storm;if(!storm)return;
+  if(!rainGroup||!camera)return;const force=weatherForce(), storm=force>=0.9;rainGroup.visible=storm;if(!storm)return;
+  rainGroup.material.opacity=Math.min(.82,.36+.22*force);
   rainGroup.position.set(camera.position.x,0,camera.position.z);const a=rainAttr.array;
-  for(let i=0;i<rainDrops.length;i++){const d=rainDrops[i];d.y-=dt*(95+Math.random()*45);if(d.y<-8){d.y=78+Math.random()*35;d.x=(Math.random()-.5)*150;d.z=(Math.random()-.5)*150;}const k=i*6;a[k]=d.x;a[k+1]=d.y;a[k+2]=d.z;a[k+3]=d.x-1.5;a[k+4]=d.y-11;a[k+5]=d.z+.5;}rainAttr.needsUpdate=true;
+  for(let i=0;i<rainDrops.length;i++){const d=rainDrops[i];d.y-=dt*(85+force*62+Math.random()*45);if(d.y<-8){d.y=78+Math.random()*35;d.x=(Math.random()-.5)*(135+force*45);d.z=(Math.random()-.5)*(135+force*45);}const k=i*6;a[k]=d.x;a[k+1]=d.y;a[k+2]=d.z;a[k+3]=d.x-1.5-force*1.8;a[k+4]=d.y-11-force*4;a[k+5]=d.z+.5;}rainAttr.needsUpdate=true;
 }
 function spawnWake(x,z,scale,op){
   let w=wakes.find(w=>w.life<=0);
@@ -797,13 +844,13 @@ function updateGraphics(dt,t){
   // sun disc rides its true elevation; dims/vanishes in weather
   const elv=(-0.12+1.05*day)*0.9, az=Math.atan2(120,80);
   sunSprite.position.set(Math.sin(az)*Math.cos(elv)*8200, Math.sin(elv)*8200, Math.cos(az)*Math.cos(elv)*8200);
-  sunSprite.material.opacity=Math.max(0,day*1.2-0.1)*(W==='storm'?0.1:W==='fog'?0.2:W==='overcast'?0.45:1);
+  sunSprite.material.opacity=Math.max(0,day*1.2-0.1)*((W==='storm'||W==='supercell'||W==='tornado'||W==='volcano')?0.1:W==='fog'?0.2:W==='overcast'?0.45:1);
   sunSprite.material.color.setRGB(1,1-dusk*0.28,1-dusk*0.55);
   // stars fade in at night (dimmed by cloud cover)
   starPts.material.opacity=Math.max(0,1-day*1.7)*(W==='clear'?0.9:W==='overcast'?0.25:0.12);
   // clouds drift, tint with the weather
-  const cop=W==='overcast'?0.72:W==='storm'?0.85:W==='fog'?0.2:0.42;
-  const shade=W==='storm'?0.45:W==='overcast'?0.72:1;
+  const cop=W==='overcast'?0.72:(W==='storm'||W==='supercell'||W==='tornado'||W==='volcano')?0.85:W==='fog'?0.2:0.42;
+  const shade=(W==='storm'||W==='supercell'||W==='tornado'||W==='volcano')?0.45:W==='overcast'?0.72:1;
   cloudSprites.forEach(c=>{
     c.position.x+=c.userData.vx*dt;
     if(c.position.x>5200) c.position.x=-5200;
@@ -837,9 +884,17 @@ function updateGraphics(dt,t){
 let weather={ tod:0.32, type:'clear', t:50, sea:1, day:1 };
 const _skyDay=new THREE.Color(0x7f96a8), _skyNight=new THREE.Color(0x07111b), _skyDusk=new THREE.Color(0x9e603a);
 const _gray=new THREE.Color(0x2c333b), _foggy=new THREE.Color(0x747c84);
-const WTYPES={ clear:{dark:0.86,far:9000,sea:1}, overcast:{dark:0.66,far:4700,sea:1.55}, fog:{dark:0.58,far:1250,sea:1.2}, storm:{dark:0.34,far:1450,sea:3.25} };
+const WTYPES={
+  clear:{dark:0.86,far:9000,sea:1},
+  overcast:{dark:0.66,far:4700,sea:1.55},
+  fog:{dark:0.58,far:1250,sea:1.2},
+  storm:{dark:0.34,far:1450,sea:3.25},
+  supercell:{dark:0.23,far:1100,sea:4.45},
+  tornado:{dark:0.3,far:1500,sea:3.9},
+  volcano:{dark:0.38,far:2100,sea:1.75}
+};
 function weatherVis(){ const w=WTYPES[weather.type]||WTYPES.clear; return Math.max(0.4, w.dark) * (0.55+0.45*weather.day); }   // sensor/visibility multiplier
-function weatherForce(){ return weather.type==='storm'?1:weather.type==='overcast'?0.35:weather.type==='fog'?0.18:0; }
+function weatherForce(){ return weather.type==='supercell'?1.55:weather.type==='tornado'?1.75:weather.type==='storm'?1:weather.type==='volcano'?0.65:weather.type==='overcast'?0.35:weather.type==='fog'?0.18:0; }
 function weatherWind(speed=1){
   const k=weatherForce(); if(!k) return new THREE.Vector3();
   const a=0.85+Math.sin((typeof t2==='number'?t2:0)*0.075)*0.45+Math.sin((typeof t2==='number'?t2:0)*0.21)*0.12;
@@ -851,7 +906,7 @@ function updateWeather(dt){
   else { weather.tod=(weather.tod+dt/360)%1;              // full day ≈ 6 minutes
     weather.t-=dt;
     if(weather.t<=0){ weather.t=55+Math.random()*85;
-      const r=Math.random(); weather.type = r<0.5?'clear':r<0.72?'overcast':r<0.88?'fog':'storm';
+      const r=Math.random(); weather.type = r<0.48?'clear':r<0.7?'overcast':r<0.86?'fog':r<0.955?'storm':r<0.972?'volcano':r<0.987?'tornado':'supercell';
       if(phase==='play') flashPrompt('⛅ Weather: '+weather.type.toUpperCase()); } }
   const W=WTYPES[weather.type]||WTYPES.clear;
   weather.sea += (W.sea-weather.sea)*Math.min(1,dt*0.4);  // sea state eases in
@@ -862,7 +917,9 @@ function updateWeather(dt){
   // sky / fog colour
   const sky=_skyNight.clone().lerp(_skyDay, day);
   sky.lerp(_skyDusk, dusk*0.5);
-  if(weather.type==='storm') sky.lerp(_gray,0.55); else if(weather.type==='fog') sky.lerp(_foggy,0.5); else if(weather.type==='overcast') sky.lerp(_gray,0.3);
+  if(weather.type==='supercell'||weather.type==='tornado') sky.lerp(_gray,0.72);
+  else if(weather.type==='volcano') sky.lerp(new THREE.Color(0x2f221c),0.68);
+  else if(weather.type==='storm') sky.lerp(_gray,0.55); else if(weather.type==='fog') sky.lerp(_foggy,0.5); else if(weather.type==='overcast') sky.lerp(_gray,0.3);
   sky.multiplyScalar(0.9);
   scene.background.copy(sky); scene.fog.color.copy(sky);
   scene.fog.far = W.far*(0.45+0.55*day); scene.fog.near = Math.min(800, scene.fog.far*0.25);
@@ -886,9 +943,10 @@ function lightningBolt(pos){
   fx.push({mesh:f,life:0.2,max:0.2,op:1,fade:true,grow:true,growRate:6});
 }
 function updateLightning(dt){
-  if(typeof weather!=='object' || weather.type!=='storm'){ lightningT=8+Math.random()*8; return; }
+  const electric=weather&&['storm','supercell','tornado'].includes(weather.type);
+  if(typeof weather!=='object' || !electric){ lightningT=8+Math.random()*8; return; }
   lightningT-=dt; if(lightningT>0) return;
-  lightningT=4.5+Math.random()*8;                       // storms are now actively dangerous, not background decoration
+  lightningT=weather.type==='supercell'?.9+Math.random()*2.2:weather.type==='tornado'?1.8+Math.random()*3.8:4.5+Math.random()*8;                       // storms are now actively dangerous, not background decoration
   const ships=[...allies,...enemies].filter(s=>s.sinkT===0&&!s.proxy);
   if(player&&player.hp>0&&!playerShipLost&&!landCampaignMode) ships.push(player);
   const target=(ships.length && Math.random()<0.6) ? ships[Math.floor(Math.random()*ships.length)] : null;
@@ -902,6 +960,69 @@ function updateLightning(dt){
     if(target===player){ damageTarget(player,dmg,null,gp); flashPrompt('⚡ LIGHTNING STRIKE — hull jolted!'); }
     else if(target.team===0) damageAlly(target,dmg,gp); else damageTarget(target,dmg,null,gp);
     if(Math.random()<0.4) igniteEntity(target,'ship'); }   // electrical fire
+}
+const extremeWeather={tornado:null,rocks:[],volcanoT:3};
+function spawnTornado(){
+  if(extremeWeather.tornado||!scene)return;
+  const anchor=(player&&player.pos)?player.pos:new THREE.Vector3();
+  const pos=anchor.clone().add(new THREE.Vector3((Math.random()<.5?-1:1)*(520+Math.random()*420),0,(Math.random()-.5)*780));
+  const g=new THREE.Group(), mat=new THREE.MeshBasicMaterial({color:0x7e8790,transparent:true,opacity:.25,depthWrite:false,side:THREE.DoubleSide});
+  for(let i=0;i<7;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(10+i*7,1.2+i*.35,8,28),mat.clone());ring.position.y=5+i*11;ring.scale.set(1+i*.18,1,0.65+i*.07);g.add(ring);}
+  const core=_spr(smokeTex(),false);core.material.opacity=.45;core.material.color.setHex(0x5b6168);core.scale.set(90,150,1);core.position.y=58;g.add(core);
+  g.position.copy(pos);scene.add(g);
+  const dir=anchor.clone().sub(pos).setY(0).normalize(); if(dir.lengthSq()<.1)dir.set(Math.random()-.5,0,Math.random()-.5).normalize();
+  extremeWeather.tornado={group:g,pos,vel:dir.multiplyScalar(12+Math.random()*7),life:42+Math.random()*24,pulse:0};
+  if(phase==='play')flashPrompt('🌪 TORNADO WARNING — keep ships out of the funnel!');
+}
+function clearTornado(){const tw=extremeWeather.tornado;if(tw){destroyObject3D(tw.group);extremeWeather.tornado=null;}}
+function catastrophicWeatherKill(s,pos){
+  if(!s||s.sinkT>0||s.proxy)return;
+  s.hp=0;s.sinkT=0.001;
+  if(s!==player&&s.build&&s.build.group)s.build.group.visible=false;
+  if(s!==player)spawnCatastrophicWreck(s,pos,1.5);
+  else damageTarget(player,999,null,pos);
+}
+function updateTornado(dt,t){
+  if(weather.type!=='tornado'){clearTornado();return;}
+  if(!extremeWeather.tornado)spawnTornado();
+  const tw=extremeWeather.tornado;if(!tw)return;
+  tw.life-=dt;tw.pos.addScaledVector(tw.vel,dt);tw.group.position.copy(tw.pos);
+  tw.group.rotation.y+=dt*2.7;tw.group.children.forEach((c,i)=>{c.rotation.z+=dt*(1+i*.16);c.material.opacity=Math.max(0,.28*(tw.life/8));});
+  const affect=(s,isAlly)=>{ if(!s||s.sinkT>0||s.proxy)return; const pos=s===player?player.pos:s.pos, d=pos.distanceTo(tw.pos), R=160;
+    if(d>R)return; const pull=(1-d/R);
+    if(s!==player&&s.vel){const v=tw.pos.clone().sub(pos).setY(0).normalize().multiplyScalar(18*pull*dt);s.vel.add(v);}
+    if(s.build&&s.build.group&&!s._tornadoSpin)s.build.group.rotation.z+=(s.team===0?-1:1)*dt*pull*.35;
+    if(d<58){ if(s===player)damageTarget(player,(70+Math.random()*50)*dt,null,pos); else catastrophicWeatherKill(s,pos); }
+  };
+  affect(player,false);allies.forEach(s=>affect(s,true));enemies.forEach(s=>affect(s,false));
+  if(tw.life<=0||tw.pos.length()>5200)clearTornado();
+}
+function spawnVolcanicRock(target){
+  if(!scene||extremeWeather.rocks.length>=18)return;
+  const g=new THREE.Group(), rock=new THREE.Mesh(new THREE.DodecahedronGeometry(2.6+Math.random()*2.4,0),PAINT(0x211712));
+  const glow=new THREE.PointLight(0xff6a22,2.4,140);g.add(rock,glow);
+  const anchor=(player&&player.pos)?player.pos:new THREE.Vector3();
+  const start=target.clone().add(new THREE.Vector3((Math.random()-.5)*900,250+Math.random()*180,(Math.random()-.5)*900));
+  g.position.copy(start);scene.add(g);
+  const vel=target.clone().sub(start).multiplyScalar(.45+Math.random()*.16);vel.y-=35+Math.random()*18;
+  extremeWeather.rocks.push({group:g,vel,life:9,target});
+}
+function updateVolcano(dt){
+  if(weather.type==='volcano'){
+    extremeWeather.volcanoT-=dt;
+    if(extremeWeather.volcanoT<=0){extremeWeather.volcanoT=5+Math.random()*5;
+      const anchor=(player&&player.pos)?player.pos:new THREE.Vector3();
+      if(phase==='play')flashPrompt('🌋 VOLCANIC ERUPTION — burning rock incoming!');
+      for(let i=0;i<5+Math.floor(Math.random()*5);i++)spawnVolcanicRock(anchor.clone().add(new THREE.Vector3((Math.random()-.5)*1200,0,(Math.random()-.5)*1200)));
+    }
+  }else extremeWeather.volcanoT=Math.min(extremeWeather.volcanoT,4);
+  for(let i=extremeWeather.rocks.length-1;i>=0;i--){const r=extremeWeather.rocks[i];r.life-=dt;r.vel.y-=dt*24;r.group.position.addScaledVector(r.vel,dt);r.group.rotation.x+=dt*2.2;r.group.rotation.z+=dt*1.6;
+    if(r.life<=0||r.group.position.y<=2){const p=r.group.position.clone().setY(2);boom(p,2.1);blastAll(p,85,46,false,true);burnFx(p,2.1);destroyObject3D(r.group);extremeWeather.rocks.splice(i,1);}
+  }
+}
+function updateExtremeWeather(dt,t){
+  updateTornado(dt,t);updateVolcano(dt);
+  if(weather.type==='supercell'&&phase==='play'){extremeWeather.superMsg=(extremeWeather.superMsg||0)-dt;if(extremeWeather.superMsg<=0){extremeWeather.superMsg=24;flashPrompt('⛈ SUPERCELL — violent lightning and extreme seas!');}}
 }
 
 // =====================================================================
@@ -1231,12 +1352,12 @@ function sfxAlarm(){ // police-siren style alert: urgent two-tone sweep for warn
   if(!SFX.on||!SFX.ctx||!_voice(1.45)) return; const ctx=SFX.ctx, t0=ctx.currentTime, dur=1.25;
   const main=ctx.createOscillator(),alt=ctx.createOscillator(),g=ctx.createGain(),f=ctx.createBiquadFilter();
   main.type='sawtooth';alt.type='triangle';f.type='bandpass';f.frequency.value=980;f.Q.value=2.2;
-  g.gain.setValueAtTime(.0001,t0);g.gain.linearRampToValueAtTime(.13,t0+.04);g.gain.setTargetAtTime(.11,t0+.08,.12);g.gain.exponentialRampToValueAtTime(.001,t0+dur);
+  g.gain.setValueAtTime(.0001,t0);g.gain.linearRampToValueAtTime(.22,t0+.04);g.gain.setTargetAtTime(.18,t0+.08,.12);g.gain.exponentialRampToValueAtTime(.001,t0+dur);
   const steps=[0,.28,.56,.84,1.12];
   steps.forEach((off,i)=>{const hi=i%2===0;main.frequency.linearRampToValueAtTime(hi?760:430,t0+off+.02);main.frequency.linearRampToValueAtTime(hi?430:760,t0+off+.26);alt.frequency.linearRampToValueAtTime(hi?960:540,t0+off+.02);alt.frequency.linearRampToValueAtTime(hi?540:960,t0+off+.26);});
   main.connect(f);alt.connect(f);f.connect(g);g.connect(SFX.master);main.start(t0);alt.start(t0);main.stop(t0+dur);alt.stop(t0+dur);
   const pulse=_noise(dur),pf=ctx.createBiquadFilter(),pg=ctx.createGain();
-  pf.type='bandpass';pf.frequency.value=1350;pf.Q.value=.9;pg.gain.setValueAtTime(.035,t0);pg.gain.exponentialRampToValueAtTime(.001,t0+dur);
+  pf.type='bandpass';pf.frequency.value=1350;pf.Q.value=.9;pg.gain.setValueAtTime(.065,t0);pg.gain.exponentialRampToValueAtTime(.001,t0+dur);
   pulse.connect(pf);pf.connect(pg);pg.connect(SFX.master);pulse.start(t0);pulse.stop(t0+dur);
 }
 function sfxClick(){ if(!SFX.on||!SFX.ctx||!_voice(0.08)) return; const ctx=SFX.ctx, t0=ctx.currentTime;
@@ -2965,6 +3086,40 @@ function showHit(target,kill=false,mode=''){
     line.textContent=kill?'DESTROYED · '+target:(mode==='crit'?'CRITICAL HIT · '+target:mode==='rail'?'RAIL STRIKE · '+target:mode==='aa'?'AIR HIT · '+target:mode==='missile'?'MISSILE HIT · '+target:'HIT · '+target);
     feed.prepend(line);while(feed.children.length>5)feed.lastChild.remove();setTimeout(()=>line.remove(),3600);}}
 }
+function shipBreakupLikely(ship,dmg,hitPos){
+  if(!ship||ship===player||ship.proxy||ship._wreckSpawned||ship._catBreakup)return false;
+  const max=ship.maxhp||ship.def&&ship.def.hp||240, overkill=(ship.hp||0)-dmg;
+  if(dmg>=max*.55)return Math.random()<.65;
+  if(dmg>=max*.35&&overkill<-max*.1)return Math.random()<.45;
+  if(dmg>=180&&overkill<0)return Math.random()<.35;
+  return false;
+}
+function spawnCatastrophicWreck(ship,hitPos,power=1){
+  if(!ship||ship._wreckSpawned)return;ship._wreckSpawned=true;ship._catBreakup=true;
+  while(wrecks.length>=MAX_WRECKS){const old=wrecks.shift();destroyObject3D(old.group);}
+  const g=new THREE.Group(), L=ship.def.len/2,B=ship.def.beam/2,col=ship.team===1?0x4b4f55:0x666e74;
+  const mat=PAINT(col), dark=PAINT(0x1d2022), fire=PAINT(0xff7a28);
+  const parts=12+Math.min(10,Math.floor((ship.def.len||50)/12));
+  for(let i=0;i<parts;i++){
+    const big=i<4, piece=new THREE.Group();
+    const m=mkBox((big?B*.9:.45+Math.random()*1.1),(big?Math.max(1,ship.def.depth*.42):.18+Math.random()*.5),(big?L*.42:.55+Math.random()*1.4),i%5===0?fire:(big?mat:dark));
+    piece.add(m);piece.position.set((Math.random()-.5)*B*2.6,.55+Math.random()*1.8,(Math.random()-.5)*L*1.7);
+    piece.rotation.set(Math.random()*1.2,ship.heading+(Math.random()-.5)*.9,Math.random()*1.2);
+    const away=piece.position.clone().setY(0); if(away.lengthSq()<1)away.set(Math.random()-.5,0,Math.random()-.5);
+    piece.userData.drift=away.normalize().multiplyScalar((.9+Math.random()*2.4)*power);
+    piece.userData.roll=(Math.random()-.5)*(1.1+power*.8);
+    piece.userData.sink=.08+Math.random()*.12;
+    g.add(piece);
+  }
+  const oil=new THREE.Mesh(new THREE.CircleGeometry(Math.max(7,B*.95),24),new THREE.MeshBasicMaterial({color:0x090b0c,transparent:true,opacity:.5,depthWrite:false}));
+  oil.rotation.x=-Math.PI/2;oil.position.y=.1;g.add(oil);
+  g.position.copy(ship.pos).setY(.1);scene.add(g);
+  const smokeAt=(hitPos||ship.pos).clone().setY(5);
+  for(let i=0;i<4;i++){boom(smokeAt.clone().add(new THREE.Vector3((Math.random()-.5)*B*1.4,0,(Math.random()-.5)*L*.8)),1.2+Math.random()*1.4);}
+  burnFx(smokeAt,2.2);addCameraShake(ship.pos,2.4+ship.def.beam*.08);
+  if(typeof sfxExplosion==='function')sfxExplosion(smokeAt,1.7);
+  wrecks.push({group:g,oil,life:34,max:34,cat:true,halves:g.children.filter(x=>x.userData&&x.userData.drift)});
+}
 function spawnWreck(ship){
   if(!ship||ship._wreckSpawned)return;ship._wreckSpawned=true;
   while(wrecks.length>=MAX_WRECKS){const old=wrecks.shift();destroyObject3D(old.group);}
@@ -2981,8 +3136,8 @@ function spawnWreck(ship){
   boom(ship.pos.clone().setY(2.5),Math.min(3.4,1+ship.def.beam*.12));addCameraShake(ship.pos,1.4+ship.def.beam*.07);
 }
 function updateWrecks(dt){for(let i=wrecks.length-1;i>=0;i--){const w=wrecks[i];w.life-=dt;const age=1-w.life/w.max;
-  w.oil.scale.setScalar(1+age*2.4);w.oil.material.opacity=Math.max(0,.42*(1-age));
-  w.halves.forEach(h=>{h.position.addScaledVector(h.userData.drift,dt);h.position.y-=dt*.045;h.rotation.z+=h.userData.roll*dt*.045;});
+  w.oil.scale.setScalar(1+age*(w.cat?3.2:2.4));w.oil.material.opacity=Math.max(0,(w.cat?.5:.42)*(1-age));
+  w.halves.forEach(h=>{h.position.addScaledVector(h.userData.drift,dt);h.position.y-=dt*(h.userData.sink||.045);h.rotation.z+=h.userData.roll*dt*(w.cat?.42:.045);h.rotation.x+=(h.userData.roll||0)*dt*(w.cat?.24:0);});
   if(w.life<=0){destroyObject3D(w.group);wrecks.splice(i,1);}}
 }
 const salvage=[];
@@ -3368,6 +3523,28 @@ let walkPos=new THREE.Vector3();
 const EYE=0.85, WALK=9;   // half-height eye level — lower first-person camera
 let mouseDownFire=false;
 let fpv=false;            // V toggles first-person (cockpit) view in tanks & planes
+// ===== PHOTO MODE — a free-fly spectator camera for screenshots (L to toggle) =====
+let photoMode=false, photoPos=new THREE.Vector3();
+function togglePhotoMode(){
+  if(phase!=='play') return;
+  photoMode=!photoMode;
+  if(photoMode){
+    photoPos.copy(camera.position);
+    flashPrompt('📷 Photo mode — WASD fly · Space/Shift up-down · mouse look · L to exit');
+    setTimeout(()=>{ if(photoMode) document.getElementById('hud').style.display='none'; }, 1400);   // let the prompt read first
+  } else { document.getElementById('hud').style.display='block'; updateMode(); }
+}
+function updatePhotoMode(dt){
+  const yaw=camYaw.v, pitch=camPitch.v;
+  const f=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch));
+  const r=new THREE.Vector3(f.z,0,-f.x).normalize();
+  const mv=new THREE.Vector3();
+  if(keys['KeyW'])mv.add(f); if(keys['KeyS'])mv.sub(f);
+  if(keys['KeyD'])mv.add(r); if(keys['KeyA'])mv.sub(r);
+  if(keys['Space'])mv.y+=1; if(keys['ShiftLeft']||keys['ShiftRight'])mv.y-=1;
+  if(mv.lengthSq()>0) mv.normalize();
+  photoPos.addScaledVector(mv, 26*dt);
+}
 let backslashMoneyPresses=[];
 function backslashMoneyCode(){
   if(phase!=='play')return;
@@ -3438,11 +3615,129 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyQ') cycleGun();                        // Q cycles your owned small arms while ashore
   if(e.code==='KeyX') deleteTurret();                    // X scraps the deck gun you're standing next to
   if(e.code==='KeyI'&&!e.repeat) cycleGfxQuality();       // I cycles bloom/AO quality (a perf safety valve)
+  if(e.code==='KeyL'&&!e.repeat) togglePhotoMode();       // L toggles a free-fly spectator camera for screenshots
   if(e.code==='KeyK'&&!e.repeat) toggleSettings();
   if(e.code==='KeyO'&&!e.repeat) fleetOrderCmd();         // O cycles a fleet order (attack / capture / regroup)
   if(e.code==='KeyT'){ fpv=!fpv;   // T toggles first-person / cockpit view (V is taken by mines)
     if(piloting||drivingTank||manning||driving) flashPrompt(driving?(fpv?'External chase view':'Bridge view'):(fpv?'First-person view':'Chase view')); } });
 addEventListener('keyup',e=>{ keys[e.code]=0; });
+
+// =====================================================================
+//  MOBILE / TOUCH CONTROLS — virtual stick + look pad + mode-aware buttons
+// =====================================================================
+let touchLookId=null,touchMoveId=null,lastTouchInput=0,mobileControlsReady=false;
+const touchMove={x:0,y:0};
+function touchCapable(){return matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0||innerWidth<820;}
+function touchMark(){lastTouchInput=Date.now();document.body.classList.add('touch-ready');}
+function setKey(code,on){keys[code]=on?1:0;}
+function clearMoveKeys(){['KeyW','KeyA','KeyS','KeyD'].forEach(k=>setKey(k,0));}
+function applyTouchMove(){
+  clearMoveKeys();
+  const x=touchMove.x,y=touchMove.y, dead=.18;
+  if(Math.abs(x)<dead&&Math.abs(y)<dead)return;
+  if(drivingTank){
+    const forward=y<-dead, reverse=y>dead, left=x<-dead, right=x>dead;
+    if(forward)setKey('KeyW',1); if(reverse)setKey('KeyS',1);
+    if(forward&&!left&&!right){setKey('KeyA',1);setKey('KeyD',1);} // both tracks = straight
+    else { if(left)setKey('KeyA',1); if(right)setKey('KeyD',1); }
+    return;
+  }
+  if(y<-dead)setKey('KeyW',1); if(y>dead)setKey('KeyS',1);
+  if(x<-dead)setKey('KeyA',1); if(x>dead)setKey('KeyD',1);
+}
+function resetTouchMove(){
+  touchMove.x=touchMove.y=0;clearMoveKeys();
+  const k=document.querySelector('#touchMove .knob');if(k)k.style.transform='translate(0,0)';
+}
+function pulseKey(code,ms=120){setKey(code,1);setTimeout(()=>setKey(code,0),ms);}
+function touchButtonLabel(act){
+  if(act==='fire')return piloting&&piloting.plane&&piloting.plane.def.uav?'CAM':'FIRE';
+  if(act==='action'){
+    if(piloting)return piloting.plane.def.uav?'RECALL':(piloting.phase==='landing'?'ABORT':'LAND');
+    if(driving||manning||drivingTank)return 'EXIT';
+    if(onFoot)return nearestFieldTank()?'TANK':'USE';
+    return 'USE';
+  }
+  if(act==='special'){
+    if(piloting)return piloting.plane.def.bomb?'BOMB':'—';
+    if(drivingTank)return 'REPAIR';
+    if(driving&&player&&player.def.kind==='sub')return player.submerged?'SURFACE':'DIVE';
+    if(onFoot)return 'GUN';
+    return 'INSTALL';
+  }
+  if(act==='board'){
+    if(drivingTank)return drivingTank.onDeck?'LAND':'SHIP';
+    if(onFoot)return playerShipLost?'HARBOR':'BOARD';
+    return 'ASHORE';
+  }
+  if(act==='bail')return piloting?'BAIL':(playerShipLost?'SHIP':'P');
+  if(act==='view')return fpv?'CHASE':'VIEW';
+  return act.toUpperCase();
+}
+function refreshTouchControls(){
+  if(!mobileControlsReady)return;
+  document.querySelectorAll('#touchControls .tbtn').forEach(b=>{
+    const act=b.dataset.act;b.textContent=touchButtonLabel(act);
+    b.classList.toggle('on',(act==='view'&&fpv)||(act==='shop'&&shopOpen)||(act==='harbor'&&harborOpen)||(act==='build'&&buildOpen)||(act==='map'&&tacticalOpen));
+    b.style.visibility=(act==='special'&&piloting&&(!piloting.plane.def.bomb))?'hidden':'visible';
+  });
+  const hint=document.getElementById('touchHint');
+  if(hint)hint.textContent=drivingTank?'left stick controls tracks · right pad aims':piloting?'left stick throttle/turn · right pad pitch/look':'left stick moves · right pad aims';
+}
+function touchActionDown(act){
+  touchMark();sfxResume();
+  if(act==='fire'){mouseDownFire=true;return;}
+  if(act==='special'){
+    if(piloting){pulseKey('Space',160);return;}
+    if(drivingTank){setKey('KeyR',1);return;}
+  }
+}
+function touchActionUp(act){
+  if(act==='fire')mouseDownFire=false;
+  if(act==='special'&&drivingTank)setKey('KeyR',0);
+}
+function touchActionTap(act){
+  if(phase!=='play'&&act!=='shop')return;
+  if(act==='action'){toggleMan();return;}
+  if(act==='special'){
+    if(piloting||drivingTank)return;
+    if(driving&&player&&player.def.kind==='sub'){toggleDive();return;}
+    if(onFoot){cycleGun();return;}
+    tryPlace();return;
+  }
+  if(act==='board'){ if(drivingTank)tankLandToggle(); else toggleFoot(); return; }
+  if(act==='bail'){ bailoutOrBoard(); return; }
+  if(act==='view'){ fpv=!fpv;flashPrompt(fpv?'First-person view':'Chase view');refreshTouchControls();return; }
+  if(act==='shop'){toggleShop();return;}
+  if(act==='harbor'){toggleHarbor();return;}
+  if(act==='build'){toggleBuild();return;}
+  if(act==='map'){toggleTacticalMap();return;}
+  if(act==='sonar'){sonarPing();return;}
+  if(act==='mine'){deployPlayerMine();return;}
+}
+function initMobileControls(){
+  if(mobileControlsReady)return;mobileControlsReady=true;
+  if(touchCapable())document.body.classList.add('touch-ready');
+  const move=document.getElementById('touchMove'),look=document.getElementById('touchLook');
+  if(move)move.addEventListener('pointerdown',e=>{touchMark();touchMoveId=e.pointerId;move.setPointerCapture(e.pointerId);}, {passive:true});
+  if(move)move.addEventListener('pointermove',e=>{if(e.pointerId!==touchMoveId)return;touchMark();const r=move.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,rad=r.width*.38;
+    touchMove.x=Math.max(-1,Math.min(1,(e.clientX-cx)/rad));touchMove.y=Math.max(-1,Math.min(1,(e.clientY-cy)/rad));applyTouchMove();
+    const k=move.querySelector('.knob');if(k)k.style.transform=`translate(${touchMove.x*rad}px,${touchMove.y*rad}px)`;}, {passive:true});
+  const moveEnd=e=>{if(e.pointerId===touchMoveId){touchMoveId=null;resetTouchMove();}};
+  if(move){move.addEventListener('pointerup',moveEnd);move.addEventListener('pointercancel',moveEnd);move.addEventListener('lostpointercapture',moveEnd);}
+  if(look)look.addEventListener('pointerdown',e=>{touchMark();touchLookId=e.pointerId;look.setPointerCapture(e.pointerId);look._lx=e.clientX;look._ly=e.clientY;}, {passive:true});
+  if(look)look.addEventListener('pointermove',e=>{if(e.pointerId!==touchLookId)return;touchMark();const dx=e.clientX-(look._lx||e.clientX),dy=e.clientY-(look._ly||e.clientY);look._lx=e.clientX;look._ly=e.clientY;
+    camYaw.v-=dx*.0042;camPitch.v-=dy*.0042;camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v));}, {passive:true});
+  const lookEnd=e=>{if(e.pointerId===touchLookId)touchLookId=null;};
+  if(look){look.addEventListener('pointerup',lookEnd);look.addEventListener('pointercancel',lookEnd);look.addEventListener('lostpointercapture',lookEnd);}
+  document.querySelectorAll('#touchControls .tbtn').forEach(b=>{
+    b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);touchActionDown(b.dataset.act);}, {passive:false});
+    b.addEventListener('pointerup',e=>{e.preventDefault();touchActionUp(b.dataset.act);touchActionTap(b.dataset.act);refreshTouchControls();}, {passive:false});
+    b.addEventListener('pointercancel',()=>touchActionUp(b.dataset.act));
+  });
+  addEventListener('resize',()=>{if(touchCapable())document.body.classList.add('touch-ready');});
+  refreshTouchControls();
+}
 
 // =====================================================================
 //  MENU
@@ -3610,6 +3905,23 @@ function showStory(title, bodyHTML, btnLabel, onClose){
   b.onclick=()=>{ o.style.display='none'; if(onClose) onClose(); };
   o.style.display='flex'; o.querySelector('#storyPanel').scrollTop=0;
 }
+// ===== SHIP ALMANAC — browse every hull's stats and story, incl. the legendary flagships =====
+function buildAlmanac(){
+  const keys=Object.keys(SHIPS);
+  const legendary=keys.filter(k=>/Legendary/.test(SHIPS[k].cls));
+  const standard=keys.filter(k=>!/Legendary/.test(SHIPS[k].cls));
+  const card=k=>{ const s=SHIPS[k];
+    return '<div style="margin-top:14px;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid #1c3145;border-radius:8px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">'+
+        '<span style="color:#ffd060;font-size:13px;letter-spacing:1px">'+s.name+'</span>'+
+        '<span style="color:#5f7a90;font-size:11px">'+s.cls+'</span></div>'+
+      '<div style="margin-top:4px;color:#7e93a8;font-size:11px">Length '+s.len+'m · Hull '+s.hp+' HP · '+Math.round(s.mounts*1.5)+' mounts · '+(s.kind==='carrier'?'Flat-top':s.kind==='sub'?'Submersible':'Surface')+'</div>'+
+      '<div style="margin-top:6px;font-size:13px;line-height:1.6;color:#cfe0ee">'+(s.desc||'')+'</div></div>'; };
+  let html='<div style="color:#9fc6e8;font-size:12px;text-align:center;margin-bottom:4px">'+keys.length+' hulls in commission — browse the fleet</div>';
+  if(legendary.length){ html+='<div style="margin-top:16px;text-align:center;color:#ff9a6a;letter-spacing:2px;font-size:11px">⚓ LEGENDARY FLAGSHIPS</div>'+legendary.map(card).join(''); }
+  html+='<div style="margin-top:'+(legendary.length?20:14)+'px;text-align:center;color:#8fb8d8;letter-spacing:2px;font-size:11px">STANDARD FLEET</div>'+standard.map(card).join('');
+  showStory('📖 SHIP ALMANAC', html, 'CLOSE');
+}
 function showWarLog(){
   const beaten=career.completed?CAMPAIGN.length:Math.max(0,mapsUnlocked()-1);
   let html='<div style="font-style:italic;color:#9fc6e8;margin-bottom:8px">'+LORE.intro+'</div>';
@@ -3617,6 +3929,165 @@ function showWarLog(){
   for(let i=0;i<beaten;i++){ html+='<div style="margin-top:18px;padding-top:14px;border-top:1px solid #1c3145"><div style="color:#ffd060;font-size:12px;letter-spacing:2px;margin-bottom:6px">'+(i+1)+'. '+CAMPAIGN[i].name.toUpperCase()+'</div><div>'+LORE.beats[i]+'</div></div>'; }
   if(career.completed) html+='<div style="text-align:center;color:#8ff0b4;margin-top:20px;letter-spacing:3px">— THE END —</div>';
   showStory('⚓ WAR LOG', html, 'CLOSE');
+}
+
+// =====================================================================
+//  MULTIPLAYER — connects to the relay server (server/server.js): browse
+//  rooms, join a side, and share the world with real captains. Each client
+//  simulates its own ship and broadcasts position/heading/hp a few times a
+//  second; peers are rendered as lerped proxy hulls. v1 scope: shared world
+//  + movement sync. Weapon fire is NOT yet broadcast/synced between players
+//  (no PvP damage reconciliation) — that's the natural next step.
+// =====================================================================
+let MP={ws:null,connected:false,active:false,side:'blue',id:null,room:null,name:'Captain',servers:[],peers:new Map(),lastSendT:0,pendingShip:'destroyer'};
+function defaultRelayUrl(){
+  try{ return (location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/play'; }catch(e){ return 'ws://localhost:3000/play'; }
+}
+function mpPanel(){
+  let o=document.getElementById('mpPanel');
+  if(!o){ o=document.createElement('div'); o.id='mpPanel';
+    o.style.cssText='display:none;position:fixed;inset:0;z-index:210;background:rgba(4,10,16,.9);align-items:center;justify-content:center;padding:22px;';
+    o.innerHTML='<div style="max-width:640px;width:100%;max-height:86vh;overflow:auto;background:linear-gradient(180deg,#0e1a24,#0a121a);border:1px solid #26425c;border-radius:14px;box-shadow:0 24px 90px rgba(0,0,0,.65);padding:24px 28px;">'+
+      '<div style="color:#ffd060;letter-spacing:3px;font-size:14px;text-align:center;margin-bottom:14px">🌐 MULTIPLAYER</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:10px">'+
+        '<input id="mpUrl" style="flex:2;background:#0e1922;border:1px solid #21384e;color:#cfe6fb;padding:8px;border-radius:6px;font-size:12px" placeholder="relay URL">'+
+        '<input id="mpName" style="flex:1;background:#0e1922;border:1px solid #21384e;color:#cfe6fb;padding:8px;border-radius:6px;font-size:12px" placeholder="Captain name" maxlength="18">'+
+      '</div>'+
+      '<div style="text-align:center;margin-bottom:12px"><button id="mpConnectBtn" style="cursor:pointer;background:#13283a;color:#cfe6fb;border:1px solid #3579a8;border-radius:8px;padding:8px 22px;font-size:12px;letter-spacing:2px">CONNECT</button></div>'+
+      '<div id="mpStatus" style="text-align:center;color:#7e93a8;font-size:11px;margin-bottom:10px"></div>'+
+      '<div id="mpServerList"></div>'+
+      '<div style="text-align:center;margin-top:18px"><button id="mpCloseBtn" style="cursor:pointer;background:#1a1a1a;color:#cfe6fb;border:1px solid #333;border-radius:8px;padding:8px 22px;font-size:12px;letter-spacing:2px">CLOSE</button></div>'+
+    '</div>';
+    document.body.appendChild(o);
+    o.querySelector('#mpConnectBtn').onclick=()=>{
+      const url=o.querySelector('#mpUrl').value.trim()||defaultRelayUrl();
+      MP.name=o.querySelector('#mpName').value.trim()||'Captain';
+      o.querySelector('#mpStatus').textContent='Connecting…';
+      mpConnect(url);
+    };
+    o.querySelector('#mpCloseBtn').onclick=()=>{ o.style.display='none'; };
+  }
+  return o;
+}
+function openMultiplayer(){
+  const o=mpPanel();
+  if(!o.querySelector('#mpUrl').value) o.querySelector('#mpUrl').value=defaultRelayUrl();
+  o.style.display='flex';
+  mpRenderPanel();
+}
+function mpRenderPanel(){
+  const o=document.getElementById('mpPanel'); if(!o||o.style.display==='none') return;
+  const status=o.querySelector('#mpStatus');
+  status.textContent = MP.connected? ('Connected — '+MP.servers.length+' server(s) online') : 'Not connected.';
+  const list=o.querySelector('#mpServerList'); list.innerHTML='';
+  if(!MP.connected) return;
+  MP.servers.forEach(s=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-bottom:6px;background:rgba(255,255,255,0.02);border:1px solid #1c3145;border-radius:8px;font-size:12px;color:#cfe0ee';
+    row.innerHTML='<span>'+s.name+' <span style="color:#5f7a90">('+s.players+'/'+s.maxPlayers+')</span></span>';
+    const btns=document.createElement('span');
+    ['blue','red'].forEach(side=>{
+      const b=document.createElement('button'); b.textContent=side.toUpperCase();
+      b.style.cssText='cursor:pointer;margin-left:6px;background:'+(side==='blue'?'#1c3a5e':'#5e1c1c')+';color:#fff;border:none;border-radius:5px;padding:5px 10px;font-size:11px;letter-spacing:1px';
+      b.onclick=()=>mpJoinRoom(s.name,side,'destroyer');
+      btns.appendChild(b);
+    });
+    row.appendChild(btns); list.appendChild(row);
+  });
+}
+function mpConnect(url){
+  try{
+    if(MP.ws){ try{ MP.ws.onclose=null; MP.ws.close(); }catch(e){} }
+    MP.ws=new WebSocket(url);
+    MP.ws.onopen=()=>{ MP.connected=true; mpRenderPanel();
+      if(MP.heartbeat) clearInterval(MP.heartbeat);
+      // an independent keepalive: requestAnimationFrame (what mpBroadcastState normally rides on)
+      // is throttled hard in backgrounded/minimized tabs, which would silently idle-timeout the
+      // connection mid-match. setInterval keeps sending state even while the tab isn't rendering.
+      MP.heartbeat=setInterval(()=>{ if(MP.active) mpBroadcastState(); }, 4000);
+    };
+    MP.ws.onclose=()=>{ MP.connected=false; MP.active=false; if(MP.heartbeat){clearInterval(MP.heartbeat);MP.heartbeat=null;} mpRenderPanel(); };
+    MP.ws.onerror=()=>{ const s=document.querySelector('#mpStatus'); if(s)s.textContent='Connection failed.'; };
+    MP.ws.onmessage=e=>{ let m; try{ m=JSON.parse(e.data); }catch(err){ return; } mpHandleMessage(m); };
+  }catch(err){ const s=document.querySelector('#mpStatus'); if(s)s.textContent='Could not reach that server.'; }
+}
+function mpJoinRoom(serverName,side,shipId){
+  if(!MP.ws||!MP.connected) return;
+  MP.pendingShip=shipId;
+  MP.ws.send(JSON.stringify({type:'join',server:serverName,side,name:MP.name}));
+}
+function mpHandleMessage(m){
+  if(m.type==='welcome'){ MP.id=m.id; MP.servers=m.servers||[]; mpRenderPanel(); }
+  else if(m.type==='servers'){ MP.servers=m.servers||[]; mpRenderPanel(); }
+  else if(m.type==='joined'){
+    MP.active=true; MP.room=m.server; MP.side=m.side; MP.id=m.id;
+    MP.peers.forEach((p,id)=>mpRemovePeer(id));
+    (m.peers||[]).forEach(p=>mpSpawnPeer(p));
+    mpStartMatch(m.spawn);
+  }
+  else if(m.type==='playerJoined'){ if(m.player&&m.player.id!==MP.id) mpSpawnPeer(m.player); }
+  else if(m.type==='playerLeft'){ mpRemovePeer(m.id); }
+  else if(m.type==='playerSideChanged'){ const p=MP.peers.get(m.id); if(p) p.side=m.side; }
+  else if(m.type==='state'){ if(m.from&&m.from!==MP.id) mpUpdatePeerState(m.from,m.state,m.side); }
+  else if(m.type==='error'){ const s=document.querySelector('#mpStatus'); if(s)s.textContent=m.message||'Error.'; }
+}
+function mpStartMatch(spawn){
+  const o=document.getElementById('mpPanel'); if(o) o.style.display='none';
+  document.getElementById('menu').style.display='none';
+  document.getElementById('hud').style.display='block';
+  sfxResume(); musicPlay('ambient'); phase='play';
+  currentSandboxIdx=-1; currentMapIdx=Math.max(0,Math.min(CAMPAIGN.length-1,3));   // a neutral shared arena
+  applyMap(); buildTheater();
+  makePlayerShip(MP.pendingShip||'destroyer');
+  if(spawn){ player.pos.set(spawn.x||0,0,spawn.z||0); player.heading=spawn.heading||0; }
+  buildShopUI();
+  landCampaignMode=false;
+  _eventT=1e9; _eventCount=0;      // single-player dynamic events stay off in a shared match
+  updateMode();
+  flashPrompt('🌐 Joined '+(MP.room&&MP.room.name||'the server')+' as '+MP.side.toUpperCase()+' — '+MP.peers.size+' other captain(s) aboard.');
+}
+function mpSpawnPeer(p){
+  if(!p||p.id===MP.id||MP.peers.has(p.id)||typeof buildAIShipModel!=='function') return;
+  const shipKey=(p.state&&p.state.shipId&&SHIPS[p.state.shipId])?p.state.shipId:'destroyer';
+  const def=SHIPS[shipKey];
+  const build=buildAIShipModel(def, p.side==='red'?1:0);
+  const peer={id:p.id,name:p.name||'Captain',side:p.side,def,build,pos:new THREE.Vector3(),heading:0,
+    targetPos:new THREE.Vector3(),targetHeading:0,hp:def.hp,maxhp:def.hp};
+  if(p.state) mpApplyState(peer,p.state);
+  peer.pos.copy(peer.targetPos); peer.heading=peer.targetHeading;
+  build.group.position.copy(peer.pos); build.group.rotation.y=peer.heading;
+  MP.peers.set(p.id,peer);
+}
+function mpApplyState(peer,st){
+  if(!st) return;
+  peer.targetPos.set(st.x||0,0,st.z||0);
+  peer.targetHeading=st.heading||0;
+  if(st.hp!=null) peer.hp=st.hp; if(st.maxhp!=null) peer.maxhp=st.maxhp;
+}
+function mpUpdatePeerState(id,state,side){
+  let peer=MP.peers.get(id);
+  if(!peer){ mpSpawnPeer({id,name:'Captain',side,state}); return; }
+  if(side) peer.side=side;
+  mpApplyState(peer,state);
+}
+function mpRemovePeer(id){
+  const peer=MP.peers.get(id); if(!peer) return;
+  if(peer.build&&peer.build.group) destroyObject3D(peer.build.group);
+  MP.peers.delete(id);
+}
+function mpTickPeers(dt){
+  MP.peers.forEach(peer=>{
+    peer.pos.lerp(peer.targetPos, Math.min(1,dt*6));
+    let dh=peer.targetHeading-peer.heading; while(dh>Math.PI)dh-=6.283; while(dh<-Math.PI)dh+=6.283;
+    peer.heading+=dh*Math.min(1,dt*6);
+    if(peer.build){ peer.build.group.position.copy(peer.pos); peer.build.group.rotation.y=peer.heading; }
+  });
+}
+function mpBroadcastState(){
+  if(!MP.active||!MP.ws||MP.ws.readyState!==1||!player) return;
+  const now=performance.now()/1000;                    // one consistent wall-clock, independent of rAF game-time (t2)
+  if(now-MP.lastSendT<0.15) return; MP.lastSendT=now;
+  MP.ws.send(JSON.stringify({type:'state',state:{x:player.pos.x,z:player.pos.z,heading:player.heading,hp:player.hp,maxhp:player.maxhp,shipId:player.shipId}}));
 }
 function buildMenu(){
   // career banner — rank, perks and lifetime record under the subtitle
@@ -3632,9 +4103,13 @@ function buildMenu(){
     sub.after(d);
     const log=document.createElement('div');
     log.style.cssText='text-align:center;margin:-6px 0 14px;';
-    log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">📖 WAR LOG</span>';
+    log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">📖 WAR LOG</span>'+
+      ' <span id="almanacBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px;margin-left:8px">⚓ SHIP ALMANAC</span>'+
+      ' <span id="mpBtn" style="cursor:pointer;color:#8fd0a0;font-size:11px;letter-spacing:2px;border:1px solid #214e2e;border-radius:20px;padding:5px 15px;margin-left:8px">🌐 MULTIPLAYER</span>';
     d.after(log);
     log.querySelector('#warlogBtn').onclick=showWarLog;
+    log.querySelector('#almanacBtn').onclick=buildAlmanac;
+    log.querySelector('#mpBtn').onclick=openMultiplayer;
   }
   buildCampaignPicker();
   const wrap=document.getElementById('ships');
@@ -3676,7 +4151,7 @@ function makePlayerShip(shipId){
   placed.length=0; planes.length=0; crew.length=0; planeSpots.length=0;
   manning=null; piloting=null; driving=false; onFoot=false; drivingTank=null; mouseDownFire=false; playerShipLost=false; resetFootHealth();
   const build=buildShip(def,false);
-  player={ build, hp:def.hp, maxhp:def.hp, def, submerged:false, air:100, diveY:0 };
+  player={ build, hp:def.hp, maxhp:def.hp, def, shipId, submerged:false, air:100, diveY:0 };
   const spawnZ = friendlyHarbor ? friendlyHarbor.pos.z-240 : 0;
   player.pos=new THREE.Vector3(0,0,spawnZ); player.heading=Math.PI; player.throttle=0; player.speed=0;
   // helm / bridge station
@@ -3749,6 +4224,7 @@ function startGame(shipId){
   musicPlay('ambient');   // subtle background bed for the selected theater
   buildTheater();
   makePlayerShip(shipId);
+  applyShipWear(shipId);        // a ship that limped home battered still shows it next mission, until you win one healthy
   buildShopUI();
   if(M.ground) deployLandCampaignStart();
   else {
@@ -3762,13 +4238,27 @@ function startGame(shipId){
   }
   _eventT=38+Math.random()*22; _eventCount=0;  // arm the dynamic mid-battle events ticker
   const cv=document.getElementById('c');
-  cv.addEventListener('click',()=>{ sfxResume(); if(phase==='play' && !shopOpen && !harborOpen) cv.requestPointerLock(); });
+  cv.addEventListener('click',()=>{ sfxResume(); if(Date.now()-lastTouchInput<700||touchCapable())return; if(phase==='play' && !shopOpen && !harborOpen) cv.requestPointerLock(); });
   document.addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv){
     camYaw.v -= e.movementX*0.0023; camPitch.v -= e.movementY*0.0023;
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v)); }});
   document.addEventListener('mousedown',e=>{ if(document.pointerLockElement===cv && e.button===0) mouseDownFire=true; });
   document.addEventListener('mouseup',e=>{ if(e.button===0) mouseDownFire=false; });
   updateMode();
+}
+// ===== PERSISTENT BATTLE DAMAGE — a ship that limped home battered still shows the scars next mission =====
+function applyShipWear(shipId){
+  const w=career.shipWear&&career.shipWear[shipId]; if(!w||w<=0.05) return;
+  player.hp=Math.max(player.maxhp*0.6, player.maxhp*(1-w*0.4));   // never worse than 60% starting hull; severe wear dips into visibly-scarred territory
+  checkCripple(player,false);                                      // show the scars immediately (no detach — keep mounts intact)
+  flashPrompt('⚓ '+player.def.name+' returns to service still battle-scarred — '+Math.round(player.hp/player.maxhp*100)+'% hull. Bring her home healthy to repair her reputation.');
+}
+function recordShipWear(){
+  if(!player||!player.shipId||!player.maxhp||playerShipLost||landCampaignMode||player._convertedToAlly) return;
+  career.shipWear=career.shipWear||{};
+  const frac=1-Math.max(0,player.hp)/player.maxhp;
+  career.shipWear[player.shipId] = frac<0.1 ? 0 : frac;   // came home healthy → wipes the scars; else carries forward
+  saveCareer();
 }
 function chooseShip(shipId){
   if(phase==='respawn'&&shipId==='boss'&&friendlyBossUsed){
@@ -4793,8 +5283,9 @@ function intercept(from, tpos, tvel, spd){
   return tpos.clone().add(tvel.clone().multiplyScalar(t));
 }
 function leadAir(from,pl){ return intercept(from, pl.pos, pl.vel||null, 175); }   // flak leads aircraft by their real velocity
-function damageAlly(a,dmg,hitPos){ if(a.sinkT>0)return; a.hp-=dmg; damageCompartment(a,dmg,hitPos); applyCrit(a,dmg); if(a.hp<=0){ a.hp=0; a.sinkT=0.001;
-  if(!a.proxy) explodeAt(a.pos.clone().setY(3),1,0,8,null); } }
+function damageAlly(a,dmg,hitPos){ if(a.sinkT>0)return; const catastrophic=shipBreakupLikely(a,dmg,hitPos); a.hp-=dmg; damageCompartment(a,dmg,hitPos); applyCrit(a,dmg); if(a.hp<=0){ a.hp=0; a.sinkT=0.001;
+  if(catastrophic&&!a.proxy){ if(a.build&&a.build.group)a.build.group.visible=false; spawnCatastrophicWreck(a,hitPos,1.15); }
+  else if(!a.proxy) explodeAt(a.pos.clone().setY(3),1,0,8,null); } }
 
 // =====================================================================
 //  SHOP
@@ -5840,7 +6331,8 @@ function calledShot(s,dmg,hitPos,friendly){
 function damageTarget(t,dmg,owner,hitPos){
   if(t===player){ player.hp-=dmg; damageCompartment(player,dmg,hitPos); applyCrit(player,dmg); calledShot(player,dmg,hitPos,false); if(player.hp<=0){ player.hp=0; playerSunk(); } updateHUD(); return; }
   const friendlyHit=owner===null||!owner||owner.team!==1, critical=dmg>=70||Math.random()<Math.min(.28,dmg/260);
-  showDamageNumber(hitPos||t.pos,dmg,friendlyHit,critical);t.hp-=dmg; damageCompartment(t,dmg,hitPos); applyCrit(t,dmg); calledShot(t,dmg,hitPos,friendlyHit); if(t.hp<=0 && t.sinkT===0){ t.hp=0; t.sinkT=0.001; spawnSalvage(t.pos.clone());
+  const catastrophic=shipBreakupLikely(t,dmg,hitPos);
+  showDamageNumber(hitPos||t.pos,dmg,friendlyHit,critical);t.hp-=dmg; damageCompartment(t,dmg,hitPos); applyCrit(t,dmg); calledShot(t,dmg,hitPos,friendlyHit); if(t.hp<=0 && t.sinkT===0){ t.hp=0; t.sinkT=0.001; if(catastrophic&&!t.proxy){ if(t.build&&t.build.group)t.build.group.visible=false; spawnCatastrophicWreck(t,hitPos,1.2); } spawnSalvage(t.pos.clone());
     if(owner===null||!owner||owner.team!==1)showHit(t.def.name||'ENEMY SHIP',true);
     const bounty=t.def.boss?30000:t.def.hp>400?700:t.def.hp>250?500:350;
     sunk++;warRecord('sunk');money+=bounty;if(t.def.boss){warRecord('bosses');flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');}
@@ -5878,8 +6370,12 @@ function update(dt,t){
   animateWater(t);
   updateWeather(dt);
   updateLightning(dt);
+  updateExtremeWeather(dt,t);
   updateGraphics(dt,t);
+  if(MP.active){ mpBroadcastState(); mpTickPeers(dt); }
   // --- controls ---
+  if(photoMode){ updatePhotoMode(dt); }
+  else {
   if(driving){ updateDrive(dt); }
   if(piloting){ updatePilot(dt); }
   else if(drivingTank){ updateTank(dt); }
@@ -5887,13 +6383,17 @@ function update(dt,t){
   else if(onFoot){ updateFoot(dt); }
   else if(!driving){ updateWalk(dt); }
   updatePlayerTankAI(dt);
+  }
   // Once the captain parachutes, the former player hull belongs to an ally.  Do
   // not run player-only transforms/auto-turrets against that same model again.
   // View/viewmodel updates must ALWAYS run (even after bailing out, when the hull became an ally) —
   // they own the first-person handheld gun, the cockpit overlay, and the tank interior.
+  // (skipped in photo mode — a free spectator cam shouldn't carry a handheld gun or cockpit frame)
+  if(!photoMode){
   updateViewGun(dt);
   updateCockpitView();
   updateTankInteriorView();
+  } else if(viewGun) viewGun.visible=false;
   if(!player._convertedToAlly){
   if(player.def.kind==='sub') updateSub(dt);
   player.vel=new THREE.Vector3(Math.sin(player.heading)*(player.speed||0),0,Math.cos(player.heading)*(player.speed||0));
@@ -5936,14 +6436,15 @@ function update(dt,t){
   enemies.forEach(e=>updateEnemy(e,dt));
   for(let i=enemies.length-1;i>=0;i--){ if(enemies[i].dead){ destroyShipVisual(enemies[i]); enemies.splice(i,1); } }
   const enemyReinforceRate=(0.18/2.25)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1); // scaled by the theater's intensity
-  if(!(window._MAP&&window._MAP.ground) && Math.random()<dt*enemyReinforceRate) spawnEnemy();
+  const enemyFleetCap=Math.round(18*((window._MAP&&window._MAP.reinforce!=null)?Math.min(2,window._MAP.reinforce):1));   // hard ceiling — long battles no longer snowball into unbounded fleets
+  if(!(window._MAP&&window._MAP.ground) && enemies.length<enemyFleetCap && Math.random()<dt*enemyReinforceRate) spawnEnemy();
   updateWarPacing(dt);   // escalating enemy offensives + rotating bonus objectives + parked-plane rearm
   // --- friendly fleet — identical NPC reinforcement and destruction rules ---
   allies.forEach(a=>updateAlly(a,dt));
   shipCollisions(dt);   // hulls repel, rams detonate
   for(let i=allies.length-1;i>=0;i--){ if(allies[i].dead){ destroyShipVisual(allies[i]); allies.splice(i,1); } }
   const allyReinforceRate=(0.18/2.25)*(1+hU(0,'fastBuild')*0.6+hU(0,'slots')*0.35);
-  if(!(window._MAP&&window._MAP.ground) && Math.random()<dt*allyReinforceRate) spawnAlly();
+  if(!(window._MAP&&window._MAP.ground) && allies.length<18 && Math.random()<dt*allyReinforceRate) spawnAlly();
   updateIslandControl(dt);
   // --- passive income ('Resource Storage' upgrade) ---
   if(fU('income')>0){ incomeAcc+=fU('income')*5*dt; if(incomeAcc>=1){ const g=Math.floor(incomeAcc); money+=g; incomeAcc-=g; updateHUD(); refreshShop(); } }
@@ -6879,6 +7380,12 @@ function damageHarbor(h,dmg){
 //  CAMERA / HUD
 // =====================================================================
 function updateCamera(){
+  if(photoMode){
+    const yaw=camYaw.v, pitch=camPitch.v;
+    const dir=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch));
+    camera.position.copy(photoPos); camera.lookAt(photoPos.clone().add(dir));
+    return;
+  }
   if(drivingTank){
     const tk=drivingTank, yaw=camYaw.v, pitch=Math.max(-0.4,Math.min(0.6,camPitch.v));
     const wp = tk.onDeck ? tk.group.getWorldPosition(new THREE.Vector3()) : tk.pos.clone();
@@ -7127,6 +7634,7 @@ function updateMode(){
     : shopOpen ? '<b>ARMORY OPEN</b><br>Click weapon/plane · Tab to close'
     : harborOpen ? '<b>HARBOR COMMAND</b><br>Click an upgrade to buy · H to close'
     : '<b>ON DECK</b><br>WASD walk · Mouse look<br>F install · E man/fly · G ashore<br>R sonar · V mine · Z damage control<br>N map · Tab shop · H harbor · Enter chat';
+  refreshTouchControls();
 }
 
 // =====================================================================
@@ -7135,6 +7643,7 @@ function updateMode(){
 function endGame(win,msg){
   if(phase==='over')return; phase='over';
   playEndMusic();                                   // the full naval score swells up when the battle ends — victory or defeat
+  if(win) recordShipWear();                          // note how battered the ship ended up, for next mission
   const oldRank=careerRank();
   warRecord(win?'wins':'losses');
   const r=careerRank(), nx=nextRank();
@@ -7185,6 +7694,7 @@ function loop(){
 // boot — show the menu immediately (pure DOM), then start 3D once Three.js is ready.
 // (some hosts, e.g. htmlpreview.github.io, run this script before the CDN <script> finishes.)
 buildMenu();
+initMobileControls();
 function start3D(){ try{ initThree(); initWaterBase(); loop(); }catch(e){ console.error(e);
   const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent='Could not start the 3D engine — try GitHub Pages or open the file directly.'; } }
 if(window.THREE){ start3D(); }
