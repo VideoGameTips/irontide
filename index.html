@@ -216,7 +216,7 @@
   #over p{color:#9fb6cc;margin-bottom:22px;}
   #over button{padding:12px 28px;font-size:15px;letter-spacing:2px;background:#1d4d6e;border:1px solid #5fd0ff;
     color:#eaf6ff;border-radius:8px;cursor:pointer;}
-  #fatalError{position:fixed;inset:0;z-index:99;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(4,9,14,.9);}
+  #fatalError{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(4,9,14,.9);}
   #fatalError .card{width:min(560px,94vw);padding:24px;border:1px solid #c65b54;border-radius:12px;background:#151d27;box-shadow:0 12px 55px #000;color:#dfeaf4;}
   #fatalError h2{margin-bottom:10px;color:#ff8a7e;letter-spacing:2px;font-size:20px;}#fatalError p{color:#aebfd0;font-size:13px;line-height:1.55;}
   #fatalError code{display:block;max-height:110px;overflow:auto;margin:13px 0;padding:9px;border-radius:6px;background:#0a1018;color:#ffd0c8;font:11px ui-monospace,monospace;white-space:pre-wrap;}
@@ -448,7 +448,7 @@ function setDifficulty(d){ if(!DIFFICULTY[d]||d===difficulty)return; difficulty=
 // ---------- player settings: volume, simple HUD, parental content filter ----------
 const SETTINGS={ volume:1, simpleHud:null, contentFilter:false };   // simpleHud null = auto (on for brand-new players)
 try{ const s=JSON.parse(localStorage.getItem('ironTideSettings')); if(s&&typeof s==='object') Object.assign(SETTINGS,s); }catch(e){}
-function saveSettings(){ try{ localStorage.setItem('ironTideSettings',JSON.stringify(SETTINGS)); }catch(e){} }
+function saveSettings(){ try{ const g=(typeof gameSettings!=='undefined')?gameSettings:{}; localStorage.setItem('ironTideSettings',JSON.stringify({...g,...SETTINGS})); }catch(e){} }   // one key, two panels — always persist the union
 function simpleHudOn(){ return SETTINGS.simpleHud==null ? (career.wins+career.losses===0) : !!SETTINGS.simpleHud; }
 function contentFilterOn(){ return !!SETTINGS.contentFilter; }
 const FILTERED_PLANES=new Set(['b29','tu95v','lfc5','mhkl235']);    // nuclear payloads + the dedicated kamikaze airframe
@@ -870,7 +870,7 @@ function cycleGfxQuality(){ if(!composer){ flashPrompt('Post-processing unavaila
 let frameEMA=16.7, qualitySlowT=0, qualityFastT=0;
 function updateAdaptiveQuality(rawDt){
   if(!renderer||!Number.isFinite(rawDt))return;
-  const ms=Math.min(100,rawDt*1000), maxPR=Math.min(1.5,devicePixelRatio||1);
+  const ms=Math.min(100,rawDt*1000), maxPR=Math.min((typeof touchCapable==='function'&&touchCapable())?1:1.5,devicePixelRatio||1);
   frameEMA+=(ms-frameEMA)*.07;
   if(frameEMA>30){qualitySlowT+=rawDt;qualityFastT=0;}
   else if(frameEMA<18){qualityFastT+=rawDt;qualitySlowT=0;}
@@ -879,7 +879,7 @@ function updateAdaptiveQuality(rawDt){
     const next=Math.max(.75,renderer.getPixelRatio()-.25);
     if(next<renderer.getPixelRatio()){renderer.setPixelRatio(next);renderer.setSize(innerWidth,innerHeight);resizePostFX();flashPrompt('⚙ Performance mode: render detail reduced');}
     if(gfxQuality>0)setGfxQuality(0);qualitySlowT=0;
-  }else if(qualityFastT>12&&renderer.getPixelRatio()<maxPR-.01){
+  }else if(qualityFastT>12&&renderer.getPixelRatio()<maxPR-.01&&phase==='play'&&!gamePaused()){   // menus/pause render cheap frames — never treat them as GPU headroom
     renderer.setPixelRatio(Math.min(maxPR,renderer.getPixelRatio()+.25));renderer.setSize(innerWidth,innerHeight);resizePostFX();qualityFastT=0;
   }
 }
@@ -1254,11 +1254,9 @@ function sfxInit(){
 }
 function _ramp(param,v){ param.setTargetAtTime(v, SFX.ctx.currentTime, 0.15); }
 function sfxResume(){ sfxInit(); if(SFX.ctx && SFX.ctx.state==='suspended') SFX.ctx.resume(); }
-function sfxToggle(){ SFX.on=!SFX.on; if(SFX.master) SFX.master.gain.value=SFX.on?0.5:0;
-  if(MUSIC.gain) MUSIC.gain.gain.setTargetAtTime((SFX.on&&MUSIC.on)?MUSIC.level:0, SFX.ctx.currentTime, 0.2);
+function sfxToggle(){ SFX.on=!SFX.on; applyVolume();
   if(typeof flashPrompt==='function') flashPrompt('🔊 Sound '+(SFX.on?'ON':'OFF')); }
-function musicToggle(){ MUSIC.on=!MUSIC.on;
-  if(MUSIC.gain) MUSIC.gain.gain.setTargetAtTime((SFX.on&&MUSIC.on)?MUSIC.level:0, SFX.ctx.currentTime, 0.25);
+function musicToggle(){ MUSIC.on=!MUSIC.on; applyVolume();
   if(typeof flashPrompt==='function') flashPrompt('🎵 Music '+(MUSIC.on?'ON':'OFF')); }
 // ===== MUSIC — a fully-synthesized, slowly-evolving naval score (no audio files) =====
 const MUSIC={ctx:null,gain:null,on:true,playing:false,level:0.16,mode:'ending',barDur:3.4,nextTime:0,bar:0,timer:null,
@@ -1391,6 +1389,7 @@ function _scheduleAmbientBar(t0){
 }
 function _musicSched(){
   const ctx=MUSIC.ctx; if(!ctx||!MUSIC.playing) return;
+  if(!SFX.on||!MUSIC.on||(SETTINGS.volume!=null&&SETTINGS.volume<=0)){ MUSIC.nextTime=Math.max(MUSIC.nextTime,ctx.currentTime+0.2); return; }   // muted: skip synthesis entirely
   while(MUSIC.nextTime < ctx.currentTime+0.6){ _scheduleBar(MUSIC.nextTime); MUSIC.nextTime+=MUSIC.barDur; }
 }
 function musicStop(){ MUSIC.playing=false; if(MUSIC.timer){ clearInterval(MUSIC.timer); MUSIC.timer=null; } }
@@ -1404,7 +1403,7 @@ function musicPlay(mode){
   MUSIC.barDur = mode==='ambient' ? (MUSIC.profile.barDur||5.6)   : 3.4;
   MUSIC.ctx=SFX.ctx;
   if(!MUSIC.gain){ MUSIC.gain=MUSIC.ctx.createGain(); MUSIC.gain.connect(MUSIC.ctx.destination); }
-  MUSIC.gain.gain.setTargetAtTime((SFX.on&&MUSIC.on)?MUSIC.level:0, MUSIC.ctx.currentTime, mode==='ambient'?1.6:0.35);
+  MUSIC.gain.gain.setTargetAtTime(((SFX.on&&MUSIC.on)?MUSIC.level:0)*(SETTINGS.volume!=null?SETTINGS.volume:1), MUSIC.ctx.currentTime, mode==='ambient'?1.6:0.35);
   MUSIC.playing=true; MUSIC.nextTime=MUSIC.ctx.currentTime+0.15;
   MUSIC.timer=setInterval(_musicSched, 200);
 }
@@ -3279,7 +3278,7 @@ let settingsOpen=false;
 const gameSettings={combatFeedback:true,damageNumbers:false,cameraShake:true};
 const damageNumbers=[];
 function loadGameSettings(){try{const s=JSON.parse(localStorage.getItem('ironTideSettings'));if(s&&typeof s==='object')Object.assign(gameSettings,s);}catch(e){}}
-function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify(gameSettings));}catch(e){}}
+function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
 function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+label+'</span><b>'+ (gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
 function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;document.getElementById('settings').style.display=settingsOpen?'block':'none';if(settingsOpen){mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
 function clearDamageNumbers(){while(damageNumbers.length){const d=damageNumbers.pop();d.el.remove();}}
@@ -3822,6 +3821,7 @@ addEventListener('keydown',e=>{
     if(harborOpen){ toggleHarbor(); return; }
     if(buildOpen){ toggleBuild(); return; }
     if(tacticalOpen){ toggleTacticalMap(false); return; }
+    if(settingsOpen){ toggleSettings(); return; }
     if(tutIdx>=0&&phase==='play') skipTutorial();
   }
   keys[e.code]=1; if(e.code==='Tab'){ e.preventDefault(); toggleShop(); } if(e.code==='Space') e.preventDefault();
@@ -4325,13 +4325,17 @@ function mpConnect(url){
       // connection mid-match. setInterval keeps sending state even while the tab isn't rendering.
       MP.heartbeat=setInterval(()=>{ if(MP.active) mpBroadcastState(); }, 4000);
     };
-    MP.ws.onclose=()=>{ MP.connected=false; MP.active=false; if(MP.heartbeat){clearInterval(MP.heartbeat);MP.heartbeat=null;} mpRenderPanel(); };
+    MP.ws.onclose=()=>{ MP.connected=false; MP.active=false; if(MP.heartbeat){clearInterval(MP.heartbeat);MP.heartbeat=null;}
+      MP.peers.forEach((p,id)=>mpRemovePeer(id));   // no frozen ghost hulls after a disconnect
+      if(MP.everJoined&&phase==='play') flashPrompt(T('🌐 Connection lost — this arena is now offline. Reload for a new war.','🌐 连接断开——竞技场已离线。刷新页面开新战局。'));
+      mpRenderPanel(); };
     MP.ws.onerror=()=>{ const s=document.querySelector('#mpStatus'); if(s)s.textContent='Connection failed.'; };
     MP.ws.onmessage=e=>{ let m; try{ m=JSON.parse(e.data); }catch(err){ return; } mpHandleMessage(m); };
   }catch(err){ const s=document.querySelector('#mpStatus'); if(s)s.textContent='Could not reach that server.'; }
 }
 function mpJoinRoom(serverName,side,shipId){
   if(!MP.ws||!MP.connected) return;
+  if(phase==='play'){ const st=document.querySelector('#mpStatus'); if(st)st.textContent=T('Finish or abandon the current war first (reload the page), then join.','先结束当前战局（刷新页面），再加入联机。'); return; }
   MP.pendingShip=shipId;
   MP.ws.send(JSON.stringify({type:'join',server:serverName,side,name:MP.name}));
 }
@@ -4354,14 +4358,17 @@ function mpStartMatch(spawn){
   const o=document.getElementById('mpPanel'); if(o) o.style.display='none';
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
-  sfxResume(); musicPlay('ambient'); phase='play';
+  sfxResume(); phase='play';
+  MP.everJoined=true;                              // from here on this browser session is a shared-arena session — never autosave over the solo campaign
+  money=Math.round(8000*(1+careerRank().perk)*DIFF().funds);   // a fresh war chest, same as any new war
   currentSandboxIdx=-1; currentMapIdx=Math.max(0,Math.min(CAMPAIGN.length-1,3));   // a neutral shared arena
-  applyMap(); buildTheater();
+  applyMap(); musicPlay('ambient'); buildTheater();
   makePlayerShip(MP.pendingShip||'destroyer');
   if(spawn){ player.pos.set(spawn.x||0,0,spawn.z||0); player.heading=spawn.heading||0; }
   buildShopUI();
   landCampaignMode=false;
   _eventT=1e9; _eventCount=0;      // single-player dynamic events stay off in a shared match
+  wireGameInput();                 // mouse look / fire — MP can be the first war of the session
   updateMode();
   flashPrompt('🌐 Joined '+(MP.room&&MP.room.name||'the server')+' as '+MP.side.toUpperCase()+' — '+MP.peers.size+' other captain(s) aboard.');
 }
@@ -5027,7 +5034,7 @@ function destroyPlayerTank(tk,msg){
 }
 function tankFireTick(tk,dt){
   if(tk.cook>0){ tk.cook-=dt; if(tk.cook<=0){ destroyPlayerTank(tk,'Ammunition cook-off!'); return; } }
-  if(tk.fire>0){ tk.hp-=tk.fire*Math.max(6,(tk.maxhp||220)*0.03)*dt;                     // burning armour cooks off fast
+  if(tk.fire>0){ tk.hp-=pDmg(tk.fire*Math.max(6,(tk.maxhp||220)*0.03)*dt);               // burning armour cooks off fast (player difficulty applies)
     burnFx(tankWP(tk).setY(tankWP(tk).y+0.9), 1.15, dt, tk.fire);
     if(tk.fire>=3 && !tk.cook && Math.random()<dt*0.25) tk.cook=1.6;                       // an intense blaze can touch off the ammo
     tk.fireBurn=(tk.fireBurn||0)+dt; if(tk.fireBurn>6){ tk.fireBurn=0; tk.fire--; }
@@ -5038,7 +5045,7 @@ function playerTankWaterTick(tk,dt){
   const surf=footSurfaceAt(tk.pos||tk.group.position,0);
   tk.island=surf?landIdentity(surf):null;
   if(!surf){
-    tk.hp-=5*dt; tk.waterT=(tk.waterT||0)+dt;
+    tk.hp-=pDmg(5*dt); tk.waterT=(tk.waterT||0)+dt;
     if(tk.waterT>2){tk.waterT=0;flashPrompt('🌊 Tank taking water damage — get back to land!');}
     if(tk.hp<=0){destroyPlayerTank(tk,'Flooded in deep water!');}
   } else tk.waterT=0;
@@ -6344,6 +6351,7 @@ function returnFromUAV(destroyed,msg){
     const i=planes.indexOf(pa);if(i>=0)planes.splice(i,1);
   }else{
     if(P.returning)return;
+    if(playerShipLost||player.hp<=0){ returnFromUAV(true,T('Ship lost — UAV ditched','母舰已沉——无人机弃置')); return; }   // no deck to return to
     P.returning=true;P.phase='uavreturn';mouseDownFire=false;
     flashPrompt((msg||'UAV recalled')+' — autopilot returning to ship.');return;
   }
@@ -7208,7 +7216,6 @@ function updateSub(dt){
     if(player.air<=0){ player.submerged=false; flashPrompt('⚠ Out of air — surfacing!'); } }
   else player.air=Math.min(100, player.air+dt*10);                    // recharges on the surface
 }
-let _groundedWarned=false;   // debounces the "aground" prompt to once per grounding, not once per frame
 function updateDrive(dt){
   const def=player.def;
   if(keys['KeyW']) player.throttle=Math.min(1,(player.throttle||0)+dt*0.5);
@@ -7311,16 +7318,8 @@ function updateShells(dt){
     if(s.maxDist && s.dist>s.maxDist){ boom(s.mesh.position.clone(),0.5); removeShellAt(i); continue; } // out of range — self-destruct
     if(s.mesh.geometry.type==='ConeGeometry'||s.mesh.geometry.type==='CylinderGeometry') s.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), s.vel.clone().normalize());
     if(s.water) s.mesh.position.y=0.6;
-    // Islands are solid: shells cannot ghost through beachheads and emerge on
-    // the other side. Torpedoes remain water-only and pass alongside shore.
-    const terrain=!s.water&&islandSurfaceAt(s.mesh.position,.15);
-    if(terrain&&s.mesh.position.y<=terrain.height+.45){
-      splashAt(s.mesh.position.clone().setY(terrain.height+.2),s.strategic?7:1.4);
-      if(s.strategic)blastAll(s.mesh.position.clone().setY(terrain.height+1),s.dmg,s.splash,true,s.spareHarbors);
-      else if(s.splash)explodeAt(s.mesh.position.clone().setY(terrain.height+1),s.team,s.dmg,s.splash,s.owner);
-      else boom(s.mesh.position.clone().setY(terrain.height+.4),.6);
-      removeShellAt(i);continue;
-    }
+    // Islands are solid — handled once, further down, by the layered islandSurfaceY check
+    // (exact beach/grass/mound heights + the spawn-island exemption for shore batteries).
     if(s.trail){ const v=s.vel.clone().normalize(); s.trail.position.copy(s.mesh.position).addScaledVector(v,-s.trailLen/2);
       s.trail.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), v); s.trail.scale.set(1,s.trailLen,1);
       s.trail.material.opacity=(s.heavy?0.72:0.55)+Math.random()*0.22;              // combustion flicker
@@ -8305,18 +8304,19 @@ function updateMode(){
 // =====================================================================
 function endGame(win,msg){
   if(phase==='over')return; phase='over';
-  clearSave();   // the war is decided — nothing to resume
+  const mpMatch=!!(MP.active||MP.everJoined);        // a shared arena is not the campaign: keep the solo save, record, wear and rival arc untouched
+  if(!mpMatch) clearSave();   // the war is decided — nothing to resume
   playEndMusic();                                   // the full naval score swells up when the battle ends — victory or defeat
-  if(win) recordShipWear();                          // note how battered the ship ended up, for next mission
+  if(win&&!mpMatch) recordShipWear();                // note how battered the ship ended up, for next mission
   const oldRank=careerRank();
-  warRecord(win?'wins':'losses');
-  if(win){ rivalAdvance('frustrated'); if(currentMapIdx+1>=Math.floor(CAMPAIGN.length/2)) rivalAdvance('respect'); }
+  if(!mpMatch) warRecord(win?'wins':'losses');
+  if(win&&!mpMatch){ rivalAdvance('frustrated'); if(currentMapIdx+1>=Math.floor(CAMPAIGN.length/2)) rivalAdvance('respect'); }
   const r=careerRank(), nx=nextRank();
   let unlockMsg='';
-  if(win&&currentSandboxIdx<0){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
+  if(win&&currentSandboxIdx<0&&!mpMatch){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
       unlockMsg=`<br><br><span style="color:#7ff0a8">🗺 NEW THEATER UNLOCKED — ${nm.name}!</span>`; }
     else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); rivalAdvance('done'); rivalSpeak('done'); } unlockMsg='<br><br><span style="color:#ffd060">🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.</span>'; } }
-  const marketEarned=awardCareerCredits(win);
+  const marketEarned=mpMatch?0:awardCareerCredits(win);
   if(document.pointerLockElement)document.exitPointerLock();
   document.getElementById('over').style.display='flex';
   const t=document.getElementById('overTitle');
@@ -8352,7 +8352,7 @@ const _idOf=(cat,def)=>{ for(const k in cat) if(cat[k]===def) return k; return n
 const _tankId=tk=>Object.keys(TANKS).find(k=>TANKS[k].name===tk.name)||null;
 function warSavable(){
   if(phase!=='play'||!player||!friendlyHarbor||!enemyHarbor) return false;
-  if(currentSandboxIdx>=0||MP.active) return false;   // sandbox & multiplayer sessions aren't resumable saves
+  if(currentSandboxIdx>=0||MP.active||MP.everJoined) return false;   // sandbox & multiplayer sessions aren't resumable saves (everJoined survives a disconnect)
   return landCampaignMode ? true : (!playerShipLost&&!onFoot&&!piloting&&!drivingTank);   // only snapshot stable aboard-ship states
 }
 function saveWar(){ if(!warSavable()) return;
@@ -8439,6 +8439,7 @@ function resumeWar(){
     buildGroundPlayerTank(p,td.tt,isl);
     const tk=playerTanks[playerTanks.length-1]; tk.heading=td.hd||0; if(td.hp>0) tk.hp=Math.min(td.hp,tk.maxhp); });
   buildShopUI(); applySimpleHud(); wireGameInput(); updateHUD(); updateMode();
+  musicPlay('ambient'); deployNemesis(); _eventT=38+Math.random()*22; _eventCount=0;   // a resumed war gets its music, nemesis and event ticker back
   flashPrompt(T('▶ War resumed — welcome back, Captain!','▶ 战局已恢复——欢迎回来，舰长！'));
 }
 addEventListener('beforeunload',()=>saveWar());
@@ -8580,7 +8581,7 @@ function updateTutorial(dt){
   tutShow();
 }
 
-function gamePaused(){ return shopOpen||harborOpen||buildOpen||tacticalOpen||chatOpen; }   // any open panel freezes the war
+function gamePaused(){ return shopOpen||harborOpen||buildOpen||tacticalOpen||chatOpen||settingsOpen; }   // any open panel freezes the war
 function loop(){
   requestAnimationFrame(loop);
   const rawDt=clock.getDelta(),dt=Math.min(0.05,rawDt);
