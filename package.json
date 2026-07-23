@@ -3,6 +3,10 @@
   "private": true,
   "description": "Unit tests for Iron Tide's pure game logic. The game itself has no build step — this is dev tooling only.",
   "scripts": {
-    "test": "node --test \"tests/**/*.test.js\""
+    "test": "node --test \"tests/**/*.test.js\"",
+    "smoke": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }
