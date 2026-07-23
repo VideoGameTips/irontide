@@ -1,3 +1,4 @@
 node_modules/
 .DS_Store
 test-results/
+tests/sim/results-pilot.json

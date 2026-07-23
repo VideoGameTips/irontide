@@ -146,6 +146,8 @@ const SIM_FN = async (cfg) => {
   await browser.close();
   console.log('\n== difficulty × theater summary ==');
   console.table(rows);
-  require('node:fs').writeFileSync('tests/sim/results.json', JSON.stringify(rows, null, 2));
-  console.log('written tests/sim/results.json');
+  // pilot runs get their own file — a 5-run sanity check must never clobber the committed matrix
+  const out = PILOT ? 'tests/sim/results-pilot.json' : 'tests/sim/results.json';
+  require('node:fs').writeFileSync(out, JSON.stringify(rows, null, 2));
+  console.log('written ' + out);
 })();
