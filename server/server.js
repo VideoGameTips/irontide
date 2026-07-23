@@ -9,7 +9,6 @@ const PORT = Number(process.env.PORT || 3000);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(HERE, '..');
 const GAME_INDEX = path.join(REPO_ROOT, 'index.html');
-const THREE_JS = path.join(REPO_ROOT, 'vendor', 'three.min.js');
 const ROOM_IDLE_MS = 20 * 60 * 1000;
 const CLIENT_IDLE_MS = 45 * 1000;
 const MAX_ROOMS = 32;
@@ -153,23 +152,33 @@ async function serveGame(res) {
   }
 }
 
-async function serveThree(res) {
+// The game page loads a handful of local scripts (vendor/three.min.js, js/terrain.js,
+// vendor/postprocessing/*). Serve any .js under those two directories — resolved and
+// prefix-checked so ../ traversal cannot escape the repo.
+async function serveScript(res, urlPath) {
+  const clean = path.normalize(urlPath).replace(/^([/\\])+/, '');
+  const abs = path.resolve(REPO_ROOT, clean);
+  const allowedRoots = [path.resolve(REPO_ROOT, 'vendor'), path.resolve(REPO_ROOT, 'js')];
+  if (!abs.endsWith('.js') || !allowedRoots.some((r) => abs.startsWith(r + path.sep))) {
+    return writeJson(res, 404, { error: 'Not found.' });
+  }
   try {
-    const js = await readFile(THREE_JS);
+    const js = await readFile(abs);
     res.writeHead(200, {
       'content-type': 'application/javascript; charset=utf-8',
       'cache-control': 'public, max-age=86400',
     });
     res.end(js);
   } catch (err) {
-    writeJson(res, 404, { error: 'vendor/three.min.js missing from deployment.', detail: err.message });
+    writeJson(res, 404, { error: clean + ' missing from deployment.', detail: err.message });
   }
 }
 
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return writeJson(res, 204, {});
   if (req.url === '/' || req.url === '/index.html') return serveGame(res);
-  if (req.url === '/vendor/three.min.js') return serveThree(res);
+  if (req.url === '/favicon.ico') { res.writeHead(204); return res.end(); }
+  if ((req.url.startsWith('/vendor/') || req.url.startsWith('/js/')) && req.url.endsWith('.js')) return serveScript(res, req.url);
   if (req.url === '/health') {
     return writeJson(res, 200, {
       ok: true,
