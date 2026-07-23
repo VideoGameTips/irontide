@@ -3167,7 +3167,14 @@ function awardCareerCredits(win){
   const earned=Math.max(80,Math.round((win?700:180)+level*(win?150:45)+sunk*65+planeKills*30+blue*20));
   career.credits+=earned;saveCareer();return earned;
 }
-function applyMap(){ const M=currentSandboxIdx>=0?(SANDBOX_MAPS[currentSandboxIdx]||SANDBOX_MAPS[0]):(CAMPAIGN[currentMapIdx]||CAMPAIGN[0]);
+// ⏱ QUICK BATTLE (#36) — a deliberately tiny theater for a five-minute session:
+// the harbor sits close, the fleet is small, and sinking 5 ships also wins.
+// Soft goal, no hard clock — a countdown that kills a fight mid-swing feels bad.
+const QUICK_BATTLE={name:'Quick Battle', theme:'A five-minute skirmish. Sink 5 ships or smash the harbor — whichever comes first.',
+  enemies:2, allies:2, isles:2, reinforce:0.35, weather:'clear', tod:0.42, boss:false, hqZ:1100, bigIsles:false};
+let quickMode=false;
+const QUICK_KILL_GOAL=5;
+function applyMap(){ const M=quickMode?QUICK_BATTLE:currentSandboxIdx>=0?(SANDBOX_MAPS[currentSandboxIdx]||SANDBOX_MAPS[0]):(CAMPAIGN[currentMapIdx]||CAMPAIGN[0]);
   if(typeof weather==='object'){ weather.type=M.weather; weather.tod=M.tod; weather.day=null; }
   window._MAP=M; return M; }
 function mapArmyProfile(team=1,map=null){
@@ -3634,6 +3641,7 @@ function updateWarPacing(dt){
   const ground=window._MAP&&window._MAP.ground;
   // land victory: on an all-ground theater, seizing every island wins the war
   if(ground){ const cap=islands.filter(i=>i.capturable); if(cap.length&&cap.every(i=>i.owner===0)){ endGame(true,'All islands secured — the archipelago is yours!'); return; } }
+  if(quickMode&&sunk>=QUICK_KILL_GOAL){ endGame(true,T(QUICK_KILL_GOAL+' ships down — quick battle won!',QUICK_KILL_GOAL+' 艘敌舰击沉——快速战斗获胜！')); return; }
   // parked aircraft slowly rearm from the ship's magazine (strategic bombs excluded — no free nukes)
   planes.forEach(p=>{ if(p.parked&&p.def.bombs&&!p.def.strategicBomb&&p.bombsLeft<p.def.bombs){
       p.deckRearmT=(p.deckRearmT||0)+dt; if(p.deckRearmT>=5){ p.deckRearmT=0; p.bombsLeft++; } } else p.deckRearmT=0; });
@@ -3665,6 +3673,9 @@ function updateWarPacing(dt){
   if(!ce){ const parent=document.getElementById('objective');
     if(parent){ ce=document.createElement('div'); ce.id='obcompass';
       ce.style.cssText='margin-top:2px;font-size:11px;color:#9fc6e8;letter-spacing:1px;'; if(simpleHudOn()) ce.style.display='none'; parent.appendChild(ce); } }
+  const qe=document.getElementById('quickgoal')||(function(){ const parent=document.getElementById('objective'); if(!parent) return null;
+    const q=document.createElement('div'); q.id='quickgoal'; q.style.cssText='margin-top:2px;font-size:11px;color:#ffe6a0;letter-spacing:1px;'; parent.appendChild(q); return q; })();
+  if(qe) qe.textContent = quickMode ? ('⏱ '+T('QUICK BATTLE — ','快速战斗——')+Math.min(sunk,QUICK_KILL_GOAL)+'/'+QUICK_KILL_GOAL+T(' ships · ',' 艘 · ')+Math.floor(Math.max(0,t2-warStartT2)/60)+':'+String(Math.floor(Math.max(0,t2-warStartT2)%60)).padStart(2,'0')) : '';
   if(ce){ const from=playerFocusPos(); let txt='';
     if(from){ let tgt=enemyHarbor?enemyHarbor.pos:null, lbl=T('ENEMY HARBOR','敌方海港');
       if(sideOb&&sideOb.kind==='capture'){ let bd=1e9,bi=null;
@@ -4541,6 +4552,14 @@ function buildMenu(){
     log.querySelector('#medalsBtn').onclick=showMedals;
     log.querySelector('#mpBtn').onclick=openMultiplayer;
   }
+  // ⏱ quick battle button — one click, straight into a five-minute skirmish with your usual ship
+  if(!document.getElementById('quickBtn')){
+    const sub2=document.querySelector('#menu .sub');
+    if(sub2){ const qb=document.createElement('div'); qb.id='quickBtn';
+      qb.style.cssText='text-align:center;margin:2px 0 10px;';
+      qb.innerHTML='<span style="cursor:pointer;color:#ffe6a0;font-size:12px;letter-spacing:2px;border:1px solid #4e3f21;border-radius:20px;padding:6px 18px;background:rgba(255,208,96,0.05)">⏱ '+T('5-MINUTE BATTLE','5 分钟快速战斗')+'</span>';
+      qb.firstChild.onclick=startQuickBattle;
+      sub2.after(qb); } }
   // continue button — appears when a saved war exists (fresh menu only, not the respawn picker)
   let rb=document.getElementById('resumeBtn');
   if(!rb){ rb=document.createElement('button'); rb.id='resumeBtn';
@@ -4686,7 +4705,7 @@ function deployLandCampaignStart(skipEscort){   // skipEscort: resuming a save w
   flashPrompt('🪂 AIRBORNE ASSAULT — landed at '+(footLand.name||'the command center')+'. Secure every island.');
 }
 function startGame(shipId){
-  lastShipId=shipId;
+  lastShipId=shipId; try{localStorage.setItem('ironTideLastShip',shipId);}catch(e){}
   shipsLostThisWar=0; warStartT2=t2;
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
@@ -4704,7 +4723,8 @@ function startGame(shipId){
     landCampaignMode=false;
     for(let i=0;i<M.enemies;i++) spawnEnemy();
     for(let i=0;i<M.allies;i++) spawnAlly();   // NPC starting fleets per map
-    if(currentSandboxIdx>=0) showBanner(T('SANDBOX','沙盒战场')+' · '+M.name, M.theme+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:3});
+    if(quickMode) showBanner('⏱ '+T('QUICK BATTLE','快速战斗'), T('Sink '+QUICK_KILL_GOAL+' ships or smash the harbor — whichever comes first.','击沉 '+QUICK_KILL_GOAL+' 艘敌舰或摧毁敌港——先到先赢。')+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:3});
+    else if(currentSandboxIdx>=0) showBanner(T('SANDBOX','沙盒战场')+' · '+M.name, M.theme+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:3});
     else showBanner(T('OPERATION '+(currentMapIdx+1),'第 '+(currentMapIdx+1)+' 号作战')+' · '+campaignName(currentMapIdx),
       campaignTheme(currentMapIdx)+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:3});
     if(currentMapIdx>=CAMPAIGN.length-4) rivalAdvance('showdown');
@@ -8425,18 +8445,25 @@ let lastShipId=null;
 // guaranteed-clean world reset this single-file game has (no half-torn-down piloting/
 // onFoot/tank state). consumeRetryIntent() below re-enters battle right after boot.
 function retrySameWar(){
-  try{ sessionStorage.setItem('ironTideRetry', JSON.stringify({map:currentMapIdx, sandbox:currentSandboxIdx, ship:lastShipId||'destroyer'})); }catch(e){}
+  try{ sessionStorage.setItem('ironTideRetry', JSON.stringify({map:currentMapIdx, sandbox:currentSandboxIdx, ship:lastShipId||'destroyer', quick:quickMode})); }catch(e){}
   location.reload();
 }
 function consumeRetryIntent(){
   let r=null;
   try{ const raw=sessionStorage.getItem('ironTideRetry'); if(raw){ sessionStorage.removeItem('ironTideRetry'); r=JSON.parse(raw); } }catch(e){}
   if(!r||typeof r.ship!=='string'||!SHIPS[r.ship]) return;
-  if(typeof r.sandbox==='number'&&r.sandbox>=0&&SANDBOX_MAPS[r.sandbox]) currentSandboxIdx=r.sandbox;
+  if(r.quick){ quickMode=true; currentSandboxIdx=-1; }
+  else if(typeof r.sandbox==='number'&&r.sandbox>=0&&SANDBOX_MAPS[r.sandbox]) currentSandboxIdx=r.sandbox;
   else { currentSandboxIdx=-1; if(typeof r.map==='number'&&CAMPAIGN[r.map]&&r.map<mapsUnlocked()) currentMapIdx=r.map; }
   const story=document.getElementById('story'); if(story) story.style.display='none';
   document.addEventListener('pointerdown',()=>sfxResume(),{once:true});   // reloaded page: audio unlocks on the first click of the rematch
   startGame(r.ship);
+}
+function startQuickBattle(){
+  let ship='destroyer';
+  try{ const v=localStorage.getItem('ironTideLastShip'); if(v&&SHIPS[v]&&!SHIPS[v].marketOnly) ship=v; }catch(e){}
+  quickMode=true; currentSandboxIdx=-1;
+  startGame(ship);
 }
 function endGame(win,msg){
   if(phase==='over')return; phase='over';
@@ -8450,14 +8477,14 @@ function endGame(win,msg){
   if(win&&!mpMatch){ rivalAdvance('frustrated'); if(currentMapIdx+1>=Math.floor(CAMPAIGN.length/2)) rivalAdvance('respect'); }
   const r=careerRank(), nx=nextRank();
   let unlockMsg='';
-  if(win&&currentSandboxIdx<0&&!mpMatch){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
+  if(win&&currentSandboxIdx<0&&!mpMatch&&!quickMode){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
       unlockMsg=`<br><br><span style="color:#7ff0a8">${T('🗺 NEW THEATER UNLOCKED — '+nm.name+'!','🗺 新战区解锁——'+campaignName(currentMapIdx+1)+'！')}</span>`; }
     else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); rivalAdvance('done'); rivalSpeak('done'); } unlockMsg='<br><br><span style="color:#ffd060">'+T('🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.','🏆 战役通关——每一片战区都是你的了，舰队司令。')+'</span>'; } }
   const marketEarned=mpMatch?0:awardCareerCredits(win);
   // #34: theater stars — 1★ for the win, +1★ under par time, +1★ without losing a ship.
   // Best-of across replays; par scales with the theater's authored fleet size.
   let starsHtml='', earnedStars=0;
-  if(win&&currentSandboxIdx<0&&!mpMatch){
+  if(win&&currentSandboxIdx<0&&!mpMatch&&!quickMode){
     const M=CAMPAIGN[currentMapIdx]||{};
     const dur=Math.max(0,t2-warStartT2), parT=240+(M.enemies||3)*80;
     earnedStars=1+(dur<=parT?1:0)+(shipsLostThisWar===0?1:0);
@@ -8486,14 +8513,14 @@ function endGame(win,msg){
     unlockMsg + cheerMsg(win,mpMatch);
   // campaign win: append this theater's chronicle beat to the victory screen
   // (cheerMsg defined below endGame — hoisted function declaration)
-  if(win && currentSandboxIdx<0 && LORE.beats[currentMapIdx]){
+  if(win && currentSandboxIdx<0 && !quickMode && LORE.beats[currentMapIdx]){
     document.getElementById('overText').innerHTML +=
       `<br><br><span style="display:block;max-width:620px;margin:8px auto 0;padding-top:14px;border-top:1px solid #21384e;text-align:left;color:#cfe0ee;font-size:13px;line-height:1.7;font-style:italic">`+
       `<span style="display:block;color:#ffd060;font-style:normal;letter-spacing:2px;font-size:12px;margin-bottom:7px;text-align:center">${trText('⚓ CHRONICLE — ')}${isZh()?campaignName(currentMapIdx):CAMPAIGN[currentMapIdx].name.toUpperCase()}</span>`+
       `${(isZh()&&typeof LORE_ZH_BEATS!=='undefined'&&LORE_ZH_BEATS[currentMapIdx])?LORE_ZH_BEATS[currentMapIdx]:LORE.beats[currentMapIdx]}</span>`;
   }
   _lastReport={ win, sunk, money, rankName:r.name, stars:earnedStars,
-    theater: currentSandboxIdx>=0 ? (SANDBOX_MAPS[currentSandboxIdx]||{}).name||'' : campaignName(currentMapIdx) };
+    theater: quickMode ? T('Quick Battle','快速战斗') : currentSandboxIdx>=0 ? (SANDBOX_MAPS[currentSandboxIdx]||{}).name||'' : campaignName(currentMapIdx) };
 }
 // #35: draw the summary onto a canvas and download it — a battle report worth showing someone
 let _lastReport=null;
@@ -8550,7 +8577,7 @@ const _idOf=(cat,def)=>{ for(const k in cat) if(cat[k]===def) return k; return n
 const _tankId=tk=>Object.keys(TANKS).find(k=>TANKS[k].name===tk.name)||null;
 function warSavable(){
   if(phase!=='play'||!player||!friendlyHarbor||!enemyHarbor) return false;
-  if(currentSandboxIdx>=0||MP.active||MP.everJoined) return false;   // sandbox & multiplayer sessions aren't resumable saves (everJoined survives a disconnect)
+  if(currentSandboxIdx>=0||MP.active||MP.everJoined||quickMode) return false;   // sandbox, multiplayer & quick battles aren't resumable saves (everJoined survives a disconnect)
   return landCampaignMode ? true : (!playerShipLost&&!onFoot&&!piloting&&!drivingTank);   // only snapshot stable aboard-ship states
 }
 function saveWar(){ if(!warSavable()) return;
