@@ -248,6 +248,9 @@
   .tbtn.primary{height:58px;background:rgba(110,36,28,.78);border-color:rgba(255,140,110,.72);color:#ffe7dc;}
   .tbtn.on{background:rgba(40,90,120,.86);border-color:#8bdcff;color:#fff;}
   #touchUtility{position:absolute;left:18px;top:88px;display:flex;gap:7px;flex-wrap:wrap;width:min(330px,calc(100vw - 36px));pointer-events:auto;}
+  body.touch-ready #comms{top:210px!important;width:min(300px,58vw)!important;}
+  body.touch-ready #claude{bottom:230px;}
+  body.touch-ready #claudeBubble{max-width:46vw;}
   #touchUtility .tbtn{height:36px;min-width:58px;padding:0 8px;border-radius:18px;background:rgba(8,18,28,.55);font-size:9px;}
   #touchHint{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);padding:5px 9px;border-radius:999px;background:rgba(6,14,22,.55);border:1px solid rgba(120,180,220,.25);font-size:10px;color:rgba(230,245,255,.74);letter-spacing:.7px;white-space:nowrap;}
   @media (pointer:fine) and (min-width:900px){ body:not(.touch-forced) #touchControls{display:none!important;} }
@@ -3383,6 +3386,7 @@ function removeShellAt(i){
 }
 function removeFxAt(i){
   const f=fx[i]; if(!f) return;
+  if(f.fireLight) _liveFireLights=Math.max(0,_liveFireLights-1);
   destroyObject3D(f.mesh); fx.splice(i,1);
 }
 function removeSalvageAt(i){
@@ -3662,6 +3666,7 @@ function nextClaudeTip(){
 }
 function updateClaude(dt){
   if(phase!=='play') return;
+  if(typeof tutIdx!=='undefined'&&tutIdx>=0) return;   // the tutorial owns the first minute — no competing tips
   initClaude();
   if(claudeHidden) return;
   claudeT-=dt; if(claudeT>0) return; claudeT=13;
@@ -4614,11 +4619,10 @@ function startGame(shipId){
     else showBanner(T('OPERATION '+(currentMapIdx+1),'第 '+(currentMapIdx+1)+' 号作战')+' · '+campaignName(currentMapIdx),
       campaignTheme(currentMapIdx)+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:3});
     if(currentMapIdx>=CAMPAIGN.length-4) rivalAdvance('showdown');
-    rivalSpeak(career.rivalPhase);
+    _introStageT=5; _introStage=0;   // stagger the opening voices: banner first, Varga ~5s, nemesis ~11s
     if(M.boss) spawnBoss(1,true);
     if(shipId==='boss')friendlyBossUsed=true;else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
     flashPrompt('⚔ '+M.name.toUpperCase()+' — '+M.theme);
-    deployNemesis();       // named Dominion captain for this theater (if any)
     startDrive();          // spawn already at the helm: W moves the ship within seconds of clicking a card
     startTutorial();       // first-ever battle walks through W → mouse → first kill → armory (no-op once completed)
   }
@@ -6753,7 +6757,7 @@ function engineFactor(s){ const c=s.crit; return !c?1 : c.engine>=2?0.2 : c.engi
 function radarFactor(s){ return ((s.crit&&s.crit.radar)?0.6:1) * weatherVis(); }   // radar damage + fog/storm/night all shorten engagement range
 // ===== FIRE — one devastating, easily-spread blaze system shared by ships, tanks, planes & buildings =====
 function fireParticle(pos,scale){
-  if(fx.length>MAX_FX-10) return;
+  if(fx.length>MAX_FX-80) return;   // fires never starve muzzle/impact/splash feedback of pool slots
   const r=Math.random();
   if(r<0.52){ // flame tongue: white-hot base cooling to deep red, licking upward and shrinking as it rises
     const f=_spr(fireTex(),true); f.scale.setScalar((0.8+Math.random()*1.2)*scale);
@@ -6776,12 +6780,14 @@ function fireParticle(pos,scale){
       vel:new THREE.Vector3((Math.random()-0.5)*8*scale,(4+Math.random()*8)*scale,(Math.random()-0.5)*8*scale),
       c0:new THREE.Color(0xffe09a),c1:new THREE.Color(0xd8360a)}); }
 }
+let _liveFireLights=0;
+let _introStage=-1,_introStageT=0;   // staged opening chatter (see startGame)
 function burnFx(pos,scale,dt,intensity){   // a sustained blaze: flames + smoke + a flickering warm glow
   const rate=6+intensity*7; let n=0;
   while(Math.random()<dt*rate && n<3){ fireParticle(pos,scale); n++; }
-  if(Math.random()<dt*(1.1+intensity*0.5) && fx.length<MAX_FX-3){
+  if(Math.random()<dt*(1.1+intensity*0.5) && fx.length<MAX_FX-3 && _liveFireLights<6){   // PointLights are the most expensive thing here — hard cap them
     const l=new THREE.PointLight(0xff7326, 2+scale*0.8, 14+scale*8); l.position.copy(pos).setY(pos.y+1.4); scene.add(l);
-    fx.push({mesh:l,life:0.11+Math.random()*0.08,li:16,light:true}); }
+    _liveFireLights++; fx.push({mesh:l,life:0.11+Math.random()*0.08,li:16,light:true,fireLight:true}); }
 }
 // ===== BATTLE DAMAGE — models buckle, scorch and shed parts as they get wrecked =====
 function crippleParts(ent, allowDetach){
@@ -7019,6 +7025,9 @@ function update(dt,t){
   updateCamera();
   updateDamageNumbers(dt);
   updateHitFlashes(dt);
+  if(_introStage>=0){ _introStageT-=dt;
+    if(_introStageT<=0){ if(_introStage===0){ rivalSpeak(career.rivalPhase); _introStage=1; _introStageT=6; }
+      else { deployNemesis(); _introStage=-1; } } }
   updateAircraftAimAssist(dt);
 }
 
@@ -7726,6 +7735,12 @@ function moveLandUnitToward(u,target,dt,stop){
   if(!target||u.kind!=='tank'&&u.kind!=='soldier')return;
   const to=target.clone().sub(u.pos);to.y=0;const d=to.length();if(d<stop||d<1)return;
   const sp=u.kind==='tank'?(u.tank&&u.tank.speed?u.tank.speed*.7:10):7.2;
+  // amphibious discipline: an AI tank on dry land only wades in when the objective is a SHORT crossing —
+  // otherwise whole platoons drive into deep water and drown pointlessly on the way to distant islands
+  if(u.kind==='tank'&&d>240&&footSurfaceAt(u.pos,0)){
+    const aheadX=u.pos.x+to.x/d*sp*dt*4, aheadZ=u.pos.z+to.z/d*sp*dt*4;
+    if(!footSurfaceAt({x:aheadX,y:0,z:aheadZ},0)) return;   // next steps lead off the beach — hold here
+  }
   to.normalize();u.pos.addScaledVector(to,sp*dt);
   const surf=footSurfaceAt(u.pos,0); u.island=surf?landIdentity(surf):null;
   u.pos.y=surf?groundHeightAt(u.pos,landIdentity(surf)):(u.kind==='tank'?.7:.35);
