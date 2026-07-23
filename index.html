@@ -392,6 +392,9 @@ function showFatalError(err){
   if(fatalReported)return;fatalReported=true;
   const text=(err&&((err.stack)||err.message)||String(err)||'Unknown runtime failure').slice(0,1400);
   const panel=document.getElementById('fatalError'),detail=document.getElementById('fatalDetail');
+  if(panel&&typeof trText==='function'){ try{ panel.querySelector('h2').textContent=trText('⚠ GAME ERROR');
+    panel.querySelector('p').textContent=trText('The battle stopped safely instead of silently freezing. Reload to restart the renderer.');
+    panel.querySelector('button').textContent=trText('RELOAD GAME'); }catch(e){} }
   if(detail)detail.textContent=text;if(panel)panel.style.display='flex';
   if(document.pointerLockElement)document.exitPointerLock();
   console.error('Iron Tide stopped safely:',err);
@@ -416,15 +419,23 @@ let NAME_ZH_CI=null;
 function trName(n){ if(!isZh()||n==null) return n; const s=String(n);
   if(typeof NAME_ZH==='undefined') return s;
   if(NAME_ZH[s]) return NAME_ZH[s];
+  if(typeof NEMESIS_ZH!=='undefined'&&NEMESIS_ZH[s]) return NEMESIS_ZH[s];
   if(!NAME_ZH_CI){ NAME_ZH_CI={}; for(const k in NAME_ZH) NAME_ZH_CI[k.toUpperCase()]=NAME_ZH[k]; }
   return NAME_ZH_CI[s.toUpperCase()]||s; }
 let _trK=null,_trV=null;   // single-entry memo — updatePrompt re-translates the same string every frame
 function trText(s){ if(!isZh()||!s||typeof s!=='string') return s;
   if(s===_trK) return _trV;
   let out=s;
-  if(typeof ZH_EXACT!=='undefined'&&ZH_EXACT[s]) out=ZH_EXACT[s];
-  else if(typeof ZH_PATTERNS!=='undefined'){ for(const p of ZH_PATTERNS){ const m=s.match(p.re); if(m){ out=p.out(m); break; } } }
-  _trK=s; _trV=out; return out; }
+  let hitExact=false;
+  for(const D of [typeof ZH_EXACT!=='undefined'?ZH_EXACT:null, typeof ZH_EXACT_KID!=='undefined'?ZH_EXACT_KID:null,
+                  typeof NEMESIS_ZH!=='undefined'?NEMESIS_ZH:null, typeof ALMANAC_ZH!=='undefined'?ALMANAC_ZH:null,
+                  typeof MP_ZH!=='undefined'?MP_ZH:null, typeof KPANEL_ZH!=='undefined'?KPANEL_ZH:null]){
+    if(D&&D[s]){ out=D[s]; hitExact=true; break; } }
+  if(!hitExact){ let hit=false;
+    if(typeof ZH_PATTERNS!=='undefined') for(const p of ZH_PATTERNS){ const m=s.match(p.re); if(m){ out=p.out(m); hit=true; break; } }
+    if(!hit&&typeof ZH_PATTERNS_KID!=='undefined') for(const p of ZH_PATTERNS_KID){ const m=s.match(p.re); if(m){ out=p.out(m); break; } } }
+  _trK=s; _trV=out; return out;
+}
 function catTr(zh,id,field,en){ if(!isZh()||!zh) return en; const d=zh[id]; return (d&&d[field])||en; }
 function trRank(n){ if(!isZh()) return n; return (typeof RANKS_ZH!=='undefined'&&RANKS_ZH[n])||trName(n); }  // 'Commander' means 中校 as a rank, 指挥官 as tank crew
 let menuSubEn=null;   // last contextual respawn/refusal message shown in #menu .sub — survives language switches
@@ -3106,7 +3117,7 @@ function marketCost(cat,id,def){
   return Math.max(120,Math.round((base*mult+lvl*90)/10)*10);
 }
 function marketLabel(cat,id,def,normal){
-  if(!marketUnlocked(cat,id,def))return 'LOCK L'+marketLevel(cat,id,def);
+  if(!marketUnlocked(cat,id,def))return '🔒 L'+marketLevel(cat,id,def);
   return normal;
 }
 function buyMarketLicense(cat,id,def){
@@ -3291,8 +3302,9 @@ const gameSettings={combatFeedback:true,damageNumbers:false,cameraShake:true};
 const damageNumbers=[];
 function loadGameSettings(){try{const s=JSON.parse(localStorage.getItem('ironTideSettings'));if(s&&typeof s==='object')Object.assign(gameSettings,s);}catch(e){}}
 function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
-function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+label+'</span><b>'+ (gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
-function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;document.getElementById('settings').style.display=settingsOpen?'block':'none';if(settingsOpen){mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
+function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
+function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;const sp=document.getElementById('settings');sp.style.display=settingsOpen?'block':'none';if(settingsOpen){
+  sp.querySelector('h2').textContent=trText('⚙ SETTINGS'); sp.querySelector('p').innerHTML=isZh()?'战斗画面提示都可以自由开关。按 <b>K</b> 关闭。':'Visual combat feedback is optional. Press <b>K</b> to close.';mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
 function clearDamageNumbers(){while(damageNumbers.length){const d=damageNumbers.pop();d.el.remove();}}
 function showDamageNumber(pos,dmg,friendly=true,crit=false){if(!gameSettings.damageNumbers||!camera||damageNumbers.length>=14||!pos)return;const el=document.createElement('div');el.className='dmgnum'+(crit?' crit':'');el.textContent=(crit?'CRIT ':'-')+Math.max(1,Math.round(dmg));el.style.color=crit?'#ffb15f':(friendly?'#ffe08a':'#ff8f82');document.body.appendChild(el);damageNumbers.push({el,pos:pos.clone().add(new THREE.Vector3((Math.random()-.5)*1.5,2+Math.random()*1.2,(Math.random()-.5)*1.5)),life:crit?1.05:.85});}
 function updateDamageNumbers(dt){for(let i=damageNumbers.length-1;i>=0;i--){const d=damageNumbers[i];d.life-=dt;d.pos.y+=dt*2.5;const p=d.pos.clone().project(camera);if(d.life<=0||p.z<-1||p.z>1){d.el.remove();damageNumbers.splice(i,1);continue;}d.el.style.left=(p.x*.5+.5)*innerWidth+'px';d.el.style.top=(-p.y*.5+.5)*innerHeight+'px';d.el.style.opacity=Math.min(1,d.life/.2).toFixed(2);}}
@@ -3309,7 +3321,8 @@ function showHit(target,kill=false,mode=''){
   const el=document.getElementById('hitmarker');if(el)el.classList.add('on');
   if(target){const feed=document.getElementById('killfeed');if(feed){const line=document.createElement('div');line.className='killline'+(kill?' enemy':'');
     if(mode){line.className+=' '+mode;}
-    line.textContent=kill?'DESTROYED · '+target:(mode==='crit'?'CRITICAL HIT · '+target:mode==='rail'?'RAIL STRIKE · '+target:mode==='aa'?'AIR HIT · '+target:mode==='missile'?'MISSILE HIT · '+target:'HIT · '+target);
+    { const pre=kill?'DESTROYED · ':(mode==='crit'?'CRITICAL HIT · ':mode==='rail'?'RAIL STRIKE · ':mode==='aa'?'AIR HIT · ':mode==='missile'?'MISSILE HIT · ':'HIT · ');
+      line.textContent=(isZh()&&typeof MP_ZH!=='undefined'&&MP_ZH[pre]?MP_ZH[pre]:pre)+trName(target); }
     feed.prepend(line);while(feed.children.length>5)feed.lastChild.remove();setTimeout(()=>line.remove(),3600);}}
 }
 function shipBreakupLikely(ship,dmg,hitPos){
@@ -4021,10 +4034,11 @@ function campaignMapSVG(animate){
 }
 function theaterCardHTML(i){
   if(currentSandboxIdx>=0){ const M=SANDBOX_MAPS[currentSandboxIdx], army=mapArmyProfile(1,M);
+    const sz=isZh()&&typeof SANDBOX_ZH!=='undefined'&&SANDBOX_ZH[M.name];
     const tag=(t,cls)=>'<span class="tag'+(cls?' '+cls:'')+'">'+t+'</span>';
     return '<div class="no" style="color:#ffd060">'+T('⚓ SANDBOX — always unlocked · campaign progress paused','⚓ 沙盒战场——永久解锁 · 不计入战役进度')+'</div>'+
-      '<div class="nm">☢ '+M.name+'</div>'+
-      '<div class="th">'+M.theme+'</div>'+
+      '<div class="nm">☢ '+(sz?sz.name:M.name)+'</div>'+
+      '<div class="th">'+(sz?sz.theme:M.theme)+'</div>'+
       '<div class="tags">'+
         tag(M.ground?T('Land assault','陆战'):T('Naval sandbox','海战沙盒'))+
         tag(T(M.enemies+' enemy ships',M.enemies+' 艘敌舰'))+
@@ -4104,8 +4118,9 @@ function buildCampaignPicker(){
   SANDBOX_MAPS.forEach((M,i)=>{ const sel=i===currentSandboxIdx;
     const c=document.createElement('div');
     c.style.cssText='width:164px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:pointer;border:1px solid '+(sel?'#ffd060':'#3a3020')+';background:'+(sel?'#2a2212':'#141b22')+';';
-    c.innerHTML='<div style="color:#ffe6a0;font-weight:700;font-size:13px">☢ '+M.name+'</div>'+
-      '<div style="color:#9fb1bd;margin-top:4px;line-height:1.4">'+M.theme+'</div>';
+    { const sz=isZh()&&typeof SANDBOX_ZH!=='undefined'&&SANDBOX_ZH[M.name];
+    c.innerHTML='<div style="color:#ffe6a0;font-weight:700;font-size:13px">☢ '+(sz?sz.name:M.name)+'</div>'+
+      '<div style="color:#9fb1bd;margin-top:4px;line-height:1.4">'+(sz?sz.theme:M.theme)+'</div>'; }
     c.onclick=()=>{ currentSandboxIdx=i; buildCampaignPicker(); };
     sbRow.appendChild(c);
   });
@@ -4121,9 +4136,10 @@ function buildCampaignPicker(){
     const c=document.createElement('div');
     c.style.cssText='width:196px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:'+(owned||!unlocked?'default':'pointer')+
       ';border:1px solid '+(owned?'#5ecb91':unlocked?'#7d5cc8':'#342b48')+';background:'+(owned?'#10251b':unlocked?'#19152a':'#111721')+';opacity:'+(unlocked?1:.55)+';';
-    c.innerHTML='<div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#e4d6ff;font-weight:700">'+(owned?'✓ ':'')+(def.name||item.id)+'</span><span style="color:#ffd060">'+(owned?T('OWNED','已拥有'):unlocked?'◈'+item.cost:'L'+item.level)+'</span></div>'+
-      '<div style="color:#9b86d0;margin-top:3px;font-size:10px;letter-spacing:1px">'+item.tag+'</div>'+
-      '<div style="color:#9fb1bd;margin-top:5px;line-height:1.4">'+item.desc+'</div>';
+    { const mz=isZh()&&typeof MARKET_ZH!=='undefined'?MARKET_ZH[key]:null, tz=isZh()&&typeof MARKET_ZH!=='undefined'?(MARKET_ZH.TAGS||{})[item.tag]:null;
+    c.innerHTML='<div style="display:flex;justify-content:space-between;gap:8px"><span style="color:#e4d6ff;font-weight:700">'+(owned?'✓ ':'')+trName(def.name||item.id)+'</span><span style="color:#ffd060">'+(owned?T('OWNED','已拥有'):unlocked?'◈'+item.cost:'L'+item.level)+'</span></div>'+
+      '<div style="color:#9b86d0;margin-top:3px;font-size:10px;letter-spacing:1px">'+(tz||item.tag)+'</div>'+
+      '<div style="color:#9fb1bd;margin-top:5px;line-height:1.4">'+((mz&&mz.desc)||item.desc)+'</div>'; }
     if(unlocked&&!owned)c.onclick=()=>buyCampaignMarketItem(key);
     mRow.appendChild(c);
   });
@@ -4232,9 +4248,9 @@ function storyOverlay(){
 }
 function showStory(title, bodyHTML, btnLabel, onClose){
   const o=storyOverlay();
-  o.querySelector('#storyTitle').innerHTML=title;
+  o.querySelector('#storyTitle').innerHTML=trText(title);
   o.querySelector('#storyBody').innerHTML=bodyHTML;
-  const b=o.querySelector('#storyBtn'); b.textContent=btnLabel||'CONTINUE';
+  const b=o.querySelector('#storyBtn'); b.textContent=trText(btnLabel||'CONTINUE');
   b.onclick=()=>{ o.style.display='none'; if(onClose) onClose(); };
   o.style.display='flex'; o.querySelector('#storyPanel').scrollTop=0;
 }
@@ -4246,21 +4262,23 @@ function buildAlmanac(){
   const card=k=>{ const s=SHIPS[k];
     return '<div style="margin-top:14px;padding:12px 14px;background:rgba(255,255,255,0.02);border:1px solid #1c3145;border-radius:8px">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">'+
-        '<span style="color:#ffd060;font-size:13px;letter-spacing:1px">'+s.name+'</span>'+
-        '<span style="color:#5f7a90;font-size:11px">'+s.cls+'</span></div>'+
-      '<div style="margin-top:4px;color:#7e93a8;font-size:11px">Length '+s.len+'m · Hull '+s.hp+' HP · '+Math.round(s.mounts*1.5)+' mounts · '+(s.kind==='carrier'?'Flat-top':s.kind==='sub'?'Submersible':'Surface')+'</div>'+
-      '<div style="margin-top:6px;font-size:13px;line-height:1.6;color:#cfe0ee">'+(s.desc||'')+'</div></div>'; };
-  let html='<div style="color:#9fc6e8;font-size:12px;text-align:center;margin-bottom:4px">'+keys.length+' hulls in commission — browse the fleet</div>';
-  if(legendary.length){ html+='<div style="margin-top:16px;text-align:center;color:#ff9a6a;letter-spacing:2px;font-size:11px">⚓ LEGENDARY FLAGSHIPS</div>'+legendary.map(card).join(''); }
-  html+='<div style="margin-top:'+(legendary.length?20:14)+'px;text-align:center;color:#8fb8d8;letter-spacing:2px;font-size:11px">STANDARD FLEET</div>'+standard.map(card).join('');
+        '<span style="color:#ffd060;font-size:13px;letter-spacing:1px">'+trName(s.name)+'</span>'+
+        '<span style="color:#5f7a90;font-size:11px">'+trName(s.cls)+'</span></div>'+
+      '<div style="margin-top:4px;color:#7e93a8;font-size:11px">'+trText('Length')+' '+s.len+'m · '+trText('Hull')+' '+s.hp+' HP · '+Math.round(s.mounts*1.5)+' '+trText('mounts')+' · '+trText(s.kind==='carrier'?'Flat-top':s.kind==='sub'?'Submersible':'Surface')+'</div>'+
+      '<div style="margin-top:6px;font-size:13px;line-height:1.6;color:#cfe0ee">'+(isZh()&&typeof SHIPS_ZH!=='undefined'&&Object.values(SHIPS).indexOf(s)>=0?(SHIPS_ZH[Object.keys(SHIPS)[Object.values(SHIPS).indexOf(s)]]||{}).desc||s.desc||'':(s.desc||''))+'</div></div>'; };
+  let html='<div style="color:#9fc6e8;font-size:12px;text-align:center;margin-bottom:4px">'+keys.length+' '+trText('hulls in commission — browse the fleet')+'</div>';
+  if(legendary.length){ html+='<div style="margin-top:16px;text-align:center;color:#ff9a6a;letter-spacing:2px;font-size:11px">'+trText('⚓ LEGENDARY FLAGSHIPS')+'</div>'+legendary.map(card).join(''); }
+  html+='<div style="margin-top:'+(legendary.length?20:14)+'px;text-align:center;color:#8fb8d8;letter-spacing:2px;font-size:11px">'+trText('STANDARD FLEET')+'</div>'+standard.map(card).join('');
   showStory('📖 SHIP ALMANAC', html, 'CLOSE');
 }
 function showWarLog(){
   const beaten=career.completed?CAMPAIGN.length:Math.max(0,mapsUnlocked()-1);
-  let html='<div style="font-style:italic;color:#9fc6e8;margin-bottom:8px">'+LORE.intro+'</div>';
-  if(beaten<=0){ html+='<div style="color:#7e93a8;text-align:center;margin-top:14px">— Your chronicle is unwritten. Win a theater to begin. —</div>'; }
-  for(let i=0;i<beaten;i++){ html+='<div style="margin-top:18px;padding-top:14px;border-top:1px solid #1c3145"><div style="color:#ffd060;font-size:12px;letter-spacing:2px;margin-bottom:6px">'+(i+1)+'. '+CAMPAIGN[i].name.toUpperCase()+'</div><div>'+LORE.beats[i]+'</div></div>'; }
-  if(career.completed) html+='<div style="text-align:center;color:#8ff0b4;margin-top:20px;letter-spacing:3px">— THE END —</div>';
+  const loreIntro=isZh()&&typeof LORE_ZH_INTRO!=='undefined'?LORE_ZH_INTRO:LORE.intro;
+  const loreBeat=i=>(isZh()&&typeof LORE_ZH_BEATS!=='undefined'&&LORE_ZH_BEATS[i])?LORE_ZH_BEATS[i]:LORE.beats[i];
+  let html='<div style="font-style:italic;color:#9fc6e8;margin-bottom:8px">'+loreIntro+'</div>';
+  if(beaten<=0){ html+='<div style="color:#7e93a8;text-align:center;margin-top:14px">'+trText('— Your chronicle is unwritten. Win a theater to begin. —')+'</div>'; }
+  for(let i=0;i<beaten;i++){ html+='<div style="margin-top:18px;padding-top:14px;border-top:1px solid #1c3145"><div style="color:#ffd060;font-size:12px;letter-spacing:2px;margin-bottom:6px">'+(i+1)+'. '+(isZh()?campaignName(i):CAMPAIGN[i].name.toUpperCase())+'</div><div>'+loreBeat(i)+'</div></div>'; }
+  if(career.completed) html+='<div style="text-align:center;color:#8ff0b4;margin-top:20px;letter-spacing:3px">'+trText('— THE END —')+'</div>';
   showStory('⚓ WAR LOG', html, 'CLOSE');
 }
 
@@ -4281,21 +4299,21 @@ function mpPanel(){
   if(!o){ o=document.createElement('div'); o.id='mpPanel';
     o.style.cssText='display:none;position:fixed;inset:0;z-index:210;background:rgba(4,10,16,.9);align-items:center;justify-content:center;padding:22px;';
     o.innerHTML='<div style="max-width:640px;width:100%;max-height:86vh;overflow:auto;background:linear-gradient(180deg,#0e1a24,#0a121a);border:1px solid #26425c;border-radius:14px;box-shadow:0 24px 90px rgba(0,0,0,.65);padding:24px 28px;">'+
-      '<div style="color:#ffd060;letter-spacing:3px;font-size:14px;text-align:center;margin-bottom:14px">🌐 MULTIPLAYER</div>'+
+      '<div style="color:#ffd060;letter-spacing:3px;font-size:14px;text-align:center;margin-bottom:14px">'+trText('🌐 MULTIPLAYER')+'</div>'+
       '<div style="display:flex;gap:8px;margin-bottom:10px">'+
-        '<input id="mpUrl" style="flex:2;background:#0e1922;border:1px solid #21384e;color:#cfe6fb;padding:8px;border-radius:6px;font-size:12px" placeholder="relay URL">'+
-        '<input id="mpName" style="flex:1;background:#0e1922;border:1px solid #21384e;color:#cfe6fb;padding:8px;border-radius:6px;font-size:12px" placeholder="Captain name" maxlength="18">'+
+        '<input id="mpUrl" style="flex:2;background:#0e1922;border:1px solid #21384e;color:#cfe6fb;padding:8px;border-radius:6px;font-size:12px" placeholder='+JSON.stringify(trText("relay URL"))+'>'+
+        '<input id="mpName" style="flex:1;background:#0e1922;border:1px solid #21384e;color:#cfe6fb;padding:8px;border-radius:6px;font-size:12px" placeholder='+JSON.stringify(trText("Captain name"))+' maxlength="18">'+
       '</div>'+
-      '<div style="text-align:center;margin-bottom:12px"><button id="mpConnectBtn" style="cursor:pointer;background:#13283a;color:#cfe6fb;border:1px solid #3579a8;border-radius:8px;padding:8px 22px;font-size:12px;letter-spacing:2px">CONNECT</button></div>'+
+      '<div style="text-align:center;margin-bottom:12px"><button id="mpConnectBtn" style="cursor:pointer;background:#13283a;color:#cfe6fb;border:1px solid #3579a8;border-radius:8px;padding:8px 22px;font-size:12px;letter-spacing:2px">'+trText('CONNECT')+'</button></div>'+
       '<div id="mpStatus" style="text-align:center;color:#7e93a8;font-size:11px;margin-bottom:10px"></div>'+
       '<div id="mpServerList"></div>'+
-      '<div style="text-align:center;margin-top:18px"><button id="mpCloseBtn" style="cursor:pointer;background:#1a1a1a;color:#cfe6fb;border:1px solid #333;border-radius:8px;padding:8px 22px;font-size:12px;letter-spacing:2px">CLOSE</button></div>'+
+      '<div style="text-align:center;margin-top:18px"><button id="mpCloseBtn" style="cursor:pointer;background:#1a1a1a;color:#cfe6fb;border:1px solid #333;border-radius:8px;padding:8px 22px;font-size:12px;letter-spacing:2px">'+trText('CLOSE')+'</button></div>'+
     '</div>';
     document.body.appendChild(o);
     o.querySelector('#mpConnectBtn').onclick=()=>{
       const url=o.querySelector('#mpUrl').value.trim()||defaultRelayUrl();
       MP.name=o.querySelector('#mpName').value.trim()||'Captain';
-      o.querySelector('#mpStatus').textContent='Connecting…';
+      o.querySelector('#mpStatus').textContent=trText('Connecting…');
       mpConnect(url);
     };
     o.querySelector('#mpCloseBtn').onclick=()=>{ o.style.display='none'; };
@@ -4311,7 +4329,7 @@ function openMultiplayer(){
 function mpRenderPanel(){
   const o=document.getElementById('mpPanel'); if(!o||o.style.display==='none') return;
   const status=o.querySelector('#mpStatus');
-  status.textContent = MP.connected? ('Connected — '+MP.servers.length+' server(s) online') : 'Not connected.';
+  status.textContent = MP.connected? T('Connected — '+MP.servers.length+' server(s) online','已连接——'+MP.servers.length+' 个服务器在线') : trText('Not connected.');
   const list=o.querySelector('#mpServerList'); list.innerHTML='';
   if(!MP.connected) return;
   MP.servers.forEach(s=>{
@@ -4343,9 +4361,9 @@ function mpConnect(url){
       MP.peers.forEach((p,id)=>mpRemovePeer(id));   // no frozen ghost hulls after a disconnect
       if(MP.everJoined&&phase==='play') flashPrompt(T('🌐 Connection lost — this arena is now offline. Reload for a new war.','🌐 连接断开——竞技场已离线。刷新页面开新战局。'));
       mpRenderPanel(); };
-    MP.ws.onerror=()=>{ const s=document.querySelector('#mpStatus'); if(s)s.textContent='Connection failed.'; };
+    MP.ws.onerror=()=>{ const s=document.querySelector('#mpStatus'); if(s)s.textContent=trText('Connection failed.'); };
     MP.ws.onmessage=e=>{ let m; try{ m=JSON.parse(e.data); }catch(err){ return; } mpHandleMessage(m); };
-  }catch(err){ const s=document.querySelector('#mpStatus'); if(s)s.textContent='Could not reach that server.'; }
+  }catch(err){ const s=document.querySelector('#mpStatus'); if(s)s.textContent=trText('Could not reach that server.'); }
 }
 function mpJoinRoom(serverName,side,shipId){
   if(!MP.ws||!MP.connected) return;
@@ -4366,7 +4384,7 @@ function mpHandleMessage(m){
   else if(m.type==='playerLeft'){ mpRemovePeer(m.id); }
   else if(m.type==='playerSideChanged'){ const p=MP.peers.get(m.id); if(p) p.side=m.side; }
   else if(m.type==='state'){ if(m.from&&m.from!==MP.id) mpUpdatePeerState(m.from,m.state,m.side); }
-  else if(m.type==='error'){ const s=document.querySelector('#mpStatus'); if(s)s.textContent=m.message||'Error.'; }
+  else if(m.type==='error'){ const s=document.querySelector('#mpStatus'); if(s)s.textContent=m.message||trText('Error.'); }
 }
 function mpStartMatch(spawn){
   const o=document.getElementById('mpPanel'); if(o) o.style.display='none';
@@ -4506,7 +4524,7 @@ function buildMenu(){
     wrap.parentNode.insertBefore(b, wrap.nextSibling);
   }
   // first-ever launch: run the prologue once
-  if(!career.seenIntro) showStory('⚓ IRON TIDE', LORE.intro, T('BEGIN','启航'), ()=>{ career.seenIntro=true; saveCareer(); });
+  if(!career.seenIntro) showStory('⚓ IRON TIDE', isZh()&&typeof LORE_ZH_INTRO!=='undefined'?LORE_ZH_INTRO:LORE.intro, T('BEGIN','启航'), ()=>{ career.seenIntro=true; saveCareer(); });
 }
 function installBossStarterGuns(build){
   const half=Math.floor(build.mounts.length/2),slots=[0,1,2,3,4,5,half,half+1,half+2,half+3,half+4,half+5];
@@ -5906,7 +5924,8 @@ function refreshBuild(){
     const k=el.dataset.struct, s=STRUCTS[k], cost=priceOf(s.cost);
     const licensed=marketLicensed('struct',k,s),unlocked=marketUnlocked('struct',k,s);
     el.classList.toggle('poor', !unlocked || (!licensed&&career.credits<marketCost('struct',k,s)) || (licensed&&money<cost));
-    el.innerHTML=`<div class="un"><span>${s.name}</span><span class="uc">${marketLabel('struct',k,s,'$'+cost)}</span></div><div class="ud">${s.desc}</div>`;
+    const zh=typeof STRUCTS_ZH!=='undefined'?STRUCTS_ZH:null;
+    el.innerHTML=`<div class="un"><span>${catTr(zh,k,'name',s.name)}</span><span class="uc">${marketLabel('struct',k,s,'$'+cost)}</span></div><div class="ud">${catTr(zh,k,'desc',s.desc)}</div>`;
   });
 }
 function closeBuild(){ buildOpen=false; document.getElementById('build').style.display='none'; updateMode(); }
@@ -8339,8 +8358,8 @@ function endGame(win,msg){
   const r=careerRank(), nx=nextRank();
   let unlockMsg='';
   if(win&&currentSandboxIdx<0&&!mpMatch){ if(unlockNextMap(currentMapIdx)){ const nm=CAMPAIGN[currentMapIdx+1];
-      unlockMsg=`<br><br><span style="color:#7ff0a8">🗺 NEW THEATER UNLOCKED — ${nm.name}!</span>`; }
-    else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); rivalAdvance('done'); rivalSpeak('done'); } unlockMsg='<br><br><span style="color:#ffd060">🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.</span>'; } }
+      unlockMsg=`<br><br><span style="color:#7ff0a8">${T('🗺 NEW THEATER UNLOCKED — '+nm.name+'!','🗺 新战区解锁——'+campaignName(currentMapIdx+1)+'！')}</span>`; }
+    else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); rivalAdvance('done'); rivalSpeak('done'); } unlockMsg='<br><br><span style="color:#ffd060">'+T('🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.','🏆 战役通关——每一片战区都是你的了，舰队司令。')+'</span>'; } }
   const marketEarned=mpMatch?0:awardCareerCredits(win);
   if(document.pointerLockElement)document.exitPointerLock();
   document.getElementById('over').style.display='flex';
@@ -8358,8 +8377,8 @@ function endGame(win,msg){
   if(win && currentSandboxIdx<0 && LORE.beats[currentMapIdx]){
     document.getElementById('overText').innerHTML +=
       `<br><br><span style="display:block;max-width:620px;margin:8px auto 0;padding-top:14px;border-top:1px solid #21384e;text-align:left;color:#cfe0ee;font-size:13px;line-height:1.7;font-style:italic">`+
-      `<span style="display:block;color:#ffd060;font-style:normal;letter-spacing:2px;font-size:12px;margin-bottom:7px;text-align:center">⚓ CHRONICLE — ${CAMPAIGN[currentMapIdx].name.toUpperCase()}</span>`+
-      `${LORE.beats[currentMapIdx]}</span>`;
+      `<span style="display:block;color:#ffd060;font-style:normal;letter-spacing:2px;font-size:12px;margin-bottom:7px;text-align:center">${trText('⚓ CHRONICLE — ')}${isZh()?campaignName(currentMapIdx):CAMPAIGN[currentMapIdx].name.toUpperCase()}</span>`+
+      `${(isZh()&&typeof LORE_ZH_BEATS!=='undefined'&&LORE_ZH_BEATS[currentMapIdx])?LORE_ZH_BEATS[currentMapIdx]:LORE.beats[currentMapIdx]}</span>`;
   }
 }
 
@@ -8648,6 +8667,31 @@ function loop(){
 
 // ---------- 舰船 ----------
 const SHIPS_ZH = {
+
+  // Andy 新增的其他舰船
+  frigate: { name:'导弹护卫舰', cls:'护航舰', desc:'灵活的导弹护卫舰——又快又轻,负责给舰队打掩护,把来袭的飞机从天上拍下来。' },
+  battlecruiser: { name:'战列巡洋舰', cls:'快速主力舰', desc:'把战列舰的巨炮装在又瘦又快的船体上——火力赶得上主力舰,但装甲带很薄。打不过的就跑给它看。' },
+  monitor: { name:'近岸浅水重炮舰', cls:'炮台舰', desc:'又矮又平、几乎不会动——但装甲厚得像碉堡,还扛着几门超大口径的炮。一座专打岸轰的浮动堡垒。' },
+  akagi: { name:'赤城号', cls:'舰队航母', desc:'偷袭珍珠港的机动部队旗舰,传奇航母。三层飞行甲板和庞大的舰载机队——远程打击毁天灭地,但装甲薄,记得让僚舰护好她。' },
+  fletcher: { name:'弗莱彻号', cls:'集市驱逐舰', desc:'集市舰船。历史上著名的弗莱彻级驱逐舰:快、皮实,甲板空间特别实用。' },
+  type055: { name:'055型', cls:'集市导弹巡洋舰', desc:'集市舰船。现代大型导弹驱逐舰/巡洋舰,武器甲板宽阔,生存能力出色。' },
+  nimitz: { name:'尼米兹号', cls:'集市超级航母', desc:'集市舰船。核动力超级航母:巨大的飞行甲板、结实的船体,足够打一场像样的空中战争。' },
+  // 传奇旗舰(Andy 新增)
+  bismarck: { name:'俾斯麦号', cls:'传奇战列舰', desc:'二战德国最令人生畏的战列舰——第三轮齐射就击沉了胡德号,随后整个皇家海军倾巢出动将她围猎。装甲带厚得能扛住轻型炮火,炮位充足,但转向比小船慢。' },
+  enterprise: { name:'企业号', cls:'传奇航空母舰', desc:'"大E"——二战获得荣誉最多的战舰。中途岛、瓜岛……几乎每场太平洋大战都有她,而且从未被击沉。一块经得起打、始终能放飞机的均衡飞行甲板。' },
+  missouri: { name:'密苏里号', cls:'传奇战列舰', desc:'"强大的密苏里"——衣阿华级战列舰,同类中的巅峰,1945年日本就是在她的甲板上签字投降的。全舰队最坚固的船体。' },
+  iowa: { name:'衣阿华号', cls:'传奇战列舰', desc:'美国海军史上最快、火力最猛的战列舰级别的首舰。密苏里号的姊妹舰——几乎一样结实,一样随时准备战斗。' },
+  arizona: { name:'亚利桑那号', cls:'传奇战列舰', desc:'一艘较老的"标准型"战列舰,在珍珠港沉没,没来得及还手。现在开着她出海,替历史补上那一仗。' },
+  hmshood: { name:'胡德号', cls:'传奇战列巡洋舰', desc:'"威武的胡德"——皇家海军的骄傲,航速快、火炮多,但装甲带是她唯一的弱点。历史记得俾斯麦号找到这个弱点时发生了什么。' },
+  hmsdreadnought: { name:'无畏号', cls:'传奇战列舰', desc:'1906年的一场革命——她让全世界其他战列舰一夜过时,这一舰种至今仍以她的名字命名。以现代标准看她并不起眼,但一切都是从她开始的。' },
+  arkroyal: { name:'皇家方舟号', cls:'传奇航空母舰', desc:'一位著名的猎手——她的鱼雷机打坏了俾斯麦号的船舵,锁定了那场围猎的结局。比大型航母更灵活轻巧的飞行甲板。' },
+  yamato: { name:'大和号', cls:'传奇战列舰', desc:'有史以来最大、最强的战列舰——近乎传说的巨舰,在战争尾声被派上了一条单程航线。论块头仅次于利维坦。' },
+  musashi: { name:'武藏号', cls:'传奇战列舰', desc:'大和号的姊妹舰,同样庞大却少有人记得——她扛住了狂风暴雨般的鱼雷和炸弹才最终沉没。带她赢回历史欠她的荣耀吧。' },
+  aurora: { name:'阿芙乐尔号', cls:'传奇巡洋舰', desc:'一艘俄国巡洋舰,一发空包弹宣告了一场革命的开始。在周围的巨舰旁她又小又旧,却照样改变了历史。' },
+  richelieu: { name:'黎塞留号', cls:'传奇战列舰', desc:'法国最强的二战战列舰——她从沦陷的法国突围而出,宁可继续为同盟国而战,也不交出自己的火炮。' },
+  zhiyuan: { name:'致远号', cls:'传奇巡洋舰', desc:'一艘清朝巡洋舰,1894年黄海海战中弹尽粮绝——管带邓世昌选择撞向敌阵,与舰同沉。航速快,但装甲薄。' },
+  dingyuan: { name:'定远号', cls:'传奇战列舰', desc:'北洋水师旗舰,当年亚洲最强的铁甲舰。黄海海战中她中弹数百发仍在战斗——一块打不烂的装甲砖,就是为扛住一切而造的。' },
+  liaoning: { name:'辽宁号', cls:'传奇航空母舰', desc:'中国第一艘航空母舰——由苏联舰体改建,让中国海军航空兵登上了世界舞台。全舰队最长的飞行甲板。' },
   scout:      { name:'侦察巡逻舰', cls:'快速哨舰', desc:'小巧又飞快。炮位少、船壳薄——打了就跑。' },
   submarine:  { name:'攻击潜艇',   cls:'潜水艇',   desc:'按 C 下潜——潜在水下时敌人看不见你，火炮也打不到你，但你只能用鱼雷。想用甲板炮就得上浮。' },
   destroyer:  { name:'驱逐舰',     cls:'护航舰',   desc:'全能选手。速度、船体和炮位都很均衡。' },
@@ -8686,6 +8730,21 @@ const WEAPONS_ZH = {
 
 // ---------- 飞机 ----------
 const PLANES_ZH = {
+  // Andy 新增的飞机与无人机
+  f14:  { name:'F-14 雄猫', desc:'集市图纸。可变后掠翼舰队截击机,导弹射程远,经典的航母剪影。' },
+  harrier: { name:'AV-8B 海鹞II', desc:'集市图纸。短距起降攻击机:不算最快,但在拥挤的航母甲板上特别好用。' },
+  mi24: { name:'米-24 雌鹿', desc:'集市图纸。苏联的"飞行步兵战车":比眼镜蛇结实,比堡垒直升机便宜。' },
+  chinook: { name:'CH-47 支奴干武装型', desc:'集市图纸。大块头双旋翼运输机改装的耐打火力支援机。' },
+  uav:  { name:'RQ-7 侦察无人机', desc:'无武装的第一视角侦察无人机。远距离发现敌人;摔了也没事,你会安全回到船上。' },
+  mq9:  { name:'MQ-9 死神', desc:'武装猎杀无人机——遥控追踪打击,能在天上盘旋好几个小时。摔了也没事,驾驶员还在船上呢。' },
+  globalhawk: { name:'RQ-4 全球鹰', desc:'无武装的高空侦察机,翼展巨大、航程全场最远——舰队里最好的眼睛,但被抓到就毫无还手之力。' },
+  switchblade: { name:'弹簧刀巡飞弹', desc:'小巧的一次性自杀式无人机——便宜、快、有去无回。先侦察,再俯冲撞向目标,临别送上结实一击。' },
+  microdrone: { name:'四轴迷你侦察机', desc:'巴掌大的民用风格侦察无人机——超便宜、丢了不心疼,电量刚够翻过地平线偷看一眼。' },
+  attackquad: { name:'攻击四轴无人机', desc:'带云台相机的四旋翼攻击无人机——悬停、侦察,往下面丢制导弹药。摔了也没事,遥控驾驶员毫发无伤。' },
+  vtolscout: { name:'垂直起降侦察无人机', desc:'双桨垂直起降侦察机,挂着大号光电吊舱——续航长、光学一流,论侦察只输全球鹰。' },
+  bayraktar: { name:'旗手 TB2', desc:'集市图纸。便宜的长航时打击无人机:脆、慢,但特别会找目标、点名清除。' },
+  predator: { name:'MQ-1 捕食者', desc:'集市图纸。早期武装无人机:便宜的眼睛,外加两发制导打击。' },
+  nukedrone: { name:'原子打击无人机', desc:'⚛ 挂着战术核弹头的一次性四轴无人机。飞进敌人舰队俯冲——爆炸把一大片全部夷平。贵得吓人,也彻底有去无回。' },
   fighter:    { name:'战斗机', desc:'又快又灵活。机头有两挺机枪。' },
   divebomber: { name:'俯冲轰炸机', desc:'机枪加重磅炸弹（按 Space 投弹）。' },
   torpbomber: { name:'鱼雷轰炸机', desc:'把鱼雷投在水面上，直奔敌舰。' },
@@ -8737,6 +8796,11 @@ const PLANES_ZH = {
 
 // ---------- 坦克（desc 留空，数据行由代码生成） ----------
 const TANKS_ZH = {
+  prototype: { name:'原型坦克', desc:'' },
+  merkava: { name:'梅卡瓦4型', desc:'集市图纸。以生存性为核心的重型主战坦克,正面装甲厚,射击稳定。' },
+  maus:    { name:'八号坦克鼠式', desc:'集市图纸。离谱的超重型坦克:装甲和火炮都巨大,就是慢得心疼。' },
+  centurion: { name:'百夫长Mk5', desc:'集市图纸。冷战初期的经典:装甲、火炮和可靠性都很均衡。' },
+  bmp2:    { name:'BMP-2 步兵战车', desc:'集市图纸。速度快的步兵战车,机关炮射速惊人;皮薄但便宜。' },
   sherman: { name:'M4 谢尔曼', desc:'' },
   t34:     { name:'T-34', desc:'' },
   panzer4: { name:'四号坦克', desc:'' },
@@ -8771,6 +8835,8 @@ const HANDHELD_ZH = {
 
 // ---------- 岛屿建筑 ----------
 const STRUCTS_ZH = {
+  railgun: { name:'实验电磁炮', desc:'集市图纸。超级炮级别的直射能量火炮,弹药储备极少,但装填更快。' },
+  vls:     { name:'宙斯盾垂发导弹阵', desc:'集市图纸。方方正正的导弹发射单元,大幅强化岛屿防空和反舰火力。' },
   command:   { name:'指挥所', desc:'掌控岛屿归属；每座岛只能有一座大型总部' },
   barracks:  { name:'兵营', desc:'最多维持三支守岛步兵小队' },
   tankdepot: { name:'坦克库', desc:'维修坦克，并缓慢补充一辆被毁的守岛坦克' },
@@ -8884,7 +8950,468 @@ const CLAUDE_TIPS_ZH = [
 ];
 
 // ---------- 英文显示名 → 中文 平面映射（供 trName() 使用；运行时有大小写兜底） ----------
+// ===== i18n merge supplement — kid-friendly zh for the newly merged English-only systems =====
+// ZH_EXACT_KID: exact whole-string prompts (flashPrompt/comms/prompt → trText)
+// ZH_PATTERNS_KID: anchored regexes for runtime-concatenated strings (same shape as ZH_PATTERNS)
+
+const ZH_EXACT_KID = {
+  // ---- 搁浅警告 ----
+  '⚠ HULL GROUNDING — back off the shoreline!': '⚠ 船底擦着海底了——快倒车离开浅滩！',
+
+  // ---- 极端天气 ----
+  '⚡ LIGHTNING STRIKE — hull jolted!': '⚡ 被闪电劈中——船身猛地一震！',
+  '🌪 TORNADO WARNING — keep ships out of the funnel!': '🌪 龙卷风警报——让战舰离风柱远一点！',
+  '🌋 VOLCANIC ERUPTION — burning rock incoming!': '🌋 火山喷发——燃烧的岩石砸过来了！',
+  '⛈ SUPERCELL — violent lightning and extreme seas!': '⛈ 超级雷暴——狂雷闪电加滔天巨浪！',
+  // 三种新天气名会以 '⛅ Weather: X' 整句出现,精确条目优先于旧模式规则
+  '⛅ Weather: VOLCANO': '⛅ 天气：火山',
+  '⛅ Weather: TORNADO': '⛅ 天气：龙卷风',
+  '⛅ Weather: SUPERCELL': '⛅ 天气：超级雷暴',
+
+  // ---- 天气转变(turnWeather 的四种 label,flashPrompt + comms 两种形态) ----
+  '⛅ Weather shifting — skies clearing': '⛅ 天气转变——天要放晴了',
+  '⛅ Weather shifting — cloud rolling in': '⛅ 天气转变——乌云压过来了',
+  '⛅ Weather shifting — a fog bank closing in': '⛅ 天气转变——大雾正在围上来',
+  '⛅ Weather shifting — a storm bearing down': '⛅ 天气转变——风暴正朝我们扑来',
+  'Skies clearing — adjust your gunnery.': '天要放晴了——重新校准你的火炮吧。',
+  'Cloud rolling in — adjust your gunnery.': '乌云压过来了——重新校准你的火炮吧。',
+  'A fog bank closing in — adjust your gunnery.': '大雾围上来了——重新校准你的火炮吧。',
+  'A storm bearing down — adjust your gunnery.': '风暴扑过来了——重新校准你的火炮吧。',
+
+  // ---- 动态战场事件 ----
+  '📦 Supply drop — salvage crates in the water nearby': '📦 空投补给——附近海面漂着物资箱，快去打捞',
+  'Air-dropped supplies near your position — go collect them.': '补给已空投到你附近——快去收下。',
+  'New surface contacts bearing from the enemy line.': '敌方战线方向出现新的水面目标。',
+  '✖ CONVOY LOST — escort failed.': '✖ 运输船沉了——护航失败。',
+  'Cargo run underway — cover me, Admiral!': '运输任务开始——掩护我，将军！',
+  'Cargo delivered. Converting to fleet support duty.': '货物送到了。我转为舰队支援任务。',
+  'the front': '前线',
+  'the forward line': '前线',
+
+  // ---- 强行登舰(接舷战) ----
+  'Boarding broken off.': '登舰行动中断了。',
+  'Prize crew aboard — captured hull joining the fleet.': '接管小队已登舰——俘获的战舰正式加入舰队。',
+
+  // ---- 无人机(UAV) ----
+  'UAVs need your remote pilot — press E to launch.': '无人机需要你远程驾驶——按 E 放飞。',
+  // 下面这些短句是 '(msg) — autopilot…' / '(msg) — captain…' 拼接的开头,供模式规则回查
+  'UAV recovered': '无人机已回收',
+  'UAV recalled': '无人机已召回',
+  'UAV destroyed': '无人机被击毁',
+  'UAV link ended': '无人机链路已断开',
+  'Nuclear strike drone expended': '核打击无人机已完成使命',
+  'UAV battery depleted before recovery': '无人机电池没撑到回收就耗尽了',
+  'UAV recovered — captain safely back aboard.': '无人机已回收——舰长安全回到舰上。',
+  'UAV recalled — autopilot returning to ship.': '无人机已召回——自动驾驶正带它飞回战舰。',
+  'UAV recovered — autopilot returning to ship.': '无人机已回收——自动驾驶正带它飞回战舰。',
+  '☢ NUCLEAR STRIKE DRONE DETONATED': '☢ 核打击无人机已引爆',
+  '🔥 YOUR AIRCRAFT IS ON FIRE — press P to bail out!': '🔥 你的飞机着火了——快按 P 跳伞！',
+  'Burning aircraft went down!': '着火的飞机坠毁了！',
+
+  // ---- 坦克涉水 / 卡住 ----
+  '🌊 Tank taking water damage — get back to land!': '🌊 坦克泡在水里受损——快开回陆地！',
+  'Flooded in deep water!': '在深水里泡坏了！',
+  '⛔ Tank blocked by structure': '⛔ 坦克被建筑挡住了',
+
+  // ---- 部位命中(calledShot 的 msg;玩家侧以 '⚠ msg' 出现,由旧 ⚠ 兜底规则回查这里) ----
+  '💧 waterline hit — flooding': '💧 打中水线——正在进水',
+  '⚙ stern hit — engines crippled': '⚙ 打中船尾——引擎受创',
+  '🔫 turret knocked out': '🔫 打哑了一座炮塔',
+  '🔥 magazine fire': '🔥 弹药库起火',
+  '💥 bow holed — taking water': '💥 船头开了个洞——正在进水',
+
+  // ---- 起火(igniteEntity) ----
+  "🔥 FIRE ABOARD — she's burning!": '🔥 舰上起火——船烧起来了！',
+
+  // ---- 拍照模式 / 画质 ----
+  '📷 Photo mode — WASD fly · Space/Shift up-down · mouse look · L to exit': '📷 拍照模式——WASD 飞行 · Space/Shift 升降 · 鼠标转视角 · L 退出',
+  'Post-processing unavailable in this browser.': '这个浏览器用不了画面特效。',
+  '⚙ Performance mode: render detail reduced': '⚙ 性能模式：画面细节已调低',
+  '🖼 Graphics: Clean': '🖼 画质：简洁',
+  '🖼 Graphics: Bloom': '🖼 画质：泛光',
+
+  // ---- K 键设置面板 ----
+  '⚙ SETTINGS': '⚙ 设置',
+  'Visual combat feedback is optional. Press <b>K</b> to close.': '战斗画面提示都可以自由开关。按 <b>K</b> 关闭。',
+  'Hit marker & kill feed': '命中标记和击杀播报',
+  'Floating damage numbers': '飘出的伤害数字',
+  'Camera shake': '镜头震动',
+
+  // ---- 联机(MP)状态 ----
+  'Connection failed.': '连接失败。',
+  'Could not reach that server.': '联系不上那台服务器。',
+  'Error.': '出错了。',
+
+  // ---- 致命错误卡片 ----
+  '⚠ GAME ERROR': '⚠ 游戏出错了',
+  'The battle stopped safely instead of silently freezing. Reload to restart the renderer.': '战斗已经安全停下，而不是悄悄卡死。刷新页面就能重启游戏画面。',
+  'RELOAD GAME': '重新加载游戏',
+  'Unknown error': '未知错误',
+
+  // ---- 舰队无线电新增台词 ----
+  'Captain has bailed out — assuming autonomous combat patrol.': '舰长已跳伞——我来接管飞机，继续自主巡逻作战。',
+  'Taking heavy fire — falling back!': '挨了太多炮火——正在撤退！',
+  'Aircraft recovering to rearm — back up shortly.': '飞机返场补弹——很快就回来。',
+
+  // ---- 宿敌(NEMESIS)开场狠话与败北台词(comms 原文精确匹配) ----
+  'So Southhaven sends a cadet. I will send you home in pieces.': '南港就派来个学员？我会把你打成碎片送回去。',
+  'The Wolf... run to ground. Impossible.': '狼……居然被围死了。不可能。',
+  'This harbour is mine to starve, Captain. Turn back while you float.': '这座海港归我封锁，舰长。趁你还浮着，赶紧掉头。',
+  'The lanes are... open. Kessler will pay for this.': '航线……被打通了。凯斯勒会付出代价的。',
+  'Every gun on this reef is ranged on you. By all means — come closer.': '礁上每一门炮都瞄好了你。来呀——再靠近一点。',
+  'My batteries... silenced. The reef is lost.': '我的炮群……全哑了。礁堡丢了。',
+  'You cannot fight what you cannot see. The dark belongs to me.': '看不见的敌人，你怎么打？黑夜是属于我的。',
+  'Even shadows... burn. Varga, forgive me.': '连影子……也会燃烧。瓦尔加，原谅我。',
+  'Into the fog, then. They never find the ones I take.': '那就进雾里来吧。被我抓走的船，从来没人找得到。',
+  'The fog... clears. You should not have found me.': '雾……散了。你不该找到我的。',
+  'You face the LEVIATHAN now, child. Nothing floats that I cannot sink.': '现在你面对的是利维坦，小家伙。海上没有我击沉不了的东西。',
+  'The great ship... goes down. But Varga will build more.': '巨舰……沉下去了。但瓦尔加还会造出更多。',
+  'The trap sprang the moment you set your heading. Far too late now.': '你定下航向那一刻，陷阱就合上了。现在已经太迟了。',
+  'Outfoxed... by a Free Isles dog. Unthinkable.': '居然被自由群岛的家伙……算计了。难以置信。',
+  'Eleven hulls answer my flag, and you bring... that? Charge, then.': '十一艘战舰听我号令，而你就带了……这个？那就冲吧。',
+  'My armada... a reef of scrap. The war turns here.': '我的无敌舰队……成了一片废铁礁。战局从这里逆转了。',
+  'We answer to no radio and fear no death. We are already lost.': '我们不接电台呼叫，也不怕死——因为我们早就沉没过了。',
+  'Back... to the deep. Where the lost belong.': '回到……深海去。那才是迷失者的归宿。',
+  'The storm is my ally, Admiral. It will drown you long before I must.': '风暴是我的盟友，将军。不用我动手，它就会先淹了你。',
+  'Even the hurricane... could not save me from you.': '连飓风……都没能把我从你手里救走。',
+  'One Leviathan broke you once. Now face two — and the brothers Vukovic.': '一艘利维坦就曾打垮过你。现在来了两艘——还有武科维奇兄弟。',
+  'Brother... they are both gone. It is over.': '兄弟……两艘都没了。结束了。',
+  'You will not reach the Marshal. I am the last wall — and I do not fall.': '你到不了元帅面前。我是最后一堵墙——墙是不会倒的。',
+  'Forgive me, Marshal... the wall... is broken.': '原谅我，元帅……这堵墙……被打穿了。',
+  'So the cadet became an Admiral. Come then — let us end the tide where it began. FIRE!': '当年的小学员，如今成了上将。来吧——让这场怒潮在它开始的地方终结。开火！',
+  'A hundred years... undone by a single hull. The tide... is yours.': '一百年的战争……败给了一艘战舰。这片怒潮……归你了。',
+  'Varga is gone, but the Dominion is not. Over my sinking deck, Admiral.': '瓦尔加倒了，但多米宁还在。想过去？先从我沉没的甲板上踏过去吧，将军。',
+  'The last of us... falls. The Iron Tide is free.': '我们最后一个人……也倒下了。钢铁怒潮的大海，自由了。'
+};
+
+const ZH_PATTERNS_KID = (() => {
+  const TN = s => (typeof trName === 'function') ? trName(s) : s;
+  // 回查:先旧精确表,再本次新增精确表,最后名称兜底
+  const RK = s => (typeof ZH_EXACT !== 'undefined' && ZH_EXACT[s]) || ZH_EXACT_KID[s] || TN(s);
+  // 宿敌人名与头衔(横幅里以 原样/全大写 两种形态出现)
+  const NEM_NAME = {
+    'Cmdr. Skarr': '斯卡尔中校', 'Capt. Dross': '德罗斯舰长', 'Gunmaster Holt': '炮术长霍尔特',
+    'Nightcaptain Vex': '夜航舰长维克斯', 'Marsh-Capt. Grull': '泽地舰长格鲁尔',
+    'Capt. Idris Corvo': '伊德里斯·科尔沃舰长', 'Baron Kessig': '凯西格男爵',
+    'Admiral Torvald': '托瓦尔德上将', 'The Revenant': '亡魂船长', 'Stormlord Bane': '风暴领主贝恩',
+    'The Vukovic Twins': '武科维奇双子', 'Grand Capt. Mordent': '莫登特大舰长',
+    'Grand Marshal Varga': '瓦尔加大元帅', 'Admiral Rook': '鲁克上将'
+  };
+  const NEM_TITLE = {
+    'the Coastal Wolf': '海岸之狼', 'the Blockade-Breaker': '封锁粉碎者', 'the Reefwarden': '守礁人',
+    'the Shadow of the Straits': '海峡之影', 'the Fogwolf': '雾中之狼',
+    'master of the Leviathan': '利维坦的主人', 'the Ambusher': '伏击大师',
+    'lord of the Iron Armada': '钢铁舰队之主', 'captain of the Ghost Fleet': '幽灵舰队船长',
+    'who rides the hurricane': '驾驭飓风的人', 'admirals of the Twin Leviathans': '双子利维坦的统帅',
+    "Varga's right hand": '瓦尔加的左右手', 'warlord of the Dominion': '多米宁的最高统帅',
+    'the Last Loyalist': '最后的忠臣'
+  };
+  const NEMU = {}; for (const k in NEM_NAME) NEMU[k.toUpperCase()] = NEM_NAME[k];
+  const NEM = s => NEM_NAME[s] || NEMU[s] || TN(s);
+
+  return [
+    // ---- 无人机 msg+后缀 拼接句(msg 部分回查精确表) ----
+    { re: /^([\s\S]+) — autopilot returning to ship\.$/, out: m => RK(m[1]) + '——自动驾驶正带它飞回战舰。' },
+    { re: /^([\s\S]+) — captain safely back aboard\.$/, out: m => RK(m[1]) + '——舰长安全回到舰上。' },
+    { re: /^Drone bay limit reached \((\d+)\)$/, out: m => '无人机机位满了（上限 ' + m[1] + ' 架）' },
+
+    // ---- 飞机撞岛 / 部件脱落 ----
+    { re: /^Flew into (.+) — aircraft destroyed!$/, out: m => '一头撞上' + (m[1] === 'an island' ? '岛屿' : TN(m[1])) + '——飞机报废了！' },
+    { re: /^💥 (.+) broke away!$/, out: m => '💥 ' + TN(m[1]) + ' 整个脱落了！' },
+
+    // ---- 强行登舰 ----
+    { re: /^⚔ BOARDING (.+) — hold your ground, her crew is fighting back!$/, out: m => '⚔ 正在强行登上' + TN(m[1]) + '——站稳了，敌舰船员在反击！' },
+    { re: /^⚔ Her crew fights back! (\d+)% health — (\d+)s to secure the deck$/, out: m => '⚔ 敌舰船员在反击！生命值 ' + m[1] + '%——再撑 ' + m[2] + ' 秒就能拿下甲板' },
+    { re: /^⚓ SHIP CAPTURED — (.+) JOINS YOUR FLEET · \+\$750$/, out: m => '⚓ 俘获战舰——' + TN(m[1]) + ' 加入你的舰队 · +$750' },
+
+    // ---- 宿敌横幅(由具体到宽泛) ----
+    { re: /^☠ NEMESIS — (.+?), (.+)$/, out: m => '☠ 宿敌现身——' + NEM(m[1]) + '，' + (NEM_TITLE[m[2]] || TN(m[2])) },
+    { re: /^☠ (.+) DEFEATED — \$(\d+) BOUNTY$/, out: m => '☠ 击败了' + NEM(m[1]) + '——赏金 $' + m[2] },
+    { re: /^☠ (.+) DEFEATED$/, out: m => '☠ 击败了' + NEM(m[1]) },
+
+    // ---- 部位命中提示(msg 部分回查精确表) ----
+    { re: /^🎯 Called shot — ([\s\S]+)$/, out: m => '🎯 精准命中——' + RK(m[1]) },
+
+    // ---- 动态战场事件 ----
+    { re: /^⚠ Dominion reinforcements — (\d+) hulls? inbound!$/, out: m => '⚠ 多米宁援军——' + m[1] + ' 艘战舰来袭！' },
+    { re: /^📦 CONVOY INBOUND — escort (.+) to (.+)$/, out: m => '📦 运输船队来了——护送 ' + m[1] + ' 前往' + (m[2] === 'the forward line' ? '前线' : TN(m[2])) },
+    { re: /^(.+) is carrying fuel and ammunition\. Escort it through the combat zone\.$/, out: m => m[1] + ' 装着燃料和弹药。护送它穿过交战区。' },
+    { re: /^📦 (.+) DELIVERED — \+\$900, fleet resupplied$/, out: m => '📦 ' + m[1] + ' 送达——+$900，舰队补给完毕' },
+    { re: /^ESCORT convoy to (.+)$/, out: m => '护送运输船前往' + (m[1] === 'the front' ? '前线' : TN(m[1])) },
+
+    // ---- 联机加入横幅 ----
+    { re: /^🌐 Joined (.+) as ([A-Z]+) — (\d+) other captain\(s\) aboard\.$/, out: m => '🌐 加入了' + (m[1] === 'the server' ? '服务器' : TN(m[1])) + '——你在' + ({ BLUE: '蓝方', RED: '红方' }[m[2]] || m[2]) + '，还有 ' + m[3] + ' 位舰长同场作战。' },
+
+    // ---- 战舰旧伤(带伤复出) ----
+    { re: /^⚓ (.+) returns to service still battle-scarred — (\d+)% hull\. Bring her home healthy to repair her reputation\.$/, out: m => '⚓ ' + TN(m[1]) + ' 带着旧伤重新出战——船体 ' + m[2] + '%。这回平平安安开回家，它就能恢复名声。' },
+
+    // ---- 画质 / 音乐 ----
+    { re: /^🖼 Graphics: (.+)$/, out: m => '🖼 画质：' + ({ Clean: '简洁', Bloom: '泛光' }[m[1]] || TN(m[1])) },
+    { re: /^🎵 Music (ON|OFF)$/, out: m => '🎵 音乐：' + (m[1] === 'ON' ? '开' : '关') },
+
+    // ---- 战役商店(蓝图市场) ----
+    { re: /^(.+) is a campaign-market blueprint\. Buy it before battle\.$/, out: m => TN(m[1]) + ' 是战役商店的蓝图。要在开战前先买好。' },
+    { re: /^(.+) unlocks after campaign level (\d+)$/, out: m => TN(m[1]) + ' 要打到战役第 ' + m[2] + ' 关才解锁' },
+    { re: /^(.+) reaches the marketplace after level (\d+)$/, out: m => TN(m[1]) + ' 要到 ' + m[2] + ' 级才会在商店上架' },
+    { re: /^(.+) already owned$/, out: m => TN(m[1]) + ' 已经拥有了' },
+    { re: /^Need ◈(\d+) market credits\. You have ◈(\d+)\.$/, out: m => '需要 ◈' + m[1] + ' 商店点数。你现在有 ◈' + m[2] + '。' },
+    { re: /^Marketplace blueprint purchased: (.+) · ◈(\d+) left$/, out: m => '买下商店蓝图：' + TN(m[1]) + ' · 还剩 ◈' + m[2] }
+  ];
+})();
+// =====================================================================
+//  合并内容中文补翻 —— 宿敌舰长 / 战役市场 / 沙盒地图 / K 设置 / 联机 / 武器角色 / 图鉴与战记
+//  (键为 index.html 中的英文原串,精确匹配;接线时经 trText/trName/catTr 同风格查表)
+// =====================================================================
+
+// ---------- 宿敌舰长(NEMESIS):显示名 + 台词精确串 ----------
+const NEMESIS_ZH = {
+  // -- 名字(裸名,供 comms 说话人 / 铭牌 / 击败横幅回查;运行时可大小写兜底) --
+  'Cmdr. Skarr':'斯卡尔中校',
+  'Capt. Dross':'德罗斯舰长',
+  'Gunmaster Holt':'霍尔特炮长',
+  'Nightcaptain Vex':'夜航舰长维克斯',
+  'Marsh-Capt. Grull':'沼泽舰长格鲁尔',
+  'Capt. Idris Corvo':'伊德里斯·科尔沃舰长',
+  'Baron Kessig':'凯西格男爵',
+  'Admiral Torvald':'托瓦尔德上将',
+  'The Revenant':'亡魂',
+  'Stormlord Bane':'风暴领主贝恩',
+  'The Vukovic Twins':'武科维奇双子',
+  'Grand Capt. Mordent':'莫登特大舰长',
+  'Grand Marshal Varga':'瓦尔加大元帅',
+  'Admiral Rook':'鲁克上将',
+  // -- 名号连写('name, title',供 '☠ NEMESIS — name, title' 横幅模式规则回查) --
+  'Cmdr. Skarr, the Coastal Wolf':'斯卡尔中校·海岸之狼',
+  'Capt. Dross, the Blockade-Breaker':'德罗斯舰长·封锁破坏者',
+  'Gunmaster Holt, the Reefwarden':'霍尔特炮长·礁岩守望者',
+  'Nightcaptain Vex, the Shadow of the Straits':'夜航舰长维克斯·海峡之影',
+  'Marsh-Capt. Grull, the Fogwolf':'沼泽舰长格鲁尔·迷雾之狼',
+  'Capt. Idris Corvo, master of the Leviathan':'伊德里斯·科尔沃舰长·利维坦之主',
+  'Baron Kessig, the Ambusher':'凯西格男爵·伏击大师',
+  'Admiral Torvald, lord of the Iron Armada':'托瓦尔德上将·钢铁舰队之主',
+  'The Revenant, captain of the Ghost Fleet':'亡魂·幽灵舰队船长',
+  'Stormlord Bane, who rides the hurricane':'风暴领主贝恩·驭飓风者',
+  'The Vukovic Twins, admirals of the Twin Leviathans':'武科维奇双子·双子利维坦统帅',
+  "Grand Capt. Mordent, Varga's right hand":'莫登特大舰长·瓦尔加的左膀右臂',
+  'Grand Marshal Varga, warlord of the Dominion':'瓦尔加大元帅·多米宁战争领主',
+  'Admiral Rook, the Last Loyalist':'鲁克上将·最后的忠臣',
+  // -- 开场狠话(taunt,comms→trText 精确串) --
+  'So Southhaven sends a cadet. I will send you home in pieces.':'南港居然派来个学员？我会把你拆成碎片送回去。',
+  'This harbour is mine to starve, Captain. Turn back while you float.':'想让这座海港挨饿，全看我心情，舰长。趁你还浮在水上，赶紧掉头。',
+  'Every gun on this reef is ranged on you. By all means — come closer.':'这片礁石上的每一门炮都测好了你的距离。请便——尽管靠过来。',
+  'You cannot fight what you cannot see. The dark belongs to me.':'看不见的东西，你打不着。黑暗属于我。',
+  'Into the fog, then. They never find the ones I take.':'那就进雾里来吧。被我带走的船，从来没人找得到。',
+  'You face the LEVIATHAN now, child. Nothing floats that I cannot sink.':'小家伙，你现在面对的是利维坦。凡是浮在海上的，就没有我击不沉的。',
+  'The trap sprang the moment you set your heading. Far too late now.':'你定下航向的那一刻，陷阱就已经合上了。现在后悔太迟啦。',
+  'Eleven hulls answer my flag, and you bring... that? Charge, then.':'十一艘战舰听我号令，而你就带来……这个？那就冲锋吧。',
+  'We answer to no radio and fear no death. We are already lost.':'我们不听任何电台，也不惧怕死亡。我们本就是被遗弃的亡魂。',
+  'The storm is my ally, Admiral. It will drown you long before I must.':'风暴是我的盟友，将军。等不到我动手，它就会先淹没你。',
+  'One Leviathan broke you once. Now face two — and the brothers Vukovic.':'一艘利维坦就够你受的了。现在来面对两艘吧——还有我们武科维奇兄弟。',
+  'You will not reach the Marshal. I am the last wall — and I do not fall.':'你到不了元帅面前。我就是最后一堵墙——而墙，从不倒下。',
+  'So the cadet became an Admiral. Come then — let us end the tide where it began. FIRE!':'当年的学员，如今成了上将。来吧——让这股怒潮在它开始的地方终结。开火！',
+  'Varga is gone, but the Dominion is not. Over my sinking deck, Admiral.':'瓦尔加倒下了，但多米宁还在。想过去？先让我的甲板沉了再说，将军。',
+  // -- 败亡遗言(defeat,comms→trText 精确串) --
+  'The Wolf... run to ground. Impossible.':'海岸之狼……竟被逼上绝路。不可能。',
+  'The lanes are... open. Kessler will pay for this.':'航道……被打通了。凯斯勒会为此付出代价。',
+  'My batteries... silenced. The reef is lost.':'我的炮群……全哑火了。礁堡守不住了。',
+  'Even shadows... burn. Varga, forgive me.':'原来影子……也会燃烧。瓦尔加，原谅我。',
+  'The fog... clears. You should not have found me.':'雾……散了。你本不该找到我。',
+  'The great ship... goes down. But Varga will build more.':'巨舰……沉下去了。但瓦尔加还会造出更多。',
+  'Outfoxed... by a Free Isles dog. Unthinkable.':'竟然被自由群岛的小子……反将一军。难以置信。',
+  'My armada... a reef of scrap. The war turns here.':'我的无敌舰队……成了一片废铁礁。战局从此逆转。',
+  'Back... to the deep. Where the lost belong.':'回到……深海去。那才是亡魂的归宿。',
+  'Even the hurricane... could not save me from you.':'连飓风……都没能把我从你手里救走。',
+  'Brother... they are both gone. It is over.':'兄弟……两艘都没了。一切都结束了。',
+  'Forgive me, Marshal... the wall... is broken.':'原谅我，元帅……这堵墙……塌了。',
+  'A hundred years... undone by a single hull. The tide... is yours.':'一百年的基业……毁在一艘战舰手里。这片怒潮……归你了。',
+  'The last of us... falls. The Iron Tide is free.':'我们最后一人……也倒下了。钢铁怒潮自由了。'
+};
+
+// ---------- 战役市场(MARKET_CATALOG,键 'cat:id';TAGS 为角标) ----------
+const MARKET_ZH = {
+  'ship:fletcher': {desc:'弗莱彻号——身手飞快的历史名舰驱逐舰，甲板炮位特别实用。'},
+  'ship:type055':  {desc:'055 型——现代导弹巡洋舰风格的指挥战舰。'},
+  'ship:nimitz':   {desc:'尼米兹号——巨型超级航母，玩空中大军就选它。'},
+  'plane:mi24':    {desc:'米-24 雌鹿——苏联历史名机，披着装甲的武装直升机。'},
+  'plane:chinook': {desc:'CH-47 支奴干武装型——皮实耐打的双旋翼支援直升机。'},
+  'plane:bayraktar':{desc:'旗手 TB2——便宜又能一直在天上盘旋的攻击无人机。'},
+  'plane:predator':{desc:'MQ-1 捕食者——早期武装无人机，带两发指哪打哪的导弹。'},
+  'plane:f14':     {desc:'F-14 雄猫——可变后掠翼的舰队截击机，导弹射程超远。'},
+  'plane:harrier': {desc:'AV-8B 鹞式 II——小巧的舰载攻击喷气机。'},
+  'tank:centurion':{desc:'百夫长 Mk 5——冷战早期皮实可靠的中型坦克。'},
+  'tank:bmp2':     {desc:'BMP-2——跑得飞快的轻装甲战车，机关炮突突个不停。'},
+  'tank:merkava':  {desc:'梅卡瓦 IV——开得慢的重型主战坦克，特别扛揍。'},
+  'tank:maus':     {desc:'八号坦克鼠式——装甲厚得离谱、炮大得吓人，就是慢得可怜。'},
+  'struct:vls':    {desc:'宙斯盾垂发导弹阵地——给占领的岛屿装上强力导弹防御（需要供电）。'},
+  'struct:railgun':{desc:'实验型电磁炮——超级巨炮级的岛屿火炮，装填还更快。'},
+  TAGS: {
+    'SHIP':'战舰', 'HELICOPTER':'直升机', 'DRONE':'无人机', 'JET':'喷气机',
+    'TANK':'坦克', 'IFV':'步战车', 'SUPER-HEAVY':'超重型', 'BUILD':'建筑'
+  }
+};
+
+// ---------- 沙盒地图(SANDBOX_MAPS,按英文名回查) ----------
+const SANDBOX_ZH = {
+  'Southhaven':        {name:'南港',           theme:'老家海港沙盒：海路均衡、基地岛齐全，随便你演练舰队。'},
+  '100% Land':         {name:'百分百陆地',     theme:'几乎全是战场、几乎没有海军：巨大的连片陆地，坦克和步兵的天下。'},
+  'Omaha Beach':       {name:'奥马哈海滩',     theme:'抢滩沙盒：一整条设防的海岸线，登陆区、碉堡，还有坦克大冲锋。'},
+  'Hiroshima':         {name:'广岛',           theme:'城市岛屿的核爆之后：夷平的街区、灰白的海水，还有残酷的近身战斗。'},
+  'Chernobyl':         {name:'切尔诺贝利',     theme:'废弃的反应堆禁区：大雾、隔离岛、雷达站，以及缓慢推进的装甲地面战。'},
+  'Desert Test Range': {name:'沙漠试验场',     theme:'干燥开阔的试验靶场，散落着几处营地——尽情测试大坦克和飞机吧。'},
+  'Volcanic Caldera':  {name:'火山口',         theme:'一圈厚重的岛屿围着中央的死亡地带——要塞火炮的完美舞台。'}
+};
+
+// ---------- K 键设置面板(refreshSettings 行标签与开关) ----------
+const KPANEL_ZH = {
+  'Hit marker & kill feed':'命中标记和击杀播报',
+  'Floating damage numbers':'飘出的伤害数字',
+  'Camera shake':'镜头震动',
+  'ON':'开',
+  'OFF':'关'
+};
+
+// ---------- 联机面板(mpPanel/openMultiplayer/mpRenderPanel)与击杀播报前缀 ----------
+const MP_ZH = {
+  '🌐 MULTIPLAYER':'🌐 联机对战',
+  'CONNECT':'连接',
+  'CLOSE':'关闭',
+  'Connecting…':'正在连接……',
+  'Not connected.':'尚未连接。',
+  'Connection failed.':'连接失败。',
+  'Could not reach that server.':'联系不上那台服务器。',
+  'Error.':'出错了。',
+  // 输入框占位文本
+  'relay URL':'中继服务器地址',
+  'Captain name':'舰长昵称',
+  // 参数化提示:原句为 'Connected — '+N+' server(s) online',需在 ZH_PATTERNS 里加规则,
+  // 形如 { re:/^Connected — (\d+) server\(s\) online$/, out:m=>'已连接——'+m[1]+' 个服务器在线' }
+  'Connected — {n} server(s) online':'已连接——{n} 个服务器在线',
+  // showHit 击杀播报行前缀(前缀+目标名,目标名走 trName)
+  'HIT · ':'命中 · ',
+  'DESTROYED · ':'击毁 · ',
+  'CRITICAL HIT · ':'暴击 · ',
+  'RAIL STRIKE · ':'电磁炮打击 · ',
+  'AIR HIT · ':'对空命中 · ',
+  'MISSILE HIT · ':'导弹命中 · '
+};
+
+// ---------- 武器角色名(weaponPersonality 的 role 显示名与附加词) ----------
+const ROLE_ZH = {
+  'Machine gun':'机枪',
+  'Anti-air':'防空炮',
+  'Autocannon':'机关炮',
+  'Naval cannon':'舰炮',
+  'Capital battery':'主力舰主炮',
+  'Missile':'导弹',
+  'Torpedo':'鱼雷',
+  'Bomb mortar':'臼炮',
+  'Rail strike':'电磁炮打击',
+  'Strategic weapon':'战略武器',
+  'tracks aircraft':'追踪飞机',
+  'homing':'自动追踪',
+  'lob':'抛射'
+};
+
+// ---------- 舰船图鉴与战争日志(buildAlmanac / showWarLog 界面标签) ----------
+const ALMANAC_ZH = {
+  '📖 SHIP ALMANAC':'📖 舰船图鉴',
+  '⚓ SHIP ALMANAC':'⚓ 舰船图鉴',   // 战报角落的入口按钮变体
+  '⚓ WAR LOG':'⚓ 战争日志',
+  '📖 WAR LOG':'📖 战争日志',       // 战报角落的入口按钮变体
+  'CLOSE':'关闭',
+  'CONTINUE':'继续',
+  '⚓ LEGENDARY FLAGSHIPS':'⚓ 传奇旗舰',
+  'STANDARD FLEET':'常规舰队',
+  // 参数化提示:原句为 N+' hulls in commission — browse the fleet',数字在前
+  'hulls in commission — browse the fleet':'艘战舰在役——翻翻你的舰队图鉴吧',
+  '— Your chronicle is unwritten. Win a theater to begin. —':'——你的战记还是一片空白。打赢一个战区，就开始书写吧。——',
+  '— THE END —':'——全剧终——',
+  '⚓ CHRONICLE — ':'⚓ 战记——',    // 前缀,后接战区名(战区名走 CAMPAIGN_ZH)
+  // 图鉴卡片数据行用词:'Length 112m · Hull 520 HP · 12 mounts · Surface'
+  'Length':'全长',
+  'Hull':'船体',
+  'mounts':'炮位',
+  'Flat-top':'平顶船',
+  'Submersible':'潜水艇',
+  'Surface':'水面舰'
+};
+const LORE_ZH_INTRO = `人们把这片海叫做"钢铁怒潮"——一百年的战争往海里沉下了太多钢铁,海水都泛着铁锈的颜色。旧日的国家早就沉没了;剩下的只有自由群岛——一片散落的港口,靠着时刻装满炮弹的大炮,守住了自己的自由。如今,多米宁帝国正从赤红的东方汹涌而来,瓦尔加大元帅的黑红战旗所到之处,一座又一座岛屿被吞没。<br><br>南港是最后一座自由的深水良港——就在今天早晨,凯斯勒舰队司令把舰长肩章别在你的外套上,把一艘战舰的钥匙交到你手里。"就一艘船,"她说,"每一支舰队都是这么开始的。开去训练湾,练到炮打得准了再回来。多米宁帝国可不会等你慢慢学。"<br><br>选一艘你的座舰吧,舰长。大潮正在转向——而它,正朝我们扑来。`;
+const LORE_ZH_BEATS_A = [
+  /* 1 训练湾 */ `炮术训练结束了。现在你的炮弹指哪打哪,你的船员配合得像一个人。凯斯勒司令在防波堤上从头看到尾,眼神里几乎带着赞许。"不错。"她只说了这两个字——随后脸上的暖意一下子消失了。"因为一个小时前,这已经不是演习了。多米宁的陆战队,刚刚踏上了北边的海滩。"`,
+  /* 2 大登陆 */ `敌人还没来得及站稳脚跟,你就把他们赶回了浪花里。海滩是你的了,上面扔满了多米宁士兵丢下的装备。可一名被俘的侦察兵喘着粗气,吐出一句警告:这次登陆只是试探。真正的大舰队正在近海集结——而且,已经出发了。`,
+  /* 3 海岸遭遇战 */ `地平线上,三艘多米宁战舰烧成了火把——这是你第一场真正的舰队交战,而你赢了。入夜之前,消息传遍了南港的码头:新来的舰长,真能打。凯斯勒给了你一支像样的分舰队,手指在海图上一点:"南港浅滩。他们想把我们堵在港里活活饿死。去,砸开他们的封锁线。"`,
+  /* 4 南港浅滩 */ `封锁被砸开了,航线重新畅通;粮食和炮弹又源源不断地运进南港的船舱。可多米宁帝国没有撤退——它在重新布阵。侦察机带回来的照片上,一片插满岸炮的礁石要塞森然耸立。"破碎礁,"凯斯勒低声说,"他们把一片沉船残骸,改造成了一座堡垒。"`,
+  /* 5 破碎礁 */ `你顶着暴风雨般的岸炮火力,在沉船之间穿针引线,让每一座炮台都哑了火。打捞队已经动手拆卸多米宁的大炮,搜刮废钢和秘密——而就在残骸中间,他们找到了几张海图,上面标着一条叫"铁海峡"的水道。那是整片群岛的咽喉。谁掌握它,谁就掌握这片海。`,
+  /* 6 铁海峡 */ `铁海峡是你的了。自由群岛第一次守住的海域,比丢掉的还多。瓦尔加的回应通过无线电传来,不加密,专门说给你一个人听:"好好享受白天吧,舰长。我的舰队,最擅长在黑暗里行动。"当天夜里,地平线上的航行灯,一盏接一盏地熄灭了。`,
+  /* 7 夜幕航道 */ `你摸着黑跟他们打——靠炮口的火光,靠雷达上的鬼影——最后穿过整片黑暗,船还稳稳浮在海面上。于是多米宁帝国用黑夜换来了更糟的东西:一堵灰色的雾墙从迷雾边境滚滚压来,雾里,有个非常庞大的东西正在移动。`,
+  /* 8 迷雾边境 */ `你一炮接一炮,把多米宁的迷雾分舰队硬从雾里拖了出来,直到最后一艘降下军旗。在一间进水的船舱里,你的登舰小队发现每一份命令上都反复出现同一个词——"利维坦"。那不是一个舰级,而是一艘船:多米宁的第一艘无畏巨舰,大到能搅出自己的风暴。它就等在那片深水里,你的海图上只写着一个名字——利维坦之墓。`,
+  /* 9 利维坦之墓 */ `利维坦沉了。这一仗几乎耗光了你的全部家底,还倒赔了半条命,但多米宁的旗舰,终于躺在了这片以墓地命名的海底。南港狂欢了一整夜。凯斯勒没有。"一艘利维坦而已,"她轻声说着,展开一张大得多的地图,"瓦尔加有一座专门造它们的船厂。而且现在,他记住你的名字了。"`,
+  /* 10 黎明巡逻 */ `天刚亮,你就把战火烧向了东方。这次黎明巡逻本该悄无声息——只是越过边界,去多米宁的海域看一眼。结果一点也不安静。但你冲散了敌人的警戒线,并且在整整一代人以来头一回,把自由群岛的旗帜插上了对岸。反攻,开始了。`,
+  /* 11 死亡走廊 */ `他们把你逼进两座要塞海角之间的绞杀场,一艘又一艘战舰堵在你的航线上。你硬闯了这条死亡走廊,从另一头杀了出来——引擎冒着烟,弹药库几乎见了底,但你冲过来了。多米宁的内层防线裂开了,前方是一片开阔的海。至少,眼下是。`,
+  /* 12 台风航线 */ `他们一头扎进台风的血盆大口,笃定你不敢跟。你跟了。一边跟大海搏斗,一边跟敌人开炮,风暴没干掉的,都被你送进了海底。在尖啸的狂风里,无线电中传来瓦尔加劈啪作响的声音——这一次,不再是嘲讽:"你不该这么快,就打到这里。"`,
+  /* 13 黑水伏击 */ `那本是一个完美的陷阱:整整一支分舰队外加一艘旗舰,藏在漆黑的水域里,在最刁钻的时机猛然收网。它本该成功。可你把这场伏击整个翻了过来,让设陷阱的人自己掉进了陷阱。多米宁帝国不再耍聪明了——它开始拼命堆数量。`,
+  /* 14 跳岛作战 */ `一座岛接一座岛,一片滩头接一片滩头,你夺回了多米宁占领多年的整条岛链。这活儿又慢、又苦、全是贴身近战——但你竖起的每一座指挥所都飘着你的旗帜,每一座都是抵在瓦尔加补给线上的一把尖刀。这些曾被占领的岛屿,正在变成一条新的战线。`,
+  /* 15 午夜突袭 */ `你挑了月亮还没升起、夜最黑的那一刻,突袭了他们的前进锚地;警报还没响完,你已经消失在夜色里。补给站被炸上了天,他们一半的燃料储备烧了个精光。加不上油的舰队跑不起来——瓦尔加的舰队,开始一瘸一拐了。他下令:剩下的每一艘船,全部集结。`,
+  /* 16 钢铁舰队 */ `十一艘多米宁战舰一字排开——这就是"钢铁舰队",奉命一击把你彻底了结。你迎头撞了上去,只给大海留下一片漂浮的残骸。如今南港的码头上,人们开始公开议论:这场战争,真的有可能打赢。而凯斯勒也头一次用起了一个她从前绝不允许自己说出口的词:胜利。`,
+];
+const LORE_ZH_BEATS_B = [
+  /* 17 破碎海岸 */   `多米宁舰队一头扎进破碎海岸的迷宫——上千条水道，上千个死胡同——指望让你在礁石堆里慢慢流血。结果你一条水道一条水道地把他们揪了出来。这片海里再没有能藏身的地方，他们只好掉头向北，逃进了冰海。`,
+  /* 18 冰封海峡 */   `你追着他们钻进冰架外的刺骨浓雾。在那里，大海本身就想要你的命，敌人只能算水里第二危险的东西。你带着一身冻伤杀了出来——而且赢了。冰层的另一边，就是多米宁帝国自己的海岸线。战火，眼看就要烧到他们家门口。`,
+  /* 19 清算时刻 */   `没有雾，没有冰，也没有花招——就是两支舰队在开阔海面上，按最老的规矩把账算清。这就是清算时刻。硝烟散尽时，自由群岛的军旗还在桅杆上飘。瓦尔加的正规海军打光了。可水手们悄悄传：剩下的更吓人——是那些再也不回应无线电的船。`,
+  /* 20 幽灵舰队 */   `寡不敌众、孤立无援，还被人满海追着打——你迎战的，是多米宁早就从名册上划掉、当作沉了的那些船：幽灵舰队，船员全是再没什么可失去的人。那是整场战争里最难打的一仗。你还浮在海面上；他们没有。而前方，天空渐渐变成了灰烬的颜色。`,
+  /* 21 火山湾 */     `火山灰从天上往下落，海湾被底下的岩浆映得通红——就在这里，你烧掉了多米宁最后的本土舰队。火山的红光把下一个目标照成了清清楚楚的黑影：瓦尔加的要塞之岛“最后堡垒”，城墙上密密麻麻，架满了他剩下的每一门炮。`,
+  /* 22 最后堡垒 */   `你顶着要塞的炮口把陆战队送上了岸，一堵墙一堵墙、一间屋一间屋地拿下了最后堡垒。瓦尔加的旗从城堡顶上降了下来。可他本人不见了——趁着黑夜，登上一艘谁也没见过的新船溜进了大海。他最后的电报说：“这不是投降，是一个开始。漫漫长夜就要来了，将军。”`,
+  /* 23 漫漫长夜 */   `他说的还真不是比喻。多米宁手里还剩最后一张牌——足以遮住太阳的浓烟和火山灰，好在无尽的黑暗里，打一场他们一直想打的战争。你在这个不会天亮的黑夜里打赢了头一仗，证明你同样不需要太阳。可漫漫长夜，还一直铺到地平线的那一头。`,
+  /* 24 飓风走廊 */   `遮天的浓烟养出了没完没了的风暴，瓦尔加偏偏专挑最凶的那条路逃——飓风走廊，一堵接一堵的风暴墙。你一场风暴一场风暴地追，被大海吞掉了赔不起的船，却一次也没让他甩脱。现在他被逼进了死角。而被逼急的人，会造出怪物。`,
+  /* 25 双子利维坦 */ `这回不是一艘无畏舰。是两艘。双子利维坦并排冲出风暴，有好一阵子，眼看就是你的末日。结果末日是它们的。两艘，全沉了。多米宁再也造不出更大的家伙了——凯斯勒司令却警告说，他们还剩最后一招：把手里的一切，一次性全压上来。`,
+  /* 26 熔炉 */       `大雾、舰队、旗舰，一股脑全砸向你，一场磨得看不到头的鏖战——熔炉，就是要把你的海军熔成一滩铁水。你顶住了。差一点点没顶住，但你顶住了。熔炉的另一头，多米宁最后的舰队正在后撤，做最后一次集结。战争快打完了。你的弹药也快打完了。`,
+  /* 27 钢铁之雨 */   `十二艘敌舰，炮弹密得遮住了天，水兵们管它叫钢铁之雨。你一头驶了进去，又从另一头驶了出来。作为一支能打仗的力量，多米宁海军已经不存在了——只剩一些碎片，朝着海图的边缘、朝着边缘之外的大洋没命地逃。`,
+  /* 28 无尽地平线 */ `你把最后几艘逃船一路追到海图的尽头，穿过自由群岛的军舰从没去过的海域——无尽地平线。你在那里追上了他们，做了个了断。现在前方只剩瓦尔加本人——他正把还浮得起来的每一艘船都拢到一起，给自己的退路摆下最后一道封锁线。`,
+  /* 29 最终封锁 */   `多米宁幸存的全部海军，被锁成一堵最后的高墙，横在你和瓦尔加的旗舰之间。你把它砸穿了。封锁线成了一堆废铁，航路敞开，整场战争只剩最后一战。瓦尔加自己也清楚。他发来信号：“来诸神黄昏礁吧，将军。让这场大潮，在它涨起的地方落下。”`,
+  /* 30 诸神黄昏礁 */ `黑夜、风暴，还有多米宁最后一艘利维坦——就在这片礁石上，当年这场百年战争的第一炮正是在这里打响。你和瓦尔加大元帅舰对舰正面相撞，把他的旗舰送进了海底，和其他所有沉船作伴。多米宁帝国垮了。可有一艘小小的救生艇溜进了黑暗——而大海，实在太宽了。`,
+  /* 31 最后的浪潮 */ `一切在这里终结——最后的顽抗，最后的火炮，一场百年战争的最后一波浪潮。当海面终于安静下来，从南港到无尽地平线，每一座岛上飘扬的都是你的旗。凯斯勒司令在舰桥上找到了你——你正望着一片没有在燃烧的大海，活着的人里谁都没见过这样的景象。“人们叫它钢铁怒潮，因为它带来的从来只有钢铁和落水的人，”她说，“而你，还给了它别的东西。”你身后，太阳正从自由的海面上升起。战争结束了。是你赢的。`,
+];
+const LORE_ZH_BEATS=[...LORE_ZH_BEATS_A,...LORE_ZH_BEATS_B];
+
 const NAME_ZH = {
+
+  // 集市物品名(战役选择界面的集市卡片)
+  'Experimental Railgun':'实验电磁炮',
+  'Aegis VLS Battery':'宙斯盾垂发导弹阵',
+  // Andy 新增的传奇旗舰(真实历史名舰,用通行中文舰名)
+  'Missile Frigate':'导弹护卫舰',
+  'Battlecruiser':'战列巡洋舰',
+  'Coastal Monitor':'近岸浅水重炮舰',
+  'Akagi':'赤城号',
+  'USS Fletcher':'弗莱彻号',
+  'Type 055':'055型',
+  'USS Nimitz':'尼米兹号',
+  'Escort':'护航舰',
+  'Fast Capital':'快速主力舰',
+  'Gun Platform':'炮台舰',
+  'Fleet Carrier':'舰队航母',
+  'Market Destroyer':'集市驱逐舰',
+  'Market Missile Cruiser':'集市导弹巡洋舰',
+  'Market Supercarrier':'集市超级航母',
+  'Bismarck':'俾斯麦号',
+  'USS Enterprise':'企业号',
+  'USS Missouri':'密苏里号',
+  'USS Iowa':'衣阿华号',
+  'USS Arizona':'亚利桑那号',
+  'HMS Hood':'胡德号',
+  'HMS Dreadnought':'无畏号',
+  'HMS Ark Royal':'皇家方舟号',
+  'Yamato':'大和号',
+  'Musashi':'武藏号',
+  'Aurora':'阿芙乐尔号',
+  'Richelieu':'黎塞留号',
+  'Zhiyuan':'致远号',
+  'Dingyuan':'定远号',
+  'Liaoning':'辽宁号',
+  'Legendary Battleship':'传奇战列舰',
+  'Legendary Carrier':'传奇航空母舰',
+  'Legendary Battlecruiser':'传奇战列巡洋舰',
+  'Legendary Cruiser':'传奇巡洋舰',
   // 宿敌
   'Grand Marshal Varga':'瓦尔加大元帅',
   // 舰船
