@@ -857,10 +857,10 @@ function initPostFX(){
 }
 function resizePostFX(){
   if(!composer) return;
-  const pr=renderer.getPixelRatio();
-  composer.setSize(innerWidth,innerHeight);
-  if(bloomPass) bloomPass.resolution.set(innerWidth,innerHeight);
-  if(aoPass) aoPass.uniforms.resolution.value.set(innerWidth*pr, innerHeight*pr);
+  const pr=renderer.getPixelRatio(), w=Math.round(innerWidth*pr), h=Math.round(innerHeight*pr);
+  composer.setSize(w,h);                                  // device pixels — must match the render buffer, not CSS pixels
+  if(bloomPass) bloomPass.resolution.set(w,h);
+  if(aoPass) aoPass.uniforms.resolution.value.set(w,h);
 }
 function setGfxQuality(q){
   gfxQuality=Math.max(0,Math.min(1,q));
@@ -5619,11 +5619,11 @@ function shipEconomy(s,dt){
     if(!s.proxy && !deckOut && aiPlanes.reduce((n,p)=>n+(p.team===s.team?1:0),0) < cap && s.sinkT===0) spawnAIPlane(s, s.team); }
 }
 function updateSupportShips(dt){
-  [...allies,...enemies].forEach(tender=>{
+  const scanTender=tender=>{
     if(!tender.def.support||tender.sinkT>0)return;
     shipsOf(tender.team).forEach(s=>{if(s===tender||s.sinkT>0||s.pos.distanceTo(tender.pos)>170)return;
       s.hp=Math.min(s.maxhp,s.hp+9*dt);
-      const parts=compartmentsOf(s),worst=Object.keys(parts).sort((a,b)=>parts[a].hp/parts[a].max-parts[b].hp/parts[b].max)[0];
+      const parts=compartmentsOf(s); let worst=null,wr=2; for(const k in parts){ const r=parts[k].hp/parts[k].max; if(r<wr){wr=r;worst=k;} }
       parts[worst].hp=Math.min(parts[worst].max,parts[worst].hp+s.maxhp*0.012*dt);
       if(parts[worst].disabled&&parts[worst].hp>parts[worst].max*0.28)parts[worst].disabled=false;
       tender.serviceT=(tender.serviceT||0)+dt;
@@ -5636,7 +5636,8 @@ function updateSupportShips(dt){
       piloting.hp=Math.min(piloting.maxhp,piloting.hp+7*dt);piloting.fuel=Math.min(piloting.fuelMax,piloting.fuel+18*dt);
       piloting.tenderT=(piloting.tenderT||0)+dt;if(piloting.tenderT>=2.5){piloting.tenderT=0;
         const pa=piloting.plane;if(pa.def.bombs&&!pa.def.strategicBomb)pa.bombsLeft=Math.min(pa.def.bombs,pa.bombsLeft+1);if(pa.def.gunAmmo!=null)pa.gunAmmo=Math.min(pa.def.gunAmmo,(pa.gunAmmo||0)+12);}}
-  });
+  };
+  allies.forEach(scanTender); enemies.forEach(scanTender);   // no per-frame spread array
 }
 // ---- one ship fires its whole arsenal: each weapon engages the kind of target it's good against ----
 function aiShipFire(s){
@@ -7018,7 +7019,7 @@ function update(dt,t){
   // --- fx ---
   while(fx.length>MAX_FX) removeFxAt(0);
   for(let i=fx.length-1;i>=0;i--){ const f=fx[i]; f.life-=dt;
-    if(f.vel){ if(f.grav)f.vel.y-=22*dt; if(f.drag)f.vel.multiplyScalar(Math.max(0,1-f.drag*dt)); f.mesh.position.add(f.vel.clone().multiplyScalar(dt)); }
+    if(f.vel){ if(f.grav)f.vel.y-=22*dt; if(f.drag)f.vel.multiplyScalar(Math.max(0,1-f.drag*dt)); f.mesh.position.addScaledVector(f.vel,dt); }
     if(f.grow) f.mesh.scale.multiplyScalar(1+dt*(f.growRate||6));
     if(f.c0&&f.mesh.material&&f.mesh.material.color) f.mesh.material.color.copy(f.c0).lerp(f.c1, Math.min(1,1-Math.max(0,f.life)/f.max));   // hot→cold colour ramp
     if(f.spin){ f.mesh.rotation.x+=f.spin*dt; f.mesh.rotation.z+=f.spin*0.7*dt; }                                                            // tumbling debris
@@ -7331,7 +7332,7 @@ function updateShells(dt){
     }
     if(s.arc) s.vel.y-=22*dt;
     const step=s.vel.length()*dt; s.dist+=step;
-    s.mesh.position.add(s.vel.clone().multiplyScalar(dt));
+    s.mesh.position.addScaledVector(s.vel,dt);
     if(s.nuclear&&s.fixedTarget&&s.mesh.position.distanceTo(s.fixedTarget)<18){detonateNuclearShell(s);removeShellAt(i);continue;}
     if(s.maxDist && s.dist>s.maxDist){ boom(s.mesh.position.clone(),0.5); removeShellAt(i); continue; } // out of range — self-destruct
     if(s.mesh.geometry.type==='ConeGeometry'||s.mesh.geometry.type==='CylinderGeometry') s.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), s.vel.clone().normalize());
