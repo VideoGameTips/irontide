@@ -1,0 +1,164 @@
+[
+  {
+    "diff": "easy",
+    "theater": 1,
+    "winRate": 0,
+    "avgSurvivalT": 398,
+    "avgDmg": 1384,
+    "avgSunk": "14.9",
+    "outcomes": "dddddddddd"
+  },
+  {
+    "diff": "easy",
+    "theater": 3,
+    "winRate": 0,
+    "avgSurvivalT": 703,
+    "avgDmg": 1259,
+    "avgSunk": "30.5",
+    "outcomes": "ddddddddtd"
+  },
+  {
+    "diff": "easy",
+    "theater": 4,
+    "winRate": 0,
+    "avgSurvivalT": 1355,
+    "avgDmg": 721,
+    "avgSunk": "38.6",
+    "outcomes": "dttdtdtttt"
+  },
+  {
+    "diff": "easy",
+    "theater": 5,
+    "winRate": 0,
+    "avgSurvivalT": 1353,
+    "avgDmg": 805,
+    "avgSunk": "45.0",
+    "outcomes": "tddtdddtdt"
+  },
+  {
+    "diff": "easy",
+    "theater": 6,
+    "winRate": 0,
+    "avgSurvivalT": 1111,
+    "avgDmg": 1064,
+    "avgSunk": "46.3",
+    "outcomes": "tttddddttt"
+  },
+  {
+    "diff": "easy",
+    "theater": 7,
+    "winRate": 0,
+    "avgSurvivalT": 1316,
+    "avgDmg": 981,
+    "avgSunk": "58.8",
+    "outcomes": "ttddddtttd"
+  },
+  {
+    "diff": "normal",
+    "theater": 1,
+    "winRate": 0,
+    "avgSurvivalT": 288,
+    "avgDmg": 1070,
+    "avgSunk": "9.5",
+    "outcomes": "dddddddddd"
+  },
+  {
+    "diff": "normal",
+    "theater": 3,
+    "winRate": 0,
+    "avgSurvivalT": 377,
+    "avgDmg": 1046,
+    "avgSunk": "14.3",
+    "outcomes": "dddddddddd"
+  },
+  {
+    "diff": "normal",
+    "theater": 4,
+    "winRate": 0,
+    "avgSurvivalT": 923,
+    "avgDmg": 735,
+    "avgSunk": "21.2",
+    "outcomes": "tddddtdddd"
+  },
+  {
+    "diff": "normal",
+    "theater": 5,
+    "winRate": 0,
+    "avgSurvivalT": 1173,
+    "avgDmg": 626,
+    "avgSunk": "44.2",
+    "outcomes": "ddttddtdtt"
+  },
+  {
+    "diff": "normal",
+    "theater": 6,
+    "winRate": 0,
+    "avgSurvivalT": 1093,
+    "avgDmg": 1818,
+    "avgSunk": "51.1",
+    "outcomes": "tttdddddtd"
+  },
+  {
+    "diff": "normal",
+    "theater": 7,
+    "winRate": 0,
+    "avgSurvivalT": 599,
+    "avgDmg": 700,
+    "avgSunk": "21.0",
+    "outcomes": "ddtddddddd"
+  },
+  {
+    "diff": "hard",
+    "theater": 1,
+    "winRate": 0,
+    "avgSurvivalT": 226,
+    "avgDmg": 757,
+    "avgSunk": "8.3",
+    "outcomes": "dddddddddd"
+  },
+  {
+    "diff": "hard",
+    "theater": 3,
+    "winRate": 0,
+    "avgSurvivalT": 521,
+    "avgDmg": 1000,
+    "avgSunk": "27.4",
+    "outcomes": "ddddtddddd"
+  },
+  {
+    "diff": "hard",
+    "theater": 4,
+    "winRate": 0,
+    "avgSurvivalT": 1054,
+    "avgDmg": 826,
+    "avgSunk": "31.1",
+    "outcomes": "tddddttddt"
+  },
+  {
+    "diff": "hard",
+    "theater": 5,
+    "winRate": 0,
+    "avgSurvivalT": 1143,
+    "avgDmg": 945,
+    "avgSunk": "43.9",
+    "outcomes": "tddtddtdtd"
+  },
+  {
+    "diff": "hard",
+    "theater": 6,
+    "winRate": 0,
+    "avgSurvivalT": 992,
+    "avgDmg": 1642,
+    "avgSunk": "41.1",
+    "outcomes": "ddtdttdddd"
+  },
+  {
+    "diff": "hard",
+    "theater": 7,
+    "winRate": 0,
+    "avgSurvivalT": 667,
+    "avgDmg": 910,
+    "avgSunk": "23.3",
+    "outcomes": "dddtddtddd"
+  }
+]
