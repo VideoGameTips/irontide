@@ -2990,8 +2990,17 @@ const RANKS=[
   {name:'Fleet Admiral', score:2400, perk:0.35},
 ];
 let career={ sunk:0, planes:0, islands:0, wins:0, losses:0, bosses:0, rivalPhase:'intro' };
-function loadCareer(){ try{ const c=JSON.parse(localStorage.getItem('ironTideCareer')); if(c&&typeof c==='object') career={...career,...c}; }catch(e){} }
-function saveCareer(){ try{ localStorage.setItem('ironTideCareer', JSON.stringify(career)); }catch(e){} }
+// ---- persistence schema versions: bump when a shape changes, add a step to migrateCareer ----
+const CAREER_VER=2;   // v1(implicit)=original counters · v2=+rivalPhase/seenIntro/credits/marketOwned/licenses/mapsUnlocked
+function migrateCareer(c){
+  if(!c||typeof c!=='object'||Array.isArray(c)) return null;             // corrupt → fresh start
+  const v=c.cv|0;
+  if(v<2){ if(typeof c.rivalPhase!=='string') c.rivalPhase='intro'; }    // v1→v2: fields default in below
+  for(const k of ['sunk','planes','islands','wins','losses','bosses']) if(typeof c[k]!=='number'||!isFinite(c[k])||c[k]<0) c[k]=0;
+  c.cv=CAREER_VER; return c;
+}
+function loadCareer(){ try{ const c=migrateCareer(JSON.parse(localStorage.getItem('ironTideCareer'))); if(c) career={...career,...c}; }catch(e){} }
+function saveCareer(){ try{ career.cv=CAREER_VER; localStorage.setItem('ironTideCareer', JSON.stringify(career)); }catch(e){} }
 // ===== CAMPAIGN — conquer a theater to unlock the next =====
 const CAMPAIGN=[
   // ---- warm-up theaters: short maps, gentle, no boss ----
@@ -8393,7 +8402,16 @@ function saveWar(){ if(!warSavable()) return;
     localStorage.setItem(SAVE_KEY,JSON.stringify(s));
   }catch(e){}
 }
-function loadSave(){ try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); return (s&&s.v===1&&SHIPS[s.shipId])?s:null; }catch(e){ return null; } }
+function validWarSave(s){
+  if(!s||typeof s!=='object'||!SHIPS[s.shipId]) return false;
+  if(s.v!==1) return false;                                               // unknown future/ancient shape → treat as no save (never crash on it)
+  if(typeof s.mapIdx!=='number'||s.mapIdx<0||s.mapIdx>=CAMPAIGN.length) return false;
+  if(typeof s.money!=='number'||!isFinite(s.money)) return false;
+  if(!Array.isArray(s.islands)||!Array.isArray(s.units)) return false;
+  if(s.islands.some(i=>typeof i.x!=='number'||typeof i.z!=='number'||typeof i.r!=='number')) return false;
+  return true;
+}
+function loadSave(){ try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); return validWarSave(s)?s:null; }catch(e){ return null; } }
 function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
 function resumeWar(){
   const s=loadSave(); if(!s) return;
