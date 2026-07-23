@@ -114,6 +114,33 @@ test('language toggle: the menu re-renders in Chinese and back', async ({ page }
   expect(errors).toEqual([]);
 });
 
+test('defeat offers a soft retry that restarts the same theater after reload', async ({ page }) => {
+  const errors = await boot(page);
+  await page.evaluate(() => {
+    startGame('destroyer'); skipBanner();
+    career.lossStreak = 1;           // second consecutive loss → streak encouragement copy
+    endGame(false);
+  });
+  const over = await page.evaluate(() => ({
+    retryShown: document.getElementById('overRetry').style.display !== 'none',
+    hasCheer: document.getElementById('overText').innerHTML.includes('#8fd0a0'),
+    streak: career.lossStreak,
+  }));
+  expect(over.retryShown).toBe(true);
+  expect(over.hasCheer).toBe(true);
+  expect(over.streak).toBe(2);
+  await page.evaluate(() => setTimeout(retrySameWar, 0));   // reloads the page with the retry intent stashed
+  await page.waitForFunction(() => typeof phase !== 'undefined' && phase === 'play');
+  const probe = await page.evaluate(() => {
+    for (let i = 0; i < 10; i++) update(0.033, t2 + i * 0.033);   // let the objective HUD tick once
+    return { phase, ship: player.def.name, compass: (document.getElementById('obcompass') || {}).textContent || '' };
+  });
+  expect(probe.phase).toBe('play');
+  expect(probe.ship).toBe('Destroyer');
+  expect(probe.compass).toContain('🧭');
+  expect(errors).toEqual([]);
+});
+
 test('shell detonates on island terrain; shore torpedo stays exempt', async ({ page }) => {
   const errors = await boot(page);
   const probe = await page.evaluate(() => {

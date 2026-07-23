@@ -368,7 +368,8 @@
 <div id="over">
   <h2 id="overTitle">SHIP LOST</h2>
   <p id="overText"></p>
-  <button onclick="location.reload()">NEW COMMAND</button>
+  <button id="overRetry" onclick="retrySameWar()">⚓ RETRY THEATER</button>
+  <button id="overNew" onclick="location.reload()">NEW COMMAND</button>
 </div>
 <div id="fatalError"><div class="card"><h2>⚠ GAME ERROR</h2><p>The battle stopped safely instead of silently freezing. Reload to restart the renderer.</p><code id="fatalDetail">Unknown error</code><button onclick="location.reload()">RELOAD GAME</button></div></div>
 
@@ -470,7 +471,7 @@ function applyVolume(){
   if(typeof MUSIC!=='undefined'&&MUSIC.gain&&MUSIC.ctx) MUSIC.gain.gain.setTargetAtTime((SFX.on&&MUSIC.on?MUSIC.level:0)*(SETTINGS.volume!=null?SETTINGS.volume:1), MUSIC.ctx.currentTime, 0.2); if(SFX.master) SFX.master.gain.value=SFX.on?0.5*SETTINGS.volume:0; }
 function applySimpleHud(){
   const hide=simpleHudOn();
-  ['score','territory','sideob'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=hide?'none':''; });
+  ['score','territory','sideob','obcompass'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=hide?'none':''; });
 }
 
 // ---------- catalogs ----------
@@ -3618,6 +3619,18 @@ function updateWarPacing(dt){
     if(parent){ el=document.createElement('div'); el.id='sideob';
       el.style.cssText='margin-top:3px;font-size:11px;color:#ffd060;letter-spacing:1px;'; if(simpleHudOn()) el.style.display='none'; parent.appendChild(el); } }
   if(el) el.textContent = sideOb ? ('★ '+trText(sideOb.label)+'  '+Math.min(sideOb.goal,sideObProgress())+'/'+sideOb.goal+' · '+Math.ceil(sideOb.t)+'s · $'+sideOb.pay) : '';
+  // #26: objective compass — one arrow that always points somewhere useful
+  let ce=document.getElementById('obcompass');
+  if(!ce){ const parent=document.getElementById('objective');
+    if(parent){ ce=document.createElement('div'); ce.id='obcompass';
+      ce.style.cssText='margin-top:2px;font-size:11px;color:#9fc6e8;letter-spacing:1px;'; if(simpleHudOn()) ce.style.display='none'; parent.appendChild(ce); } }
+  if(ce){ const from=playerFocusPos(); let txt='';
+    if(from){ let tgt=enemyHarbor?enemyHarbor.pos:null, lbl=T('ENEMY HARBOR','敌方海港');
+      if(sideOb&&sideOb.kind==='capture'){ let bd=1e9,bi=null;
+        for(const i of islands){ if(i.capturable&&i.owner!==0){ const dd=Math.hypot(i.pos.x-from.x,i.pos.z-from.z); if(dd<bd){bd=dd;bi=i;} } }
+        if(bi){ tgt=bi.pos; lbl=T('OBJECTIVE ISLAND','目标岛屿'); } }
+      if(tgt) txt='🧭 '+bearingArrow(from,tgt)+' '+lbl+' '+Math.round(Math.hypot(tgt.x-from.x,tgt.z-from.z))+'m'; }
+    ce.textContent=txt; }
 }
 function sideObProgress(){ if(!sideOb) return 0;
   if(sideOb.kind==='escort'){ const a=sideOb.convoy, d=a&&a.convoyTarget;
@@ -4626,6 +4639,7 @@ function deployLandCampaignStart(skipEscort){   // skipEscort: resuming a save w
   flashPrompt('🪂 AIRBORNE ASSAULT — landed at '+(footLand.name||'the command center')+'. Secure every island.');
 }
 function startGame(shipId){
+  lastShipId=shipId;
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
   sfxResume();   // browsers need a user gesture (this ship-card click) to start audio
@@ -4977,7 +4991,8 @@ function nearestFieldTank(){ let b=null,bd=8; if(!onFoot)return null;
   playerTanks.forEach(tk=>{ if(tk.onDeck||tk.hp<=0)return; const p=tk.pos||tk.group.position, d=Math.hypot(footPos.x-p.x,footPos.z-p.z); if(d<bd){bd=d;b=tk;} }); return b; }
 function mountTank(tk){ drivingTank=tk; onFoot=false;
   camYaw.v = tk.onDeck ? (player.heading + tk.heading) : tk.heading; camPitch.v=0.08;
-  flashPrompt('Crewing the '+(tk.name||'tank')+' — WASD drive · Mouse aim · Click fire · E to dismount.'); updateMode(); }
+  flashPrompt('Crewing the '+(tk.name||'tank')+' — WASD drive · Mouse aim · Click fire · E to dismount.'); updateMode();
+  startTankTutorial(); }
 function dismountTank(){ const tk=drivingTank; drivingTank=null;
   if(tk.onDeck){ walkPos.set(tk.group.position.x, deckEyeY(), tk.group.position.z+3); onFoot=false; }
   else { onFoot=true; footLand=tk.island; footPos.set(tk.pos.x+4, tk.island.pos.y, tk.pos.z); footPos.y=groundHeightAt(footPos,tk.island)+EYE; }
@@ -6216,6 +6231,7 @@ function flyPlane(pa){
   if(pa.def.uav) fpv=true;
   const cv=document.getElementById('c'); if(document.pointerLockElement!==cv) try{const _pl=cv.requestPointerLock(); if(_pl&&_pl.catch)_pl.catch(()=>{});}catch(e){}
   flashPrompt('Takeoff roll…'); updateMode();
+  startPlaneTutorial();
 }
 function setPlaneGearVisual(pa,shown){if(pa&&pa.group.userData.gearVisuals)pa.group.userData.gearVisuals.forEach(g=>g.visible=shown);}
 function applyPlaneDamageVisual(P){
@@ -8128,6 +8144,17 @@ function updateBanners(dt){
 // Walking inland, the only way back aboard is to find the ship again — so say where it is.
 // The arrow points relative to the way the captain is facing, not to the compass.
 const BEARING_ARROWS=['↑','↗','→','↘','↓','↙','←','↖'];
+function bearingArrow(from,to){
+  const dx=to.x-from.x, dz=to.z-from.z;
+  const rel=camYaw.v-Math.atan2(dx,dz);   // +z is forward, +x is the captain's LEFT — hence the flip
+  return BEARING_ARROWS[((Math.round(rel/(Math.PI/4))%8)+8)%8];
+}
+function playerFocusPos(){   // wherever the player currently IS — plane, tank, feet or helm
+  if(piloting&&piloting.pos) return piloting.pos;
+  if(drivingTank&&!drivingTank.onDeck) return tankWP(drivingTank);
+  if(onFoot) return footPos;
+  return (player&&player.pos)||null;
+}
 const isTouch=()=>typeof TOUCH!=='undefined'&&TOUCH;   // phones get button names, desktops get key names
 // the prompt used +18 while toggleFoot demanded +14: a four-metre ring where the game told you
 // to press G and G refused. One radius now answers both questions.
@@ -8136,9 +8163,8 @@ function shipWayback(near){
   if(landCampaignMode||playerShipLost||!player||!player.build) return '';
   if(near) return isTouch() ? T('   ·   tap Re-board','   ·   点「回船」按钮上舰')
                             : T('   ·   press G to board','   ·   按 G 上舰');
-  const dx=player.pos.x-footPos.x, dz=player.pos.z-footPos.z, d=Math.hypot(dx,dz);
-  const rel=camYaw.v-Math.atan2(dx,dz);   // +z is forward, +x is the captain's LEFT — hence the flip
-  const arrow=BEARING_ARROWS[((Math.round(rel/(Math.PI/4))%8)+8)%8];
+  const d=Math.hypot(player.pos.x-footPos.x, player.pos.z-footPos.z);
+  const arrow=bearingArrow(footPos, player.pos);
   const m=Math.round(d);
   return isTouch()
     ? T('   ·   '+arrow+' ship '+m+'m away — walk to it and tap Re-board',
@@ -8346,6 +8372,24 @@ function updateMode(){
 // =====================================================================
 //  END
 // =====================================================================
+let lastShipId=null;
+// Soft retry (#25): stash the run's theater+ship and reload — a fresh page is the one
+// guaranteed-clean world reset this single-file game has (no half-torn-down piloting/
+// onFoot/tank state). consumeRetryIntent() below re-enters battle right after boot.
+function retrySameWar(){
+  try{ sessionStorage.setItem('ironTideRetry', JSON.stringify({map:currentMapIdx, sandbox:currentSandboxIdx, ship:lastShipId||'destroyer'})); }catch(e){}
+  location.reload();
+}
+function consumeRetryIntent(){
+  let r=null;
+  try{ const raw=sessionStorage.getItem('ironTideRetry'); if(raw){ sessionStorage.removeItem('ironTideRetry'); r=JSON.parse(raw); } }catch(e){}
+  if(!r||typeof r.ship!=='string'||!SHIPS[r.ship]) return;
+  if(typeof r.sandbox==='number'&&r.sandbox>=0&&SANDBOX_MAPS[r.sandbox]) currentSandboxIdx=r.sandbox;
+  else { currentSandboxIdx=-1; if(typeof r.map==='number'&&CAMPAIGN[r.map]&&r.map<mapsUnlocked()) currentMapIdx=r.map; }
+  const story=document.getElementById('story'); if(story) story.style.display='none';
+  document.addEventListener('pointerdown',()=>sfxResume(),{once:true});   // reloaded page: audio unlocks on the first click of the rematch
+  startGame(r.ship);
+}
 function endGame(win,msg){
   if(phase==='over')return; phase='over';
   const mpMatch=!!(MP.active||MP.everJoined);        // a shared arena is not the campaign: keep the solo save, record, wear and rival arc untouched
@@ -8354,6 +8398,7 @@ function endGame(win,msg){
   if(win&&!mpMatch) recordShipWear();                // note how battered the ship ended up, for next mission
   const oldRank=careerRank();
   if(!mpMatch) warRecord(win?'wins':'losses');
+  if(!mpMatch){ career.lossStreak = win?0:(career.lossStreak||0)+1; saveCareer(); }
   if(win&&!mpMatch){ rivalAdvance('frustrated'); if(currentMapIdx+1>=Math.floor(CAMPAIGN.length/2)) rivalAdvance('respect'); }
   const r=careerRank(), nx=nextRank();
   let unlockMsg='';
@@ -8363,6 +8408,7 @@ function endGame(win,msg){
   const marketEarned=mpMatch?0:awardCareerCredits(win);
   if(document.pointerLockElement)document.exitPointerLock();
   document.getElementById('over').style.display='flex';
+  const rb=document.getElementById('overRetry'); if(rb) rb.style.display=(win||mpMatch)?'none':'inline-block';
   const t=document.getElementById('overTitle');
   t.textContent = win?T('VICTORY','胜利'):T('DEFEAT','战败'); t.style.color = win?'#7ff0a8':'#ff7a6a';
   const promo = r.name!==oldRank.name ? T(`  ⭐ PROMOTED TO ${r.name.toUpperCase()}!`,`  ⭐ 晋升为${trRank(r.name)}！`) : '';
@@ -8372,14 +8418,24 @@ function endGame(win,msg){
     `<br><br><span style="color:#9fc6e8">${T('⚓ WAR RECORD — '+r.name+' (+'+Math.round(r.perk*100)+'% starting funds)','⚓ 战绩档案——'+trRank(r.name)+'（初始资金 +'+Math.round(r.perk*100)+'%）')}</span>` +
     '<br>'+T(`Ships sunk ${career.sunk} · Aircraft ${career.planes} · Islands ${career.islands} · Leviathans ${career.bosses} · Wars ${career.wins}W/${career.losses}L`,`击沉军舰 ${career.sunk} · 击落飞机 ${career.planes} · 占领岛屿 ${career.islands} · 利维坦 ${career.bosses} · 战争 ${career.wins}胜/${career.losses}负`) +
     (nx?`<br><span style="color:#6b7d92">${T('Next rank: '+nx.name+' at '+nx.score+' points (you have '+careerScore()+')','下一军衔：'+trRank(nx.name)+'（需 '+nx.score+' 分，你有 '+careerScore()+' 分）')}</span>`:`<br><span style="color:#ffd060">${T('Highest rank achieved.','已达到最高军衔。')}</span>`)+
-    unlockMsg;
+    unlockMsg + cheerMsg(win,mpMatch);
   // campaign win: append this theater's chronicle beat to the victory screen
+  // (cheerMsg defined below endGame — hoisted function declaration)
   if(win && currentSandboxIdx<0 && LORE.beats[currentMapIdx]){
     document.getElementById('overText').innerHTML +=
       `<br><br><span style="display:block;max-width:620px;margin:8px auto 0;padding-top:14px;border-top:1px solid #21384e;text-align:left;color:#cfe0ee;font-size:13px;line-height:1.7;font-style:italic">`+
       `<span style="display:block;color:#ffd060;font-style:normal;letter-spacing:2px;font-size:12px;margin-bottom:7px;text-align:center">${trText('⚓ CHRONICLE — ')}${isZh()?campaignName(currentMapIdx):CAMPAIGN[currentMapIdx].name.toUpperCase()}</span>`+
       `${(isZh()&&typeof LORE_ZH_BEATS!=='undefined'&&LORE_ZH_BEATS[currentMapIdx])?LORE_ZH_BEATS[currentMapIdx]:LORE.beats[currentMapIdx]}</span>`;
   }
+}
+// #25: defeat encouragement — never shame a loss; scale the pep talk with the streak
+function cheerMsg(win,mpMatch){
+  if(win||mpMatch) return '';
+  const streak=career.lossStreak||0;
+  const line = streak>=4 ? T("Every great admiral lost battles — try an easier difficulty or an earlier theater, and come back stronger. You've got this! 💪",'每位伟大的舰队司令都打过败仗——试试更低的难度或更早的战区，练好了再回来。你一定行！💪')
+    : streak>=2 ? T('Tough streak, Captain — the sea tests everyone. One more go: mount an extra gun early and stay close to your allies.','连败不好受，舰长——大海考验每一个人。再来一局：开局多装一门炮，贴着盟友舰队打。')
+    : T('So close! Every defeat teaches something — hit RETRY and show them what you learned.','就差一点！每次战败都能学到东西——点「再战一局」，让他们见识你学到的本事。');
+  return '<br><br><span style="color:#8fd0a0">'+line+'</span>';
 }
 
 // =====================================================================
@@ -8598,10 +8654,13 @@ function touchInit(){
 
 // ---------- first-battle tutorial: one big hint at a time, condition-driven, shown once ----------
 const TUT_DONE_KEY='ironTideTutorialDone';
+const TUT_PLANE_KEY='ironTideTutorialPlaneDone', TUT_TANK_KEY='ironTideTutorialTankDone';
 let tutSteps=null, tutIdx=-1, tutHold=0, tutCamBase=0, tutPlacedBase=0, tutSunkBase=0, _tutLast='';
+let tutDoneKey=TUT_DONE_KEY, _tutGunBase=0, _tutBombBase=0, _tutTankPos=null;
 function tutorialDone(){ try{ return localStorage.getItem(TUT_DONE_KEY)==='1'; }catch(e){ return false; } }
 function startTutorial(){
   if(tutorialDone()||landCampaignMode) return;
+  tutDoneKey=TUT_DONE_KEY;
   tutSteps=[   // enter() re-baselines each step when it becomes active, so dying/respawning mid-tutorial can't skip or double a step
     { text:()=>T('You are at the helm — hold W to sail forward','你已经在舵位上——按住 W，军舰就会前进'), done:()=>player&&player.throttle>0.3 },
     { enter:()=>tutCamBase=camYaw.v,
@@ -8623,9 +8682,47 @@ function tutShow(){
   if(html!==_tutLast){ el.innerHTML=html; _tutLast=html; }
   el.style.display='block';
 }
-function skipTutorial(){ if(tutIdx<0)return; tutIdx=-1; tutSteps=null; try{localStorage.setItem(TUT_DONE_KEY,'1');}catch(e){} tutShow(); }
+function skipTutorial(){ if(tutIdx<0)return; tutIdx=-1; tutSteps=null; try{localStorage.setItem(tutDoneKey,'1');}catch(e){} tutShow(); }
+// #27: first-flight / first-tank walkthroughs, riding the same step machinery.
+// Each track owns its own done-flag; leaving the vehicle ends (and completes) the track —
+// the player has flown/driven once, which is all these teach.
+function startPlaneTutorial(){
+  if(tutIdx>=0||!piloting) return;   // never interrupt a running tutorial
+  try{ if(localStorage.getItem(TUT_PLANE_KEY)==='1') return; }catch(e){}
+  tutDoneKey=TUT_PLANE_KEY;
+  const def=piloting.plane.def, uav=!!def.uav, heli=!!def.heli;
+  tutSteps=[
+    { text:()=>heli?T('First flight! W/S fly forward · A/D turn · mouse climbs and descends','第一次飞行！W/S 前进 · A/D 转向 · 鼠标控制升降')
+                   :T('First flight! W/S throttle · A/D turn · mouse pitches up and down','第一次飞行！W/S 油门 · A/D 转向 · 鼠标控制抬头低头'), hold:6 },
+    ...(def.guns?[{ enter:()=>{_tutGunBase=piloting?piloting.plane.gunAmmo:0;},
+        text:()=>T('Click to fire your guns — tracers show where the shots land','点击开炮——曳光弹会告诉你炮弹落在哪里'),
+        done:()=>!piloting||piloting.plane.gunAmmo==null||piloting.plane.gunAmmo<_tutGunBase }]:[]),
+    ...(def.bomb?[{ enter:()=>{_tutBombBase=piloting?piloting.plane.bombsLeft:0;},
+        text:()=>T('Fly over a target and press Space to drop','飞到目标上空按空格投弹'),
+        done:()=>!piloting||piloting.plane.bombsLeft<_tutBombBase }]:[]),
+    { text:()=>uav?T('Watch the battery — press E or P any time to recall the drone','注意电量——随时按 E 或 P 召回无人机')
+                  :T('Watch your fuel — fly back OVER your ship and press E to land · P to parachute out','注意燃油——飞回自己军舰正上方按 E 降落 · 危险时按 P 跳伞'), hold:7 },
+  ];
+  tutIdx=0; tutHold=0; _tutLast=''; if(tutSteps[0].enter)tutSteps[0].enter(); tutShow();
+}
+function startTankTutorial(){
+  if(tutIdx>=0||!drivingTank) return;
+  try{ if(localStorage.getItem(TUT_TANK_KEY)==='1') return; }catch(e){}
+  tutDoneKey=TUT_TANK_KEY;
+  tutSteps=[
+    { enter:()=>{_tutTankPos=drivingTank?tankWP(drivingTank).clone():null;},
+      text:()=>T('First tank! Hold W to drive · A/D to steer · mouse aims the turret','第一次开坦克！按住 W 前进 · A/D 转向 · 鼠标瞄准炮塔'),
+      done:()=>!drivingTank||(_tutTankPos&&tankWP(drivingTank).distanceTo(_tutTankPos)>8) },
+    { text:()=>T('Click to fire the main gun — it packs a punch','点击发射主炮——威力惊人'), hold:6 },
+    { text:()=>T('Took damage? Press R to repair your tank','被打坏了？按 R 修理坦克'), hold:6 },
+    { text:()=>T('Press E to hop out · drive back beside your ship and press G to re-embark','按 E 下车 · 开回军舰旁按 G 收回甲板'), hold:7 },
+  ];
+  tutIdx=0; tutHold=0; _tutLast=''; if(tutSteps[0].enter)tutSteps[0].enter(); tutShow();
+}
 function updateTutorial(dt){
   if(tutIdx<0||!tutSteps) return;
+  if(tutDoneKey===TUT_PLANE_KEY&&!piloting){ skipTutorial(); return; }   // left the plane — lesson over
+  if(tutDoneKey===TUT_TANK_KEY&&!drivingTank){ skipTutorial(); return; }
   const s=tutSteps[tutIdx];
   if(s.hold!=null){ tutHold+=dt; if(tutHold>=s.hold){ skipTutorial(); return; } }
   else if(s.done&&s.done()){ tutIdx++; tutHold=0;
@@ -10203,7 +10300,8 @@ function applyStaticI18n(){
   set('#harbor .hint',T('Spend funds to fortify and supply your harbor. Press <b>H</b> to close.','花钱加固和补给你的海港。按 <b>H</b> 关闭。'));
   set('#build h2',T('🏝️ ISLAND ENGINEERS','🏝️ 岛屿工程队'));
   set('#build .hint',T('No slot limit: every structure has a huge physical footprint and needs clear ground. Face the build location, then click. Press <b>B</b> to close.','数量不限：每座建筑都很占地方，需要空旷的地面。面向要建的位置再点击。按 <b>B</b> 关闭。'));
-  set('#over button',T('NEW COMMAND','再战一局'));
+  set('#overRetry',T('⚓ RETRY THEATER','⚓ 再战一局'));
+  set('#overNew',T('NEW COMMAND','返回司令部'));
 }
 function refreshLanguage(){
   applyStaticI18n();
@@ -10223,7 +10321,7 @@ applyStaticI18n();
 // (some hosts, e.g. htmlpreview.github.io, run this script before the CDN <script> finishes.)
 buildMenu();
 initMobileControls();
-function start3D(){ try{ initThree(); initWaterBase(); loop(); }catch(e){ console.error(e);
+function start3D(){ try{ initThree(); initWaterBase(); loop(); consumeRetryIntent(); }catch(e){ console.error(e);
   const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent=trText('Could not start the 3D engine — try GitHub Pages or open the file directly.'); } }
 if(window.THREE){ start3D(); }
 else { let n=0, cdnTried=false; (function wait(){ if(window.THREE){ start3D(); }
