@@ -214,6 +214,9 @@
     background:rgba(6,12,20,.85);}
   #over h2{font-size:44px;letter-spacing:6px;color:#ff7a6a;margin-bottom:10px;}
   #over p{color:#9fb6cc;margin-bottom:22px;}
+  #overText{display:block;background:rgba(10,22,34,.92);border:1px solid #2a4a66;border-radius:14px;
+    padding:20px 30px;max-width:660px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  #over button{margin:5px 6px;}
   #over button{padding:12px 28px;font-size:15px;letter-spacing:2px;background:#1d4d6e;border:1px solid #5fd0ff;
     color:#eaf6ff;border-radius:8px;cursor:pointer;}
   #fatalError{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(4,9,14,.9);}
@@ -369,6 +372,7 @@
   <h2 id="overTitle">SHIP LOST</h2>
   <p id="overText"></p>
   <button id="overRetry" onclick="retrySameWar()">⚓ RETRY THEATER</button>
+  <button id="overShare" onclick="downloadBattleReport()">📸 BATTLE REPORT</button>
   <button id="overNew" onclick="location.reload()">NEW COMMAND</button>
 </div>
 <div id="fatalError"><div class="card"><h2>⚠ GAME ERROR</h2><p>The battle stopped safely instead of silently freezing. Reload to restart the renderer.</p><code id="fatalDetail">Unknown error</code><button onclick="location.reload()">RELOAD GAME</button></div></div>
@@ -3285,8 +3289,44 @@ function fleetOrderCmd(){
 function careerScore(){ return career.sunk*2 + career.planes + career.islands*5 + career.wins*40 + career.bosses*25; }
 function careerRank(){ const s=careerScore(); let r=RANKS[0]; for(const k of RANKS){ if(s>=k.score) r=k; } return r; }
 function nextRank(){ const s=careerScore(); for(const k of RANKS){ if(s<k.score) return k; } return null; }
-function warRecord(k,n){ career[k]=(career[k]||0)+(n||1); saveCareer(); }
+function warRecord(k,n){ career[k]=(career[k]||0)+(n||1); saveCareer(); checkAchievements(); }
+// ===== MEDALS (#33) — discrete milestones layered on the stats career already tracks =====
+const ACHIEVEMENTS=[
+  {id:'first_blood', icon:'🩸', name:()=>T('First Blood','首开纪录'),   desc:()=>T('Sink your first enemy warship','击沉第一艘敌舰'), check:c=>c.sunk>=1},
+  {id:'sea_wolf',    icon:'⚔️', name:()=>T('Sea Wolf','海上之狼'),     desc:()=>T('Sink 25 warships','击沉 25 艘敌舰'), check:c=>c.sunk>=25},
+  {id:'deep_terror', icon:'🌊', name:()=>T('Terror of the Deep','深海梦魇'), desc:()=>T('Sink 100 warships','击沉 100 艘敌舰'), check:c=>c.sunk>=100},
+  {id:'ace',         icon:'✈️', name:()=>T('Ace Defender','防空王牌'), desc:()=>T('Shoot down 25 aircraft','击落 25 架飞机'), check:c=>c.planes>=25},
+  {id:'beachhead',   icon:'🏝️', name:()=>T('Beachhead','抢滩登陆'),    desc:()=>T('Capture your first island','占领第一座岛屿'), check:c=>c.islands>=1},
+  {id:'conqueror',   icon:'🚩', name:()=>T('Conqueror','征服者'),      desc:()=>T('Capture 10 islands','占领 10 座岛屿'), check:c=>c.islands>=10},
+  {id:'levi_slayer', icon:'🐋', name:()=>T('Leviathan Slayer','利维坦猎手'), desc:()=>T('Sink a Leviathan','击沉一艘利维坦'), check:c=>c.bosses>=1},
+  {id:'first_win',   icon:'🏅', name:()=>T('First Victory','首胜'),    desc:()=>T('Win your first war','赢下第一场战争'), check:c=>c.wins>=1},
+  {id:'veteran',     icon:'🎖️', name:()=>T('Veteran','百战老兵'),      desc:()=>T('Win 10 wars','赢下 10 场战争'), check:c=>c.wins>=10},
+  {id:'comeback',    icon:'💪', name:()=>T('Comeback Captain','逆风翻盘'), desc:()=>T('Win a war right after losing one','在一场战败后立刻赢回来'), check:c=>c.wins>=1&&c.losses>=1&&(c.lossStreak||0)===0},
+  {id:'star_ten',    icon:'⭐', name:()=>T('Shining Fleet','群星舰队'), desc:()=>T('Earn 10 theater stars','拿到 10 颗战区星星'), check:c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return n>=10;}},
+  {id:'admiral',     icon:'👑', name:()=>T('Fleet Admiral','舰队司令'), desc:()=>T('Complete the entire campaign','通关整个战役'), check:c=>!!c.completed},
+];
+function checkAchievements(quiet){
+  career.achievements=career.achievements||[];
+  const newly=[];
+  for(const a of ACHIEVEMENTS){ if(!career.achievements.includes(a.id)&&a.check(career)){ career.achievements.push(a.id); newly.push(a); } }
+  if(newly.length){ saveCareer();
+    if(!quiet) newly.forEach((a,i)=>setTimeout(()=>{ flashPrompt('🎖 '+T('MEDAL EARNED — ','获得奖章——')+a.icon+' '+a.name()); if(typeof sfxClick==='function')sfxClick(); }, 400+i*2600)); }
+  return newly;
+}
+function showMedals(){
+  career.achievements=career.achievements||[];
+  let html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:6px;text-align:left">';
+  for(const a of ACHIEVEMENTS){ const got=career.achievements.includes(a.id);
+    html+='<div style="padding:12px;border:1px solid '+(got?'#7a622a':'#1c3145')+';border-radius:10px;background:'+(got?'rgba(255,208,96,0.06)':'rgba(255,255,255,0.02)')+';'+(got?'':'filter:grayscale(1);opacity:.55')+'">'+
+      '<div style="font-size:26px">'+a.icon+'</div>'+
+      '<div style="color:'+(got?'#ffd060':'#7e93a8')+';font-size:12px;letter-spacing:1px;margin-top:4px">'+a.name()+'</div>'+
+      '<div style="color:#9fb1bd;font-size:11px;margin-top:3px;line-height:1.5">'+a.desc()+'</div></div>';
+  }
+  html+='</div>';
+  showStory(T('🎖 MEDAL WALL — ','🎖 奖章墙——')+career.achievements.length+'/'+ACHIEVEMENTS.length, html, T('CLOSE','关闭'));
+}
 loadCareer();
+checkAchievements(true);   // retroactive unlocks for veterans' existing save data — quiet, no toast storm
 ensureCareerMarket();
 let money=Math.round(8000*(1+careerRank().perk)), sunk=0;   // veteran perk: +% starting funds per rank
 const placed=[];           // {def, group, mountIdx, yaw, pitch, cd}
@@ -3478,6 +3518,7 @@ let driving=false;         // steering the ship from the bridge
 let onFoot=false; let footPos=new THREE.Vector3(); let footLand=null;  // ashore on an island/harbor
 let landCampaignMode=false; // ground theaters hide the ship and start with an airborne command-center insertion
 let playerShipLost=false;  // true when your ship was sunk while you survived ashore/away from it
+let shipsLostThisWar=0, warStartT2=0;   // star-rating inputs (#34): flawless runs and clear time
 let footHP=100, footMaxHP=100; // the captain/soldier has real health when ashore or swimming
 let drivingTank=null; let footGunCd=0;          // piloted tank + handheld weapon
 const playerTanks=[];      // friendly drivable tanks {group, pos, heading, island, fireCd, turret, barrelLen}
@@ -4039,6 +4080,8 @@ function campaignMapSVG(animate){
     if(cur) s+='<circle cx="'+p.x+'" cy="'+p.y+'" r="'+(R+5)+'" fill="none" stroke="#ffd060" stroke-width="2"><animate attributeName="r" values="'+(R+4)+';'+(R+10)+';'+(R+4)+'" dur="1.6s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.6s" repeatCount="indefinite"/></circle>';
     s+='<circle class="ring" cx="'+p.x+'" cy="'+p.y+'" r="'+R+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+(cur?3:2)+'"/>';
     s+='<text class="lbl" x="'+p.x+'" y="'+p.y+'" text-anchor="middle" dominant-baseline="central" font-size="'+(label.length>1?12:14)+'" font-weight="700" fill="'+txtc+'" style="font-family:inherit">'+label+'</text>';
+    if(done){ const st=(career.theaters&&career.theaters[i]&&career.theaters[i].stars)||0;
+      if(st>0) s+='<text x="'+p.x+'" y="'+(p.y+R+11)+'" text-anchor="middle" font-size="9" fill="#ffd060">'+'★'.repeat(st)+'</text>'; }
     if(cur) s+='<text x="'+p.x+'" y="'+(p.y-R-7)+'" text-anchor="middle" font-size="15">⚓</text>';
     s+='<circle class="hit" cx="'+p.x+'" cy="'+p.y+'" r="'+(R+7)+'" fill="transparent"><title>'+(i+1)+'. '+campaignName(i)+(locked?T(' — locked',' — 未解锁'):' — '+campaignTheme(i))+'</title></circle>';
     s+='</g>';
@@ -4060,7 +4103,9 @@ function theaterCardHTML(i){
       '</div>'; }
   const M=CAMPAIGN[i], army=mapArmyProfile(1,M), N=CAMPAIGN.length;
   const tag=(t,cls)=>'<span class="tag'+(cls?' '+cls:'')+'">'+t+'</span>';
-  return '<div class="no">'+T('THEATER '+(i+1)+' / '+N,'战区 '+(i+1)+' / '+N)+'</div>'+
+  const _rec=career.theaters&&career.theaters[i];
+  return '<div class="no">'+T('THEATER '+(i+1)+' / '+N,'战区 '+(i+1)+' / '+N)+
+    (_rec&&_rec.stars?' &nbsp;<span style="color:#ffd060;letter-spacing:2px">'+'★'.repeat(_rec.stars)+'<span style="opacity:.25">'+'★'.repeat(3-_rec.stars)+'</span></span>':'')+'</div>'+
     '<div class="nm">'+campaignName(i)+'</div>'+
     '<div class="th">'+campaignTheme(i)+'</div>'+
     '<div class="tags">'+
@@ -4486,12 +4531,14 @@ function buildMenu(){
     sub.after(d);
     const log=document.createElement('div');
     log.style.cssText='text-align:center;margin:-6px 0 14px;';
-    log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">📖 WAR LOG</span>'+
-      ' <span id="almanacBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px;margin-left:8px">⚓ SHIP ALMANAC</span>'+
-      ' <span id="mpBtn" style="cursor:pointer;color:#8fd0a0;font-size:11px;letter-spacing:2px;border:1px solid #214e2e;border-radius:20px;padding:5px 15px;margin-left:8px">🌐 MULTIPLAYER</span>';
+    log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">'+T('📖 WAR LOG','📖 战争日志')+'</span>'+
+      ' <span id="almanacBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('⚓ SHIP ALMANAC','⚓ 舰船图鉴')+'</span>'+
+      ' <span id="medalsBtn" style="cursor:pointer;color:#ffd060;font-size:11px;letter-spacing:2px;border:1px solid #4e3f21;border-radius:20px;padding:5px 15px;margin-left:8px">🎖 '+T('MEDALS','奖章墙')+' '+((career.achievements||[]).length)+'/'+ACHIEVEMENTS.length+'</span>'+
+      ' <span id="mpBtn" style="cursor:pointer;color:#8fd0a0;font-size:11px;letter-spacing:2px;border:1px solid #214e2e;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('🌐 MULTIPLAYER','🌐 联机对战')+'</span>';
     d.after(log);
     log.querySelector('#warlogBtn').onclick=showWarLog;
     log.querySelector('#almanacBtn').onclick=buildAlmanac;
+    log.querySelector('#medalsBtn').onclick=showMedals;
     log.querySelector('#mpBtn').onclick=openMultiplayer;
   }
   // continue button — appears when a saved war exists (fresh menu only, not the respawn picker)
@@ -4640,6 +4687,7 @@ function deployLandCampaignStart(skipEscort){   // skipEscort: resuming a save w
 }
 function startGame(shipId){
   lastShipId=shipId;
+  shipsLostThisWar=0; warStartT2=t2;
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
   sfxResume();   // browsers need a user gesture (this ship-card click) to start audio
@@ -4742,7 +4790,7 @@ function playerSunk(){
   rivalSpeak('gloat');
   const survivedAway=(onFoot||drivingTank||piloting)&&!landCampaignMode;
   if(survivedAway){
-    playerShipLost=true; driving=false; manning=null;
+    playerShipLost=true; shipsLostThisWar++; driving=false; manning=null;
     if(player&&player.build&&player.build.group) player.build.group.visible=false;
     flashPrompt('⚓ Your ship was sunk while you were away. Return to your harbor and press P for a replacement.');
     updateMode(); return;
@@ -7120,7 +7168,7 @@ function parachuteFromAircraft(){
       loadout:player.def.boss?[AI_WEAPS[1],AI_WEAPS[1],AI_WEAPS[2],AI_WEAPS[5],AI_WEAPS[4]]:[AI_WEAPS[2],AI_WEAPS[5]],
       upgT:12,planeT:15,callsign:'CAPTAIN-'+(_callsignN+1),role:'attack',_sos:0,commsT:10};
     const mk=teamMarker(0,player.def.boss?24:13);mk.position.set(0,player.def.deckY+(player.def.boss?22:13),0);a.build.group.add(mk);
-    allies.push(a); player._convertedToAlly=true; playerShipLost=true; player.speed=0; player.throttle=0;
+    allies.push(a); player._convertedToAlly=true; playerShipLost=true; shipsLostThisWar++; player.speed=0; player.throttle=0;
     placed.length=0; manning=null; driving=false; // old player turrets are now decoration; AI uses its own safe loadout
     if(typeof comms==='function')comms(a.callsign,'Captain has bailed out — assuming autonomous combat patrol.','#a8d4f0');
   }
@@ -8406,13 +8454,30 @@ function endGame(win,msg){
       unlockMsg=`<br><br><span style="color:#7ff0a8">${T('🗺 NEW THEATER UNLOCKED — '+nm.name+'!','🗺 新战区解锁——'+campaignName(currentMapIdx+1)+'！')}</span>`; }
     else if(currentMapIdx>=CAMPAIGN.length-1){ if(!career.completed){ career.completed=true; saveCareer(); rivalAdvance('done'); rivalSpeak('done'); } unlockMsg='<br><br><span style="color:#ffd060">'+T('🏆 CAMPAIGN COMPLETE — every theater is yours, Fleet Admiral.','🏆 战役通关——每一片战区都是你的了，舰队司令。')+'</span>'; } }
   const marketEarned=mpMatch?0:awardCareerCredits(win);
+  // #34: theater stars — 1★ for the win, +1★ under par time, +1★ without losing a ship.
+  // Best-of across replays; par scales with the theater's authored fleet size.
+  let starsHtml='', earnedStars=0;
+  if(win&&currentSandboxIdx<0&&!mpMatch){
+    const M=CAMPAIGN[currentMapIdx]||{};
+    const dur=Math.max(0,t2-warStartT2), parT=240+(M.enemies||3)*80;
+    earnedStars=1+(dur<=parT?1:0)+(shipsLostThisWar===0?1:0);
+    const rec=(career.theaters=career.theaters||{})[currentMapIdx]||{stars:0,bestT:null};
+    rec.stars=Math.max(rec.stars||0,earnedStars);
+    rec.bestT=rec.bestT==null?Math.round(dur):Math.min(rec.bestT,Math.round(dur));
+    career.theaters[currentMapIdx]=rec; saveCareer(); checkAchievements();
+    const fmtDur=x=>{const m=Math.floor(x/60),ss=Math.round(x%60);return isZh()?(m+'分'+ss+'秒'):(m+'m '+ss+'s');};
+    starsHtml='<span style="display:block;text-align:center;color:#ffd060;font-size:24px;letter-spacing:8px;margin-bottom:4px">'+'★'.repeat(earnedStars)+'<span style="opacity:.22">'+'★'.repeat(3-earnedStars)+'</span></span>'+
+      '<span style="display:block;text-align:center;color:#6b7d92;font-size:11px;margin-bottom:10px">'+
+      T('Won in '+fmtDur(dur)+(dur<=parT?' — under par!':' (par '+fmtDur(parT)+')')+(shipsLostThisWar===0?' · no ship lost':''),
+        '用时 '+fmtDur(dur)+(dur<=parT?'——快于标准时间！':'（标准 '+fmtDur(parT)+'）')+(shipsLostThisWar===0?' · 未损失军舰':''))+'</span>';
+  }
   if(document.pointerLockElement)document.exitPointerLock();
   document.getElementById('over').style.display='flex';
   const rb=document.getElementById('overRetry'); if(rb) rb.style.display=(win||mpMatch)?'none':'inline-block';
   const t=document.getElementById('overTitle');
   t.textContent = win?T('VICTORY','胜利'):T('DEFEAT','战败'); t.style.color = win?'#7ff0a8':'#ff7a6a';
   const promo = r.name!==oldRank.name ? T(`  ⭐ PROMOTED TO ${r.name.toUpperCase()}!`,`  ⭐ 晋升为${trRank(r.name)}！`) : '';
-  document.getElementById('overText').innerHTML =
+  document.getElementById('overText').innerHTML = starsHtml +
     (msg?trText(msg)+'  ':'') + T(`You sank ${sunk} ${sunk===1?'ship':'ships'}. ($${money} in the bank.)`,`你击沉了 ${sunk} 艘敌舰。（存款 $${money}）`)+promo +
     `<br><span style="color:#ffd060">${T('◈ MARKET PAYOUT +'+marketEarned+' · Permanent bank ◈'+(career.credits||0),'◈ 市场结算 +'+marketEarned+' · 永久信用 ◈'+(career.credits||0))}</span>` +
     `<br><br><span style="color:#9fc6e8">${T('⚓ WAR RECORD — '+r.name+' (+'+Math.round(r.perk*100)+'% starting funds)','⚓ 战绩档案——'+trRank(r.name)+'（初始资金 +'+Math.round(r.perk*100)+'%）')}</span>` +
@@ -8427,6 +8492,39 @@ function endGame(win,msg){
       `<span style="display:block;color:#ffd060;font-style:normal;letter-spacing:2px;font-size:12px;margin-bottom:7px;text-align:center">${trText('⚓ CHRONICLE — ')}${isZh()?campaignName(currentMapIdx):CAMPAIGN[currentMapIdx].name.toUpperCase()}</span>`+
       `${(isZh()&&typeof LORE_ZH_BEATS!=='undefined'&&LORE_ZH_BEATS[currentMapIdx])?LORE_ZH_BEATS[currentMapIdx]:LORE.beats[currentMapIdx]}</span>`;
   }
+  _lastReport={ win, sunk, money, rankName:r.name, stars:earnedStars,
+    theater: currentSandboxIdx>=0 ? (SANDBOX_MAPS[currentSandboxIdx]||{}).name||'' : campaignName(currentMapIdx) };
+}
+// #35: draw the summary onto a canvas and download it — a battle report worth showing someone
+let _lastReport=null;
+function downloadBattleReport(){
+  if(!_lastReport) return;
+  const R=_lastReport, W=720, H=560, cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const x=cv.getContext('2d');
+  const g=x.createLinearGradient(0,0,0,H); g.addColorStop(0,'#0a1622'); g.addColorStop(1,'#0d2032');
+  x.fillStyle=g; x.fillRect(0,0,W,H);
+  x.strokeStyle='#2a4a66'; x.lineWidth=3; x.strokeRect(14,14,W-28,H-28);
+  x.textAlign='center';
+  x.fillStyle=R.win?'#7ff0a8':'#ff7a6a';
+  x.font='700 52px Georgia, "Microsoft YaHei", serif';
+  x.fillText(R.win?T('VICTORY','胜  利'):T('DEFEAT','战  败'), W/2, 105);
+  if(R.stars>0){ x.fillStyle='#ffd060'; x.font='34px serif'; x.fillText('★'.repeat(R.stars)+'☆'.repeat(3-R.stars), W/2, 152); }
+  x.fillStyle='#9fc6e8'; x.font='20px Georgia, "Microsoft YaHei", serif';
+  x.fillText(R.theater||'', W/2, 196);
+  x.fillStyle='#cfe0ee'; x.font='17px Georgia, "Microsoft YaHei", serif';
+  const lines=[
+    T('Ships sunk this war: ','本场击沉军舰：')+R.sunk,
+    T('War chest: $','战争资金：$')+R.money,
+    T('Rank: ','军衔：')+(isZh()?trRank(R.rankName):R.rankName),
+    '',
+    T('Career — sunk ','生涯——击沉 ')+career.sunk+T(' · aircraft ',' · 飞机 ')+career.planes+T(' · islands ',' · 岛屿 ')+career.islands,
+    T('Wars ','战争 ')+career.wins+T('W','胜')+'/'+career.losses+T('L','负')+T(' · medals ',' · 奖章 ')+((career.achievements||[]).length)+'/'+ACHIEVEMENTS.length,
+    new Date().toLocaleDateString(),
+  ];
+  lines.forEach((ln,i)=>{ if(ln) x.fillText(ln, W/2, 250+i*34); });
+  x.fillStyle='#5f7a90'; x.font='13px Georgia, serif';
+  x.fillText('⚓ IRON TIDE · game.boobank.com/irontide', W/2, H-42);
+  const a=document.createElement('a'); a.download='iron-tide-battle-report.png'; a.href=cv.toDataURL('image/png'); a.click();
 }
 // #25: defeat encouragement — never shame a loss; scale the pep talk with the streak
 function cheerMsg(win,mpMatch){
@@ -10301,6 +10399,7 @@ function applyStaticI18n(){
   set('#build h2',T('🏝️ ISLAND ENGINEERS','🏝️ 岛屿工程队'));
   set('#build .hint',T('No slot limit: every structure has a huge physical footprint and needs clear ground. Face the build location, then click. Press <b>B</b> to close.','数量不限：每座建筑都很占地方，需要空旷的地面。面向要建的位置再点击。按 <b>B</b> 关闭。'));
   set('#overRetry',T('⚓ RETRY THEATER','⚓ 再战一局'));
+  set('#overShare',T('📸 BATTLE REPORT','📸 保存战报'));
   set('#overNew',T('NEW COMMAND','返回司令部'));
 }
 function refreshLanguage(){
