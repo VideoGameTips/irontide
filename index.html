@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Iron Tide — Battleship Command</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a1018">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
   html,body{width:100%;height:100%;overflow:hidden;background:#0a1018;font-family:'Segoe UI',system-ui,sans-serif;color:#d6dee8;}
@@ -97,7 +101,7 @@
   #tAct{right:140px;bottom:104px;width:96px;height:52px;}
   #tAct2{right:140px;bottom:42px;width:96px;height:52px;}
   #tShop{left:22px;top:74px;width:82px;height:44px;}      /* left side — the minimap owns the top right */
-  #tMap{left:112px;top:74px;width:82px;height:44px;}
+  #tMap{left:122px;top:74px;width:82px;height:44px;}   /* ≥18px gap from tShop — fat-finger safe */
   #tClose{left:22px;top:74px;width:96px;height:44px;background:rgba(90,26,26,.72);border-color:#c05a44;}
   #tStick{position:absolute;left:30px;bottom:30px;width:132px;height:132px;border-radius:50%;pointer-events:auto;
     background:rgba(10,20,32,.34);border:1px solid #2a4660;}
@@ -8679,7 +8683,7 @@ function resumeWar(){
 addEventListener('beforeunload',()=>saveWar());
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveWar(); });
 
-// ---------- experimental touch controls (phones & tablets) ----------
+// ---------- touch controls (phones & tablets) ----------
 // Self-contained: nothing here runs unless TOUCH is true. The stick writes into the same
 // `keys` map the keyboard uses, and look-drag replaces pointer lock, so no gameplay code
 // needed changing. Add ?touch=1 to force it on for testing, ?touch=0 to force it off.
@@ -8741,7 +8745,7 @@ function touchInit(){
   document.body.classList.add('touch');
   const capture=(el,id)=>{ try{ el.setPointerCapture(id); }catch(e){} };   // capture is a nicety; never let it break the handler
   const stick=document.getElementById('tStick'), knob=stick.querySelector('i'), cv=document.getElementById('c');
-  stick.addEventListener('pointerdown',e=>{ e.preventDefault(); if(_stickId!=null) return;
+  stick.addEventListener('pointerdown',e=>{ e.preventDefault(); sfxResume(); if(_stickId!=null) return;
     const r=stick.getBoundingClientRect(); _stickCx=r.left+r.width/2; _stickCy=r.top+r.height/2;
     _stickId=e.pointerId; capture(stick,e.pointerId); });
   stick.addEventListener('pointermove',e=>{ if(e.pointerId!==_stickId) return;
@@ -8750,10 +8754,16 @@ function touchInit(){
     knob.style.transform='translate('+dx+'px,'+dy+'px)'; stickKeys(dx,dy); });
   ['pointerup','pointercancel','pointerleave'].forEach(ev=>stick.addEventListener(ev,e=>{ if(e.pointerId===_stickId) stickRelease(); }));
 
+  // Look-drag gets its own tuned constant (raw client-px deltas are noisier than pointer-lock
+  // movementX) and an edge dead-zone: touches starting within 18px of the physical edge are
+  // ignored so iOS/Android system gestures (home swipe, back swipe) can't hijack the camera.
+  const TOUCH_LOOK=0.0042, EDGE=18;
   cv.addEventListener('pointerdown',e=>{ if(_lookId!=null||gamePaused()) return;
+    if(e.clientX<EDGE||e.clientY<EDGE||e.clientX>innerWidth-EDGE||e.clientY>innerHeight-EDGE) return;
+    sfxResume();   // any first gesture — stick, button OR drag — must unlock iOS audio
     _lookId=e.pointerId; _lookX=e.clientX; _lookY=e.clientY; capture(cv,e.pointerId); });
   cv.addEventListener('pointermove',e=>{ if(e.pointerId!==_lookId||gamePaused()) return;   // a second finger opening a panel must stop the drag
-    camYaw.v -= (e.clientX-_lookX)*0.005; camPitch.v -= (e.clientY-_lookY)*0.005;
+    camYaw.v -= (e.clientX-_lookX)*TOUCH_LOOK; camPitch.v -= (e.clientY-_lookY)*TOUCH_LOOK;
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v));
     _lookX=e.clientX; _lookY=e.clientY; });
   ['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,e=>{ if(e.pointerId===_lookId) _lookId=null; }));
@@ -8857,10 +8867,41 @@ function updateTutorial(dt){
 }
 
 function gamePaused(){ return shopOpen||harborOpen||buildOpen||tacticalOpen||chatOpen||settingsOpen; }   // any open panel freezes the war
+// ---------- gamepad (#42) — a parallel input source writing into the same state keyboard/touch use ----------
+// Left stick → WASD flags · right stick → look · RT/A hold → fire · X=E · B=G · Y=T · Start=Tab.
+// Chrome only updates axes/buttons on getGamepads() reads, so we poll every frame; with no
+// pad connected the whole thing is a cheap early return and existing input is untouched.
+const GP_DEAD=0.18;
+let _gpPrev={}, _gpBtnPrev=[], _gpFire=false;
+function pollGamepad(dt){
+  let gp=null;
+  try{ const pads=navigator.getGamepads?navigator.getGamepads():[]; for(const p of pads){ if(p&&p.connected){ gp=p; break; } } }catch(e){}
+  if(!gp){ if(_gpFire){ mouseDownFire=false; _gpFire=false; }
+    for(const k in _gpPrev){ if(_gpPrev[k]){ keys[k]=0; _gpPrev[k]=0; } } return; }
+  const ax=i=>{ const v=gp.axes[i]||0; return Math.abs(v)>GP_DEAD?v:0; };
+  // left stick → the same WASD flags the keyboard sets (edge-written so a keyboard still works)
+  const want={ KeyW:ax(1)<-GP_DEAD?1:0, KeyS:ax(1)>GP_DEAD?1:0, KeyA:ax(0)<-GP_DEAD?1:0, KeyD:ax(0)>GP_DEAD?1:0 };
+  for(const k in want){ if(want[k]!==(_gpPrev[k]||0)){ keys[k]=want[k]; _gpPrev[k]=want[k]; } }
+  // right stick → look
+  if(phase==='play'&&!gamePaused()){
+    camYaw.v   -= ax(2)*2.4*dt;
+    camPitch.v -= ax(3)*1.7*dt;
+    camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v));
+  }
+  // held fire: right trigger or A/Cross
+  const fireHeld=!!((gp.buttons[7]&&gp.buttons[7].pressed)||(gp.buttons[0]&&gp.buttons[0].pressed));
+  if(fireHeld!==_gpFire){ mouseDownFire=fireHeld&&phase==='play'&&!gamePaused(); _gpFire=fireHeld; }
+  // edge-triggered taps ride the real keyboard handler via synthetic events
+  const tapMap={2:'KeyE',1:'KeyG',3:'KeyT',9:'Tab',8:'KeyM'};
+  for(const b in tapMap){ const pressed=!!(gp.buttons[b]&&gp.buttons[b].pressed);
+    if(pressed&&!_gpBtnPrev[b]) dispatchEvent(new KeyboardEvent('keydown',{code:tapMap[b]}));
+    _gpBtnPrev[b]=pressed; }
+}
 function loop(){
   requestAnimationFrame(loop);
   const rawDt=clock.getDelta(),dt=Math.min(0.05,rawDt);
   updateAdaptiveQuality(rawDt);
+  pollGamepad(dt);
   if(phase==='play'){
     if(!gamePaused()){ t2+=dt; update(dt,t2); updateHUD();
       _saveT+=dt; if(_saveT>=30){ _saveT=0; saveWar(); } }               // autosave the war twice a minute
@@ -10449,6 +10490,10 @@ buildMenu();
 initMobileControls();
 function start3D(){ try{ initThree(); initWaterBase(); loop(); consumeRetryIntent(); }catch(e){ console.error(e);
   const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent=trText('Could not start the 3D engine — try GitHub Pages or open the file directly.'); } }
+// PWA (#32): offline cache + install. file:// and unsupported browsers skip silently.
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  try{ navigator.serviceWorker.register('sw.js'); }catch(e){}
+}
 if(window.THREE){ start3D(); }
 else { let n=0, cdnTried=false; (function wait(){ if(window.THREE){ start3D(); }
   else if(n++<200){

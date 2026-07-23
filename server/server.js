@@ -152,23 +152,36 @@ async function serveGame(res) {
   }
 }
 
-// The game page loads a handful of local scripts (vendor/three.min.js, js/terrain.js,
-// vendor/postprocessing/*). Serve any .js under those two directories — resolved and
+// The game page loads a handful of local assets: scripts under vendor/ and js/, plus the
+// PWA files (manifest.json, sw.js, icons/*.png). Serve only those shapes — resolved and
 // prefix-checked so ../ traversal cannot escape the repo.
-async function serveScript(res, urlPath) {
+const STATIC_TYPES = {
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png',
+};
+async function serveStatic(res, urlPath) {
   const clean = path.normalize(urlPath).replace(/^([/\\])+/, '');
   const abs = path.resolve(REPO_ROOT, clean);
-  const allowedRoots = [path.resolve(REPO_ROOT, 'vendor'), path.resolve(REPO_ROOT, 'js')];
-  if (!abs.endsWith('.js') || !allowedRoots.some((r) => abs.startsWith(r + path.sep))) {
+  const ext = path.extname(abs);
+  const allowedRoots = [
+    path.resolve(REPO_ROOT, 'vendor'),
+    path.resolve(REPO_ROOT, 'js'),
+    path.resolve(REPO_ROOT, 'icons'),
+  ];
+  const rootFile = abs === path.resolve(REPO_ROOT, 'manifest.json') || abs === path.resolve(REPO_ROOT, 'sw.js');
+  const inRoots = allowedRoots.some((r) => abs.startsWith(r + path.sep));
+  if (!STATIC_TYPES[ext] || (!inRoots && !rootFile)) {
     return writeJson(res, 404, { error: 'Not found.' });
   }
   try {
-    const js = await readFile(abs);
+    const body = await readFile(abs);
     res.writeHead(200, {
-      'content-type': 'application/javascript; charset=utf-8',
-      'cache-control': 'public, max-age=86400',
+      'content-type': STATIC_TYPES[ext],
+      // sw.js must never be cached long — a stale worker pins a stale game
+      'cache-control': rootFile ? 'no-cache' : 'public, max-age=86400',
     });
-    res.end(js);
+    res.end(body);
   } catch (err) {
     writeJson(res, 404, { error: clean + ' missing from deployment.', detail: err.message });
   }
@@ -178,7 +191,8 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') return writeJson(res, 204, {});
   if (req.url === '/' || req.url === '/index.html') return serveGame(res);
   if (req.url === '/favicon.ico') { res.writeHead(204); return res.end(); }
-  if ((req.url.startsWith('/vendor/') || req.url.startsWith('/js/')) && req.url.endsWith('.js')) return serveScript(res, req.url);
+  if ((req.url.startsWith('/vendor/') || req.url.startsWith('/js/')) && req.url.endsWith('.js')) return serveStatic(res, req.url);
+  if (req.url === '/manifest.json' || req.url === '/sw.js' || (req.url.startsWith('/icons/') && req.url.endsWith('.png'))) return serveStatic(res, req.url);
   if (req.url === '/health') {
     return writeJson(res, 200, {
       ok: true,
