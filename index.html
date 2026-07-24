@@ -3163,7 +3163,7 @@ function marketLevel(cat,id,def){
   if(cost>=9000)return 24;if(cost>=5200)return 18;if(cost>=3000)return 12;if(cost>=1800)return 8;if(cost>=1000)return 5;if(cost>=600)return 3;
   return 2;
 }
-function marketUnlocked(cat,id,def){return def&&def.marketOnly?ownsMarketItem(cat,id):mapsUnlocked()>=marketLevel(cat,id,def);}
+function marketUnlocked(cat,id,def){return def&&def.marketOnly?ownsMarketItem(cat,id):mapsUnlocked()>=unlockLevel(marketLevel(cat,id,def));}
 function marketLicensed(cat,id,def){return marketUnlocked(cat,id,def);}
 function marketCost(cat,id,def){
   const base=priceOf(def&&def.cost?def.cost:0),lvl=marketLevel(cat,id,def);
@@ -3176,12 +3176,22 @@ function marketLabel(cat,id,def,normal){
   if(!marketUnlocked(cat,id,def))return '🔒 L'+marketLevel(cat,id,def);
   return normal;
 }
+// Progression cap: nothing needs more than this campaign level to unlock. Reaching level 6
+// puts the whole arsenal on the table — later theatres are about using it, not grinding for it.
+const UNLOCK_CAP=6;
+function unlockLevel(lvl){ return Math.min(UNLOCK_CAP, lvl||1); }
 function buyMarketLicense(cat,id,def){
   if(marketUnlocked(cat,id,def))return true;
-  flashPrompt(def&&def.marketOnly?(def.name+' is a campaign-market blueprint. Buy it before battle.'):((def.name||id)+' unlocks after campaign level '+marketLevel(cat,id,def)));
+  flashPrompt(def&&def.marketOnly?(def.name+' is a campaign-market blueprint. Buy it before battle.'):((def.name||id)+' unlocks after campaign level '+unlockLevel(marketLevel(cat,id,def))));
   return false;
 }
 function marketBlocked(cat,id,def){return !buyMarketLicense(cat,id,def);}
+// Nukes are pointless on a pure-land assault (no fleet) and absurd overkill on the tiny warm-up
+// theatres, so the strategic arsenal (def.nuke / strategicBomb / nukesilo) is unavailable when a
+// theatre fields two or fewer enemy ships — covers The Landing, Island Hopping, Training Bay, etc.
+function theaterEnemies(){ return ((typeof quickMode!=='undefined'&&quickMode)?QUICK_BATTLE:(currentSandboxIdx>=0?(SANDBOX_MAPS[currentSandboxIdx]||{}):(CAMPAIGN[currentMapIdx]||{}))).enemies||0; }
+function nukesBannedHere(){ return landCampaignMode || theaterEnemies()<=2; }
+function isNuclear(def){ return !!(def&&(def.nuke||def.strategicBomb||def.nukesilo)); }
 const MARKET_CATALOG=[
   {cat:'ship',id:'fletcher',cost:4500,level:5,tag:'SHIP',desc:'USS Fletcher — quick historic destroyer with practical gun space.'},
   {cat:'ship',id:'type055',cost:12000,level:18,tag:'SHIP',desc:'Type 055 — modern missile cruiser-style command hull.'},
@@ -3203,9 +3213,9 @@ function marketDef(item){return item.cat==='ship'?SHIPS[item.id]:item.cat==='pla
 function buyCampaignMarketItem(key){
   const item=MARKET_CATALOG.find(x=>marketKey(x.cat,x.id)===key); if(!item)return;
   ensureCareerMarket();
-  const def=marketDef(item), unlocked=mapsUnlocked()>=item.level, owned=ownsMarketItem(item.cat,item.id);
+  const def=marketDef(item), unlocked=mapsUnlocked()>=unlockLevel(item.level), owned=ownsMarketItem(item.cat,item.id);
   if(owned){flashPrompt((def.name||item.id)+' already owned');return;}
-  if(!unlocked){flashPrompt((def.name||item.id)+' reaches the marketplace after level '+item.level);return;}
+  if(!unlocked){flashPrompt((def.name||item.id)+' reaches the marketplace after level '+unlockLevel(item.level));return;}
   if(career.credits<item.cost){flashPrompt('Need ◈'+item.cost+' market credits. You have ◈'+career.credits+'.');return;}
   career.credits-=item.cost;career.marketOwned.push(key);saveCareer();buildCampaignPicker();sfxClick();
   flashPrompt('Marketplace blueprint purchased: '+(def.name||item.id)+' · ◈'+career.credits+' left');
@@ -4411,7 +4421,7 @@ function buildCampaignPicker(){
   box.appendChild(mh);
   const mRow=document.createElement('div'); mRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;';
   MARKET_CATALOG.forEach(item=>{
-    const def=marketDef(item), key=marketKey(item.cat,item.id), owned=ownsMarketItem(item.cat,item.id), unlocked=mapsUnlocked()>=item.level;
+    const def=marketDef(item), key=marketKey(item.cat,item.id), owned=ownsMarketItem(item.cat,item.id), unlocked=mapsUnlocked()>=unlockLevel(item.level);
     const c=document.createElement('div');
     c.style.cssText='width:196px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:'+(owned||!unlocked?'default':'pointer')+
       ';border:1px solid '+(owned?'#5ecb91':unlocked?'#7d5cc8':'#342b48')+';background:'+(owned?'#10251b':unlocked?'#19152a':'#111721')+';opacity:'+(unlocked?1:.55)+';';
@@ -6051,6 +6061,7 @@ function buildShopUI(){
     let hidden=0;
     recFirst(obj).forEach(k=>{
       if(contentFilterOn()&&((obj===PLANES&&FILTERED_PLANES.has(k))||(obj===STRUCTS&&k==='nukesilo'))) return;   // kid-safe mode
+      if(nukesBannedHere()&&(k==='nukesilo'||isNuclear(obj[k]))) return;   // no strategic arsenal on small / land theatres
       const fold=!SHOP_REC.has(k)&&(obj[k].cost||0)>SHOP_HIDE_COST[key];
       if(fold) hidden++;
       if(fold&&!SHOP_SHOW_ALL[key]) return;
@@ -6213,6 +6224,7 @@ function buildBuildUI(){
   const list=document.getElementById('buildList'); if(!list) return; list.innerHTML='';
   Object.keys(STRUCTS).forEach(k=>{
     if(contentFilterOn()&&k==='nukesilo') return;   // kid-safe mode
+    if(nukesBannedHere()&&(k==='nukesilo'||isNuclear(STRUCTS[k]))) return;   // no nukes on small / land theatres
     const s=STRUCTS[k]; const d=document.createElement('div'); d.className='uitem'; d.dataset.struct=k;
     d.onclick=()=>buildStructure(k); list.appendChild(d);
   });
@@ -6242,6 +6254,7 @@ function toggleBuild(){
 }
 function buildStructure(k){
   if(contentFilterOn()&&k==='nukesilo') return;   // kid-safe mode
+  if(nukesBannedHere()&&isNuclear(STRUCTS[k])){ flashPrompt(T('No strategic weapons on this theater','本战区禁用战略武器')); return; }   // small / land theatres
   if(!onFoot){ flashPrompt('Go ashore on an island (G) to emplace '+STRUCTS[k].name); return; }
   if(!footLand){ flashPrompt('Swim to dry land before building '+STRUCTS[k].name); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('This position is not under friendly control'); return; }
@@ -6278,7 +6291,7 @@ function aiIslandBuild(dt){
   if(!enemyIsles.length) return;
   const isl=enemyIsles[Math.floor(Math.random()*enemyIsles.length)];
   let kinds=['barracks','tankdepot','hospital','ammo','workshop','coastal','torpbat','aa','silo','radar','sonar','searchlight','bunker','airstrip','helipad','dock','fuel','bridge','artillery','rocket','fortress','supergun','nukesilo','tesla','wall'];
-  if(contentFilterOn()||landUnits.some(u=>!u.dead&&u.team===1&&u.nukesilo))kinds=kinds.filter(k=>k!=='nukesilo');
+  if(contentFilterOn()||nukesBannedHere()||landUnits.some(u=>!u.dead&&u.team===1&&u.nukesilo))kinds=kinds.filter(k=>k!=='nukesilo');
   const k=!islandStructures(isl,1,'command').length?'command':!islandStructures(isl,1,'power').length?'power':kinds[Math.floor(Math.random()*kinds.length)];
   if(k==='command'&&islandStructures(isl,1,'command').length)return;
   const p=findIslandBuildPoint(isl,k);if(p)buildAndPushLand(k,1,p,2,isl);
@@ -8620,6 +8633,7 @@ function tacticalSilos(){return landUnits.filter(u=>!u.dead&&u.team===0&&u.nukes
 function toggleTacticalMap(force){
   if(phase!=='play')return;
   if(contentFilterOn()&&!tacticalOpen){ flashPrompt('Strategic weapons are disabled in kid-safe mode'); return; }
+  if(nukesBannedHere()&&!tacticalOpen){ flashPrompt(T('No strategic weapons on this theater','本战区禁用战略武器')); return; }
   tacticalOpen=force==null?!tacticalOpen:!!force;
   const panel=document.getElementById('tactical');panel.style.display=tacticalOpen?'flex':'none';
   if(tacticalOpen){
@@ -10622,6 +10636,7 @@ const ZH_PATTERNS = (() => {
 // ---------- i18n: review-pass supplements (strings the generated dictionaries missed) ----------
 Object.assign(ZH_EXACT,{
   'Strategic weapons are disabled in kid-safe mode':'家长模式下已停用战略武器',
+  'No strategic weapons on this theater':'本战区禁用战略武器',
   'Surface first (C), then press G to go ashore.':'先按 C 上浮，再按 G 登岸。',
   // point the stranded captain at the ⚓ marker the minimap now draws
   'Walk back to your ship to climb aboard.':'走回军舰旁边才能上舰——小地图上的 ⚓ 就是你的船。',
