@@ -7464,6 +7464,10 @@ function detonateNuclearShell(s){
   blastAll(s.pos.clone(),9999,900,true,true); // five times the Tu-95V Tsar Bomba radius; harbors are protected objectives
   flashPrompt('☢ R-36M WARHEAD DETONATED');
 }
+// Scratch vectors for the shell loop. Up to MAX_SHELLS projectiles are integrated every
+// frame, and each used to allocate two or three Vector3s — homing steer, mesh orientation,
+// trail orientation. Reused instances instead: same maths, no per-frame garbage.
+const _shUp=new THREE.Vector3(0,1,0), _shWant=new THREE.Vector3(), _shDir=new THREE.Vector3();
 function updateShells(dt){
   for(let i=shells.length-1;i>=0;i--){
     const s=shells[i];if(s.detonated){removeShellAt(i);continue;} s.life-=dt;
@@ -7471,7 +7475,7 @@ function updateShells(dt){
       const foe=1-s.team;
       const tgt=s.fixedTarget?{pos:s.fixedTarget}:(s.aa ? (nearestPlaneOf(foe,s.mesh.position) || nearestAnyOf(foe,s.mesh.position))
                        : nearestAnyOf(foe,s.mesh.position));
-      if(tgt){ const want=tgt.pos.clone().sub(s.mesh.position).normalize().multiplyScalar(s.vel.length());
+      if(tgt){ const want=_shWant.copy(tgt.pos).sub(s.mesh.position).normalize().multiplyScalar(s.vel.length());
         s.vel.lerp(want,Math.min(1,s.turn*dt)); }
     }
     if(s.arc) s.vel.y-=22*dt;
@@ -7479,12 +7483,12 @@ function updateShells(dt){
     s.mesh.position.addScaledVector(s.vel,dt);
     if(s.nuclear&&s.fixedTarget&&s.mesh.position.distanceTo(s.fixedTarget)<18){detonateNuclearShell(s);removeShellAt(i);continue;}
     if(s.maxDist && s.dist>s.maxDist){ boom(s.mesh.position.clone(),0.5); removeShellAt(i); continue; } // out of range — self-destruct
-    if(s.mesh.geometry.type==='ConeGeometry'||s.mesh.geometry.type==='CylinderGeometry') s.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), s.vel.clone().normalize());
+    if(s.mesh.geometry.type==='ConeGeometry'||s.mesh.geometry.type==='CylinderGeometry') s.mesh.quaternion.setFromUnitVectors(_shUp, _shDir.copy(s.vel).normalize());
     if(s.water) s.mesh.position.y=0.6;
     // Islands are solid — handled once, further down, by the layered islandSurfaceY check
     // (exact beach/grass/mound heights + the spawn-island exemption for shore batteries).
-    if(s.trail){ const v=s.vel.clone().normalize(); s.trail.position.copy(s.mesh.position).addScaledVector(v,-s.trailLen/2);
-      s.trail.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), v); s.trail.scale.set(1,s.trailLen,1);
+    if(s.trail){ const v=_shDir.copy(s.vel).normalize(); s.trail.position.copy(s.mesh.position).addScaledVector(v,-s.trailLen/2);
+      s.trail.quaternion.setFromUnitVectors(_shUp, v); s.trail.scale.set(1,s.trailLen,1);
       s.trail.material.opacity=(s.heavy?0.72:0.55)+Math.random()*0.22;              // combustion flicker
       if(s.heavy&&Math.random()<dt*7) shellSmoke(s.mesh.position); }                // heavy shells shed a smoke line along the arc
     // hit test
