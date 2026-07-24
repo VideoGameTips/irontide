@@ -3310,17 +3310,17 @@ function nextRank(){ const s=careerScore(); for(const k of RANKS){ if(s<k.score)
 function warRecord(k,n){ career[k]=(career[k]||0)+(n||1); saveCareer(); checkAchievements(); }
 // ===== MEDALS (#33) — discrete milestones layered on the stats career already tracks =====
 const ACHIEVEMENTS=[
-  {id:'first_blood', icon:'🩸', name:()=>T('First Blood','首开纪录'),   desc:()=>T('Sink your first enemy warship','击沉第一艘敌舰'), check:c=>c.sunk>=1},
-  {id:'sea_wolf',    icon:'⚔️', name:()=>T('Sea Wolf','海上之狼'),     desc:()=>T('Sink 25 warships','击沉 25 艘敌舰'), check:c=>c.sunk>=25},
-  {id:'deep_terror', icon:'🌊', name:()=>T('Terror of the Deep','深海梦魇'), desc:()=>T('Sink 100 warships','击沉 100 艘敌舰'), check:c=>c.sunk>=100},
-  {id:'ace',         icon:'✈️', name:()=>T('Ace Defender','防空王牌'), desc:()=>T('Shoot down 25 aircraft','击落 25 架飞机'), check:c=>c.planes>=25},
-  {id:'beachhead',   icon:'🏝️', name:()=>T('Beachhead','抢滩登陆'),    desc:()=>T('Capture your first island','占领第一座岛屿'), check:c=>c.islands>=1},
-  {id:'conqueror',   icon:'🚩', name:()=>T('Conqueror','征服者'),      desc:()=>T('Capture 10 islands','占领 10 座岛屿'), check:c=>c.islands>=10},
-  {id:'levi_slayer', icon:'🐋', name:()=>T('Leviathan Slayer','利维坦猎手'), desc:()=>T('Sink a Leviathan','击沉一艘利维坦'), check:c=>c.bosses>=1},
-  {id:'first_win',   icon:'🏅', name:()=>T('First Victory','首胜'),    desc:()=>T('Win your first war','赢下第一场战争'), check:c=>c.wins>=1},
-  {id:'veteran',     icon:'🎖️', name:()=>T('Veteran','百战老兵'),      desc:()=>T('Win 10 wars','赢下 10 场战争'), check:c=>c.wins>=10},
+  {id:'first_blood', icon:'🩸', name:()=>T('First Blood','首开纪录'),   desc:()=>T('Sink your first enemy warship','击沉第一艘敌舰'), check:c=>c.sunk>=1, prog:c=>[c.sunk||0,1]},
+  {id:'sea_wolf',    icon:'⚔️', name:()=>T('Sea Wolf','海上之狼'),     desc:()=>T('Sink 25 warships','击沉 25 艘敌舰'), check:c=>c.sunk>=25, prog:c=>[c.sunk||0,25]},
+  {id:'deep_terror', icon:'🌊', name:()=>T('Terror of the Deep','深海梦魇'), desc:()=>T('Sink 100 warships','击沉 100 艘敌舰'), check:c=>c.sunk>=100, prog:c=>[c.sunk||0,100]},
+  {id:'ace',         icon:'✈️', name:()=>T('Ace Defender','防空王牌'), desc:()=>T('Shoot down 25 aircraft','击落 25 架飞机'), check:c=>c.planes>=25, prog:c=>[c.planes||0,25]},
+  {id:'beachhead',   icon:'🏝️', name:()=>T('Beachhead','抢滩登陆'),    desc:()=>T('Capture your first island','占领第一座岛屿'), check:c=>c.islands>=1, prog:c=>[c.islands||0,1]},
+  {id:'conqueror',   icon:'🚩', name:()=>T('Conqueror','征服者'),      desc:()=>T('Capture 10 islands','占领 10 座岛屿'), check:c=>c.islands>=10, prog:c=>[c.islands||0,10]},
+  {id:'levi_slayer', icon:'🐋', name:()=>T('Leviathan Slayer','利维坦猎手'), desc:()=>T('Sink a Leviathan','击沉一艘利维坦'), check:c=>c.bosses>=1, prog:c=>[c.bosses||0,1]},
+  {id:'first_win',   icon:'🏅', name:()=>T('First Victory','首胜'),    desc:()=>T('Win your first war','赢下第一场战争'), check:c=>c.wins>=1, prog:c=>[c.wins||0,1]},
+  {id:'veteran',     icon:'🎖️', name:()=>T('Veteran','百战老兵'),      desc:()=>T('Win 10 wars','赢下 10 场战争'), check:c=>c.wins>=10, prog:c=>[c.wins||0,10]},
   {id:'comeback',    icon:'💪', name:()=>T('Comeback Captain','逆风翻盘'), desc:()=>T('Win a war right after losing one','在一场战败后立刻赢回来'), check:c=>c.wins>=1&&c.losses>=1&&(c.lossStreak||0)===0},
-  {id:'star_ten',    icon:'⭐', name:()=>T('Shining Fleet','群星舰队'), desc:()=>T('Earn 10 theater stars','拿到 10 颗战区星星'), check:c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return n>=10;}},
+  {id:'star_ten',    icon:'⭐', name:()=>T('Shining Fleet','群星舰队'), desc:()=>T('Earn 10 theater stars','拿到 10 颗战区星星'), check:c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return n>=10;}, prog:c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return [n,10];}},
   {id:'admiral',     icon:'👑', name:()=>T('Fleet Admiral','舰队司令'), desc:()=>T('Complete the entire campaign','通关整个战役'), check:c=>!!c.completed},
 ];
 function checkAchievements(quiet){
@@ -3338,7 +3338,14 @@ function showMedals(){
     html+='<div style="padding:12px;border:1px solid '+(got?'#7a622a':'#1c3145')+';border-radius:10px;background:'+(got?'rgba(255,208,96,0.06)':'rgba(255,255,255,0.02)')+';'+(got?'':'filter:grayscale(1);opacity:.55')+'">'+
       '<div style="font-size:26px">'+a.icon+'</div>'+
       '<div style="color:'+(got?'#ffd060':'#7e93a8')+';font-size:12px;letter-spacing:1px;margin-top:4px">'+a.name()+'</div>'+
-      '<div style="color:#9fb1bd;font-size:11px;margin-top:3px;line-height:1.5">'+a.desc()+'</div></div>';
+      '<div style="color:#9fb1bd;font-size:11px;margin-top:3px;line-height:1.5">'+a.desc()+'</div>'+
+      // locked medals show how far along you are — "12 / 25" beats "Sink 25 warships" with no
+      // sense of whether you are nearly there or have not started
+      (!got&&a.prog ? (()=>{ const [cur,goal]=a.prog(career); const pct=Math.max(0,Math.min(100,Math.round(cur/goal*100)));
+        return '<div style="margin-top:7px"><div style="height:4px;border-radius:3px;background:#16202b;overflow:hidden">'+
+          '<div style="height:100%;width:'+pct+'%;background:#5fd0ff;opacity:.75"></div></div>'+
+          '<div style="color:#7e93a8;font-size:10px;margin-top:3px">'+Math.min(cur,goal)+' / '+goal+'</div></div>'; })() : '')+
+      '</div>';
   }
   html+='</div>';
   showStory(T('🎖 MEDAL WALL — ','🎖 奖章墙——')+career.achievements.length+'/'+ACHIEVEMENTS.length, html, T('CLOSE','关闭'));
