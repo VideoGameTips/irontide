@@ -36,25 +36,78 @@ test('boots to the menu with all merged systems present and no console errors', 
   expect(errors).toEqual([]);
 });
 
-test('a war starts at the helm with starter guns, difficulty applied, and the war pauses in the armory', async ({ page }) => {
+test('a war starts at the helm with starter guns and difficulty applied', async ({ page }) => {
   const errors = await boot(page);
   const probe = await page.evaluate(() => {
     localStorage.setItem('ironTideDifficulty', 'easy');
     startGame('destroyer'); skipBanner();
-    const atStart = { phase, driving, guns: placed.length, hp: player.hp, defHp: player.def.hp, music: MUSIC.playing };
-    toggleShop();
-    const paused = gamePaused();
-    const t2Before = t2;
-    for (let i = 0; i < 30; i++) update(0.033, t2); // paused: loop() would skip update, emulate its gate
-    toggleShop();
-    return { atStart, paused, t2Frozen: t2 === t2Before };
+    return { phase, driving, guns: placed.length, hp: player.hp, defHp: player.def.hp, music: MUSIC.playing };
   });
-  expect(probe.atStart.phase).toBe('play');
-  expect(probe.atStart.driving).toBe(true);            // spawns at the helm
-  expect(probe.atStart.guns).toBeGreaterThanOrEqual(2); // free starter guns
-  expect(probe.atStart.hp).toBeGreaterThan(probe.atStart.defHp); // easy-mode hull bonus
-  expect(probe.atStart.music).toBe(true);
-  expect(probe.paused).toBe(true);
+  expect(probe.phase).toBe('play');
+  expect(probe.driving).toBe(true);            // spawns at the helm
+  expect(probe.guns).toBeGreaterThanOrEqual(2); // free starter guns
+  expect(probe.hp).toBeGreaterThan(probe.defHp); // easy-mode hull bonus
+  expect(probe.music).toBe(true);
+  expect(errors).toEqual([]);
+});
+
+test('the armory lets the war run by default, freezes it when asked, and never leaks input to the world', async ({ page }) => {
+  const errors = await boot(page);
+  const probe = await page.evaluate(() => {
+    startGame('destroyer'); skipBanner();
+
+    // default: shopping does not stop the fight
+    toggleShop();
+    const dflt = { setting: gameSettings.pauseInArmory, paused: gamePaused(), panel: panelOpen() };
+    toggleShop();
+
+    // ...but the panel still owns the screen: discrete actions must not fire through it
+    const gunsBefore = placed.length;
+    toggleShop();
+    const wasDriving = driving;
+    deleteTurret();                     // X — would scrap the gun you are standing next to
+    toggleFoot();                       // G — would drop you off the ship mid-battle
+    toggleDive();                       // C
+    const guarded = { guns: placed.length === gunsBefore, stillDriving: driving === wasDriving, onFoot };
+    toggleShop();
+
+    // opt in: the old behaviour is one toggle away
+    gameSettings.pauseInArmory = true;
+    toggleShop();
+    const t2Before = t2;
+    const optedIn = gamePaused();
+    for (let i = 0; i < 30; i++) update(0.033, t2);   // paused: loop() would skip update, emulate its gate
+    toggleShop();
+    gameSettings.pauseInArmory = false;
+
+    // regression: the other panels freeze the war unconditionally (build/harbor need the
+    // captain ashore or in port, so the K panel is the one that always opens from the helm)
+    toggleSettings();
+    const other = { paused: gamePaused(), panel: panelOpen() };
+    toggleSettings();
+
+    // being sunk mid-purchase is only possible now: the panel must not survive into the next life
+    startGame('destroyer'); skipBanner();
+    if (shopOpen) toggleShop();
+    toggleShop();
+    player.hp = 1; playerSunk();
+    const sunkWhileShopping = { shopOpen, panel: panelOpen() };
+    startGame('destroyer'); skipBanner();
+    const nextLife = { shopOpen, panel: panelOpen() };
+
+    return { dflt, guarded, optedIn, t2Frozen: t2 === t2Before, other, sunkWhileShopping, nextLife };
+  });
+  expect(probe.dflt.setting).toBe(false);   // ships defaulting to "keep fighting"
+  expect(probe.dflt.paused).toBe(false);
+  expect(probe.dflt.panel).toBe(true);      // ...while still owning the screen
+  expect(probe.guarded.guns).toBe(true);    // X did not scrap a turret through the panel
+  expect(probe.guarded.stillDriving).toBe(true);
+  expect(probe.guarded.onFoot).toBe(false); // G did not put the captain over the side
+  expect(probe.optedIn).toBe(true);
+  expect(probe.t2Frozen).toBe(true);
+  expect(probe.other.paused).toBe(true);    // the other panels still freeze, unchanged
+  expect(probe.sunkWhileShopping.shopOpen).toBe(false);  // going down closes the armory...
+  expect(probe.nextLife.panel).toBe(false);              // ...and never strands it into the next life
   expect(errors).toEqual([]);
 });
 
