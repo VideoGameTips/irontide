@@ -477,7 +477,11 @@ applySettingsBlob(SETTINGS, readSettingsBlob(), SETTINGS_SPEC);
 function saveSettings(){ try{ const g=(typeof gameSettings!=='undefined')?gameSettings:{}; localStorage.setItem('ironTideSettings',JSON.stringify({sv:SETTINGS_VER,...g,...SETTINGS})); }catch(e){} }   // one key, two panels — always persist the union
 function simpleHudOn(){ return SETTINGS.simpleHud==null ? (career.wins+career.losses===0) : !!SETTINGS.simpleHud; }
 function contentFilterOn(){ return !!SETTINGS.contentFilter; }
-const FILTERED_PLANES=new Set(['b29','tu95v','lfc5','mhkl235']);    // nuclear payloads + the dedicated kamikaze airframe
+// Hidden in kid-safe mode: anything carrying a nuclear payload, and the airframes whose whole
+// purpose is a one-way suicide run. nukedrone was missed — it is flagged nuke:true with a 250m
+// blast, so "no nukes" was letting a nuclear weapon through; switchblade is sold in its own
+// description as an expendable one-way kamikaze drone.
+const FILTERED_PLANES=new Set(['b29','tu95v','lfc5','mhkl235','nukedrone','switchblade']);
 function applyVolume(){
   if(typeof MUSIC!=='undefined'&&MUSIC.gain&&MUSIC.ctx) MUSIC.gain.gain.setTargetAtTime((SFX.on&&MUSIC.on?MUSIC.level:0)*(SETTINGS.volume!=null?SETTINGS.volume:1), MUSIC.ctx.currentTime, 0.2); if(SFX.master) SFX.master.gain.value=SFX.on?0.5*SETTINGS.volume:0; }
 function applySimpleHud(){
@@ -6383,8 +6387,10 @@ function playerKamikaze(P){ // ram an enemy ship / land unit / harbor by diving 
     returnFromUAV(true,'Nuclear strike drone expended');   // recall the pilot & remove the drone BEFORE the blast so it can't self-damage a live pilot
     blastAll(bp, 9999, def.nukeRadius||250, true, true);
     flashPrompt('☢ NUCLEAR STRIKE DRONE DETONATED'); return true; }
-  if(hitShip){ damageTarget(hitShip,kd,null); crashPlane('Kamikaze run on the '+hitShip.def.name+'!'); return true; }
-  if(hitUnit){ hitUnit.hp-=kd; if(hitUnit.hp<=0) killLandUnit(hitUnit); crashPlane('Kamikaze!'); return true; }
+  // Ramming stays possible (you can always fly into something), but kid-safe mode does not
+  // narrate it as a suicide attack.
+  if(hitShip){ damageTarget(hitShip,kd,null); crashPlane(contentFilterOn()?('Crashed into the '+hitShip.def.name+'!'):('Kamikaze run on the '+hitShip.def.name+'!')); return true; }
+  if(hitUnit){ hitUnit.hp-=kd; if(hitUnit.hp<=0) killLandUnit(hitUnit); crashPlane(contentFilterOn()?'Crashed!':'Kamikaze!'); return true; }
   damageHarbor(enemyHarbor,kd*1.2); crashPlane('Kamikaze into the harbor!'); return true;
 }
 function planeMaxSpeed(P,def){
@@ -10181,6 +10187,7 @@ const ZH_EXACT = {
   'Aircraft lost!': '飞机没了！',
   'Landing gear collapsed on touchdown!': '着陆时起落架折断了！',
   'Kamikaze!': '神风撞击！',
+  'Crashed!': '撞上了！',
   'Kamikaze into the harbor!': '神风撞进了海港！',
   'Main rotor failed — going down!': '主旋翼坏了——正在坠落！',
   'Cockpit hit — pilot down!': '座舱中弹——飞行员倒下了！',
@@ -10328,6 +10335,7 @@ const ZH_PATTERNS = (() => {
     { re: /^([\s\S]+) You did not bail out — choose another ship or restart from harbor\.$/, out: m => R(m[1]) + '你没能跳伞——另选一艘战舰，或从海港重新开始。' },
     { re: /^([\s\S]+) Your crew was lost — pick a replacement from harbor\.$/, out: m => R(m[1]) + '车组全员牺牲——去海港选一艘替补战舰吧。' },
     { re: /^Kamikaze run on the (.+)!$/, out: m => '神风撞向了' + trName(m[1]) + '！' },
+    { re: /^Crashed into the (.+)!$/, out: m => '撞上了' + trName(m[1]) + '！' },
     { re: /^Tank knocked out \[(front|rear|side|top)\]!$/, out: m => '坦克被击毁[' + FACING[m[1]] + ']！' },
     { re: /^Tank hit \[(front|rear|side|top)\] (\d+)%([\s\S]*)$/, out: m => '坦克中弹[' + FACING[m[1]] + '] ' + m[2] + '%' + SUM(m[3]) },
 
