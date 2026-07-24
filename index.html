@@ -4324,6 +4324,9 @@ function theaterCardHTML(i){
     const sz=isZh()&&typeof SANDBOX_ZH!=='undefined'&&SANDBOX_ZH[M.name];
     const tag=(t,cls)=>'<span class="tag'+(cls?' '+cls:'')+'">'+t+'</span>';
     return '<div class="no" style="color:#ffd060">'+T('⚓ SANDBOX — always unlocked · campaign progress paused','⚓ 沙盒战场——永久解锁 · 不计入战役进度')+'</div>'+
+      // a fresh captain has one theater unlocked, so the campaign map (and its nodes) never
+      // renders — this button is then the ONLY way back out of a sandbox to the campaign.
+      '<button onclick="exitSandbox()" style="margin:7px 0 3px;padding:5px 13px;border-radius:7px;border:1px solid #6fa0c8;background:#16202b;color:#cfe0ee;font-size:12px;letter-spacing:1px;cursor:pointer">'+T('← Back to campaign','← 返回战役')+'</button>'+
       '<div class="nm">☢ '+(sz?sz.name:M.name)+'</div>'+
       '<div class="th">'+(sz?sz.theme:M.theme)+'</div>'+
       '<div class="tags">'+
@@ -4347,6 +4350,7 @@ function theaterCardHTML(i){
       tag(T('Ground army '+Math.round(army.soldiers*100)+'% / '+Math.round(army.tanks*100)+'%','地面部队 步兵 '+Math.round(army.soldiers*100)+'% · 坦克 '+Math.round(army.tanks*100)+'%'))+
     '</div>';
 }
+function exitSandbox(){ currentSandboxIdx=-1; buildCampaignPicker(); }   // leave a sandbox, return to the campaign card
 function selectTheater(i){
   if(i>=mapsUnlocked()||(i===currentMapIdx&&currentSandboxIdx<0)) return;
   currentSandboxIdx=-1; currentMapIdx=i;
@@ -4410,7 +4414,8 @@ function buildCampaignPicker(){
     { const sz=isZh()&&typeof SANDBOX_ZH!=='undefined'&&SANDBOX_ZH[M.name];
     c.innerHTML='<div style="color:#ffe6a0;font-weight:700;font-size:13px">☢ '+(sz?sz.name:M.name)+'</div>'+
       '<div style="color:#9fb1bd;margin-top:4px;line-height:1.4">'+(sz?sz.theme:M.theme)+'</div>'; }
-    c.onclick=()=>{ currentSandboxIdx=i; buildCampaignPicker(); };
+    c.onclick=()=>{ currentSandboxIdx = currentSandboxIdx===i ? -1 : i; buildCampaignPicker(); };   // click the selected one again to deselect
+
     sbRow.appendChild(c);
   });
   box.appendChild(sbRow);
