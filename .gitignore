@@ -3,7 +3,11 @@ node_modules/
 test-results/
 tests/sim/results-pilot.json
 
-# promo build artifacts (regenerate with tools/build-portal.js)
+# Promotion assets and build artifacts. Not in version control — regenerate with
+# tools/. In each worktree, promo/ is a symlink to a single shared directory beside
+# the checkouts, so a tool run from any worktree lands its output in the same place
+# (and matches the paths the launch kits cite).
+/promo
 promo/builds/
 promo/assets/
 tools/trailer/frames/
