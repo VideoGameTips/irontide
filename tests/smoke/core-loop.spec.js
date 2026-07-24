@@ -86,7 +86,16 @@ test('the armory lets the war run by default, freezes it when asked, and never l
     const other = { paused: gamePaused(), panel: panelOpen() };
     toggleSettings();
 
-    return { dflt, guarded, optedIn, t2Frozen: t2 === t2Before, other };
+    // being sunk mid-purchase is only possible now: the panel must not survive into the next life
+    startGame('destroyer'); skipBanner();
+    if (shopOpen) toggleShop();
+    toggleShop();
+    player.hp = 1; playerSunk();
+    const sunkWhileShopping = { shopOpen, panel: panelOpen() };
+    startGame('destroyer'); skipBanner();
+    const nextLife = { shopOpen, panel: panelOpen() };
+
+    return { dflt, guarded, optedIn, t2Frozen: t2 === t2Before, other, sunkWhileShopping, nextLife };
   });
   expect(probe.dflt.setting).toBe(false);   // ships defaulting to "keep fighting"
   expect(probe.dflt.paused).toBe(false);
@@ -97,6 +106,8 @@ test('the armory lets the war run by default, freezes it when asked, and never l
   expect(probe.optedIn).toBe(true);
   expect(probe.t2Frozen).toBe(true);
   expect(probe.other.paused).toBe(true);    // the other panels still freeze, unchanged
+  expect(probe.sunkWhileShopping.shopOpen).toBe(false);  // going down closes the armory...
+  expect(probe.nextLife.panel).toBe(false);              // ...and never strands it into the next life
   expect(errors).toEqual([]);
 });
 

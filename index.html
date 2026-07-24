@@ -4809,6 +4809,7 @@ function respawnPlayer(shipId){
 }
 function showRespawnMenu(msg){
   if(phase!=='play'&&phase!=='respawn') return;
+  closePanelsForEnd();
   phase='respawn';
   mouseDownFire=false;
   if(document.pointerLockElement) document.exitPointerLock();
@@ -8499,7 +8500,9 @@ function startQuickBattle(){
   startGame(ship);
 }
 function endGame(win,msg){
-  if(phase==='over')return; phase='over';
+  if(phase==='over')return;
+  closePanelsForEnd();
+  phase='over';
   const mpMatch=!!(MP.active||MP.everJoined);        // a shared arena is not the campaign: keep the solo save, record, wear and rival arc untouched
   if(!mpMatch) clearSave();   // the war is decided — nothing to resume
   playEndMusic();                                   // the full naval score swells up when the battle ends — victory or defeat
@@ -8903,6 +8906,18 @@ function updateTutorial(dt){
 // They used to be one thing. The armory split them: the fight carries on behind it by
 // default, opt back in via the K panel → "Pause the war in the armory".
 function freezingPanelOpen(){ return harborOpen||buildOpen||tacticalOpen||chatOpen||settingsOpen; }
+// Being sunk or winning with a panel open was impossible until the armory stopped pausing the
+// war; now it happens mid-purchase. Close directly — every toggle*() refuses once phase leaves
+// 'play', which would strand the panel open (and panelOpen() true) into the next life.
+function closePanelsForEnd(){
+  const hide=(id)=>{ const e=document.getElementById(id); if(e) e.style.display='none'; };
+  if(shopOpen){ shopOpen=false; hide('shop'); }
+  if(harborOpen){ harborOpen=false; hide('harbor'); }
+  if(tacticalOpen){ tacticalOpen=false; hide('tactical'); }
+  if(settingsOpen){ settingsOpen=false; hide('settings'); }
+  if(buildOpen) closeBuild();
+  if(chatOpen) closeChat();
+}
 function panelOpen(){ return shopOpen||freezingPanelOpen(); }
 function gamePaused(){ return freezingPanelOpen()||(shopOpen&&gameSettings.pauseInArmory); }
 // ---------- gamepad (#42) — a parallel input source writing into the same state keyboard/touch use ----------
