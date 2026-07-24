@@ -3980,7 +3980,19 @@ addEventListener('keyup',e=>{ keys[e.code]=0; });
 // =====================================================================
 let touchLookId=null,touchMoveId=null,lastTouchInput=0,mobileControlsReady=false;
 const touchMove={x:0,y:0};
-function touchCapable(){return matchMedia('(pointer:coarse)').matches||navigator.maxTouchPoints>0||innerWidth<820;}
+// Is the PLAYER on touch — not merely "does this hardware have a digitiser".
+// maxTouchPoints>0 is true of every touchscreen laptop, including one driven entirely by a
+// mouse, and a narrow window is a narrow window, not a phone. Both used to be enough to (a)
+// pin the renderer to 1x pixel ratio and (b) make the canvas click bail out, which killed
+// pointer-lock mouse-look outright on a touchscreen Windows laptop or Chromebook.
+// (pointer:coarse) describes the PRIMARY pointer, which is the question actually being asked.
+// ?touch=1 / ?touch=0 force it either way for testing.
+function touchForced(){ try{ return new URLSearchParams(location.search).get('touch'); }catch(e){ return null; } }
+function touchCapable(){
+  const q=touchForced(); if(q==='1') return true; if(q==='0') return false;
+  if(matchMedia('(pointer:coarse)').matches) return true;
+  return navigator.maxTouchPoints>0 && !matchMedia('(pointer:fine)').matches;
+}
 function touchMark(){lastTouchInput=Date.now();document.body.classList.add('touch-ready');}
 function setKey(code,on){keys[code]=on?1:0;}
 function clearMoveKeys(){['KeyW','KeyA','KeyS','KeyD'].forEach(k=>setKey(k,0));}
@@ -4077,6 +4089,7 @@ function touchActionTap(act){
 function initMobileControls(){
   if(mobileControlsReady)return;mobileControlsReady=true;
   if(touchCapable())document.body.classList.add('touch-ready');
+  if(touchForced()==='1')document.body.classList.add('touch-forced');   // the CSS escape hatch existed but nothing ever set it, so ?touch=1 could not show the controls on a desktop
   const move=document.getElementById('touchMove'),look=document.getElementById('touchLook');
   if(move)move.addEventListener('pointerdown',e=>{touchMark();touchMoveId=e.pointerId;move.setPointerCapture(e.pointerId);}, {passive:true});
   if(move)move.addEventListener('pointermove',e=>{if(e.pointerId!==touchMoveId)return;touchMark();const r=move.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2,rad=r.width*.38;
