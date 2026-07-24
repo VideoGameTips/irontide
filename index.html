@@ -3556,7 +3556,7 @@ let driving=false;         // steering the ship from the bridge
 let onFoot=false; let footPos=new THREE.Vector3(); let footLand=null;  // ashore on an island/harbor
 let landCampaignMode=false; // ground theaters hide the ship and start with an airborne command-center insertion
 let playerShipLost=false;  // true when your ship was sunk while you survived ashore/away from it
-let shipsLostThisWar=0, warStartT2=0;   // star-rating inputs (#34): flawless runs and clear time
+let shipsLostThisWar=0, warStartT2=0, armoryT=0;   // star-rating inputs (#34): flawless runs and clear time (armoryT = seconds spent shopping, not fighting)
 let footHP=100, footMaxHP=100; // the captain/soldier has real health when ashore or swimming
 let drivingTank=null; let footGunCd=0;          // piloted tank + handheld weapon
 const playerTanks=[];      // friendly drivable tanks {group, pos, heading, island, fireCd, turret, barrelLen}
@@ -4741,7 +4741,7 @@ function deployLandCampaignStart(skipEscort){   // skipEscort: resuming a save w
 }
 function startGame(shipId){
   lastShipId=shipId; try{localStorage.setItem('ironTideLastShip',shipId);}catch(e){}
-  shipsLostThisWar=0; warStartT2=t2;
+  shipsLostThisWar=0; warStartT2=t2; armoryT=0;
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
   sfxResume();   // browsers need a user gesture (this ship-card click) to start audio
@@ -8547,7 +8547,7 @@ function endGame(win,msg){
   let starsHtml='', earnedStars=0;
   if(win&&currentSandboxIdx<0&&!mpMatch&&!quickMode){
     const M=CAMPAIGN[currentMapIdx]||{};
-    const dur=Math.max(0,t2-warStartT2), parT=240+(M.enemies||3)*80;
+    const dur=Math.max(0,t2-warStartT2-armoryT), parT=240+(M.enemies||3)*80;   // stars rate the fighting, not how long you browsed guns
     earnedStars=1+(dur<=parT?1:0)+(shipsLostThisWar===0?1:0);
     const rec=(career.theaters=career.theaters||{})[currentMapIdx]||{stars:0,bestT:null};
     rec.stars=Math.max(rec.stars||0,earnedStars);
@@ -8887,6 +8887,7 @@ function loop(){
   pollGamepad(dt);
   if(phase==='play'){
     if(!gamePaused()){ t2+=dt; update(dt,t2); updateHUD();
+      if(shopOpen) armoryT+=dt;                                          // the armory no longer stops the clock, so bank the time and take it off the star par
       _saveT+=dt; if(_saveT>=30){ _saveT=0; saveWar(); } }               // autosave the war twice a minute
     else { sfxEngine(); updatePrompt(); updateCamera(); updateHUD(); }   // audio ramps down; prompts/HUD/camera stay correct in menus
     updateMountPreview();                   // shop stays open while this runs, so the ghost/ring must update even while paused
