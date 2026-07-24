@@ -36,8 +36,8 @@ test('the medal set is well-formed and the tiered thresholds trip in order', asy
              at9: shipUnlocks(9), at10: shipUnlocks(10), at100: shipUnlocks(100), at15000: shipUnlocks(15000),
              retro, hasHighTiers, notThird };
   });
-  expect(r.count).toBe(86);
-  expect(r.uniqueIds).toBe(86);            // no duplicate ids
+  expect(r.count).toBe(100);
+  expect(r.uniqueIds).toBe(100);           // no duplicate ids
   expect(r.wellFormed).toBe(true);         // every medal bilingual with a check
   expect(r.shipCount).toBe(12);            // Ship Destroyer I–XII
   expect(r.shipGoals).toEqual([10,30,100,250,500,1000,2000,3500,5500,8000,11000,15000]);
