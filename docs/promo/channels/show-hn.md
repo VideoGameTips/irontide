@@ -1,5 +1,15 @@
 # Iron Tide — Show HN 发布全套材料
 
+
+> **文件路径基准**：下面所有 `promo/...` 路径都相对于 **`/Users/longmao/projects/irontide/`**
+> （不是仓库目录）。开始之前先执行一次，后面的路径就都能直接用：
+>
+> ```bash
+> cd /Users/longmao/projects/irontide
+> ```
+>
+> 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
+
 > 适用平台：Hacker News (news.ycombinator.com)
 > 准备日期：2026-07-24（周五）｜建议发布日期：**2026-07-28（周二）北京时间 20:00–21:30**（详见第 4 节）
 > 素材说明：HN 是纯文本社区，**没有**截图、视频、标签、分类字段——`promo/assets/` 的截图和视频本次用不上，也不需要录视频。只需要：标题 + URL + 你的首条评论。

@@ -29,8 +29,12 @@ const html = fs.readFileSync(path.join(REPO, 'index.html'), 'utf8');
 
 // --- shared transform: no service worker inside a third-party iframe origin
 let itch = html.replace(
-  /if\('serviceWorker' in navigator && location\.protocol\.startsWith\('http'\)\)\{[\s\S]{0,200}?\n\}/,
-  "/* service worker disabled in portal builds (sandboxed iframe origin) */"
+  // Matches the whole registration IIFE. Anchored on the 'serviceWorker' in navigator
+  // guard and its closing })(); — deliberately strict, so that if upstream rewrites this
+  // block again the build FAILS instead of silently shipping a registering service
+  // worker into a sandboxed portal iframe. (It has been rewritten once already.)
+  /\(\(\)=>\{\s*if\(!\('serviceWorker' in navigator\)[\s\S]{0,600}?\n\}\)\(\);/,
+  "/* service worker registration removed for portal builds (sandboxed iframe origin) */"
 );
 if (itch === html) { console.error('FAIL: service-worker strip did not match'); process.exit(1); }
 
@@ -40,9 +44,24 @@ if (!itch.includes(MP_ANCHOR)) { console.error('FAIL: mp anchor not found'); pro
 const portal = itch.replace(MP_ANCHOR,
   "{const _mp=log.querySelector('#mpBtn'); if(_mp) _mp.style.display='none';}  /* portal build: single-player */");
 
+// CrazyGames additionally forbids driving players off-platform, and an install prompt
+// makes no sense inside their iframe. So its build also loses the shareable battle
+// report's domain watermark, the PWA manifest link, and the Open Graph tags (which
+// point at our own domain and are meaningless in an embed).
+let crazygames = portal
+  .replace("'⚓ IRON TIDE · game.boobank.com/irontide'", "'⚓ IRON TIDE'")
+  .replace(/\n<link rel="manifest" href="manifest\.json">/, '')
+  .replace(/\n<!-- Link previews:[\s\S]*?<meta name="twitter:image"[^>]*>/, '');
+for (const [what, before, after] of [
+  ['battle-report watermark', portal, crazygames],
+]) {
+  if (before === after) { console.error(`FAIL: ${what} strip did not match`); process.exit(1); }
+}
+
 const variants = [
   { name: 'irontide-itch', src: portal },
   { name: 'irontide-portal-singleplayer', src: portal },
+  { name: 'irontide-crazygames', src: crazygames },
 ];
 for (const v of variants) {
   const dir = path.join(STAGE, v.name);

@@ -1,12 +1,22 @@
 # Iron Tide — Reddit 发帖工具包(Reddit Posting Kit)
 
+
+> **文件路径基准**：下面所有 `promo/...` 路径都相对于 **`/Users/longmao/projects/irontide/`**
+> （不是仓库目录）。开始之前先执行一次，后面的路径就都能直接用：
+>
+> ```bash
+> cd /Users/longmao/projects/irontide
+> ```
+>
+> 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
+
 > 适用游戏:**Iron Tide — Battleship Command**
 > 试玩地址:https://game.boobank.com/irontide/ (免费、无需注册、无广告、无需安装)
 > 开源:孩子的原仓库 https://github.com/VideoGameTips/irontide / 家长维护的优化 fork https://github.com/longmaolab/irontide
 > 今天是 **2026-07-24(周五)**。本文所有日期均以此为起点。
 >
 > **三条铁律(每次发帖前默念):**
-> 1. **隐私**:永远不提孩子的真名、年龄、城市、学校、长相。只说 "my kid" 或 GitHub ID "VideoGameTips"。所有账号、所有帖子都由家长出面。
+> 1. **隐私**:永远不提孩子的真名、年龄、城市、学校、长相。可以用名字或 GitHub ID "VideoGameTips"。所有账号、所有帖子都由家长出面。
 > 2. **诚实**:不编数字、不喊 "best/revolutionary"、不搞小号刷赞。联机模式只能标 "experimental" 或干脆不提。
 > 3. **发帖前花 2 分钟重新看一遍该版块的现行规则**(本文的版规信息基于 2025 年存档快照核实,Reddit 规则随时会变)。
 

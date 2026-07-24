@@ -1,7 +1,17 @@
 # Iron Tide — CrazyGames Basic Launch 提交套件
 
+
+> **文件路径基准**：下面所有 `promo/...` 路径都相对于 **`/Users/longmao/projects/irontide/`**
+> （不是仓库目录）。开始之前先执行一次，后面的路径就都能直接用：
+>
+> ```bash
+> cd /Users/longmao/projects/irontide
+> ```
+>
+> 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
+
 > 生成日期:2026-07-24(周五)。所有需要粘贴到平台的文字都在代码块里(英文),直接整块复制即可。
-> 隐私红线:全程用家长账号操作;任何字段不出现孩子的真名、年龄、城市、学校。署名只用 `longmaolab`(家长)和 GitHub handle `VideoGameTips`(孩子)。
+> 隐私口径:全程用家长账号操作。**名字可以公开**;**不公开**年龄、城市、学校、私人邮箱。署名用 `longmaolab`(家长)和 GitHub handle `VideoGameTips`(孩子)。
 
 ---
 
@@ -39,58 +49,21 @@
 3. **去掉 PWA manifest 链接**(第 7 行)——iframe 里不需要,避免无意义的安装提示与 404
 4. **战报 PNG 水印去掉自家域名**(约 8560 行的 `game.boobank.com/irontide`)——平台不允许把玩家往站外导流
 
-把下面整段存为 `promo/build-crazygames.sh` 后执行 `bash promo/build-crazygames.sh`:
+CrazyGames 专用的构建包**已经做进标准构建脚本**了，不用手工存 shell 脚本：
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
-SRC=/Users/longmao/projects/irontide/repo
-OUT=/Users/longmao/projects/irontide/promo/builds/.verify/portal
-
-rm -rf "$OUT"
-mkdir -p "$OUT/js" "$OUT/vendor/postprocessing" "$OUT/icons"
-cp "$SRC/index.html"                       "$OUT/"
-cp "$SRC/js/terrain.js"                    "$OUT/js/"
-cp "$SRC/vendor/three.min.js"              "$OUT/vendor/"
-cp "$SRC"/vendor/postprocessing/*.js       "$OUT/vendor/postprocessing/"
-cp "$SRC"/icons/icon-192.png "$SRC"/icons/icon-512.png "$OUT/icons/"
-# 注意:故意不复制 sw.js 和 manifest.json —— portal 构建不要 PWA
-
-python3 - "$OUT/index.html" <<'PY'
-import sys, pathlib
-p = pathlib.Path(sys.argv[1]); s = p.read_text(encoding='utf-8')
-def cut(old, new):
-    global s
-    assert s.count(old) == 1, f"pattern not found or ambiguous: {old[:60]!r}"
-    s = s.replace(old, new)
-
-# 1) 去掉 PWA manifest 链接
-cut('<link rel="manifest" href="manifest.json">',
-    '<!-- manifest removed for portal build -->')
-
-# 2) 去掉 service worker 注册
-cut("""if('serviceWorker' in navigator && location.protocol.startsWith('http')){
-  try{ navigator.serviceWorker.register('sw.js'); }catch(e){}
-}
-""", '')
-
-# 3) 隐藏主菜单的 MULTIPLAYER 按钮(单机身份提交)
-cut("log.querySelector('#mpBtn').onclick=openMultiplayer;",
-    "log.querySelector('#mpBtn').remove();")
-
-# 4) 战报图片水印去掉自家域名(平台不允许站外导流)
-cut("'⚓ IRON TIDE · game.boobank.com/irontide'", "'⚓ IRON TIDE'")
-
-p.write_text(s, encoding='utf-8')
-print('patched OK')
-PY
-
-cd "$OUT"
-rm -f ../irontide-crazygames-build.zip
-zip -rq ../irontide-crazygames-build.zip . -x '.*'
-echo "---- zip 内容与体积 ----"
-unzip -l ../irontide-crazygames-build.zip
+cd /Users/longmao/projects/irontide/repo
+node tools/build-portal.js
+node tools/verify-portal-build.js
 ```
+
+产出 `promo/builds/irontide-crazygames.zip`。它在单机版的基础上又去掉了三样 CrazyGames 会介意的东西：
+
+- **战报 PNG 的站外域名水印**（`⚓ IRON TIDE · game.boobank.com/irontide` → `⚓ IRON TIDE`）——平台不允许把玩家导流到站外
+- **PWA manifest 链接**——iframe 里装不上，留着只会产生无意义的安装提示和 404
+- **Open Graph 标签**——指向我们自己的域名，在嵌入场景里没有意义
+
+提交时用 `irontide-crazygames.zip`，**不要**用 `irontide-itch.zip`（那份保留了水印和 OG 标签，是给 itch.io 的）。
 
 > 脚本里每处替换都有 `assert`,如果上游 `index.html` 以后改了这些行,脚本会报错而不是静默漏改——重新提交新版本前重跑一遍即可。
 
@@ -199,7 +172,7 @@ longmaolab
 | Ads / In-app purchases | `No` / `No` |
 | 年龄/内容问卷 | 按 §3.3 的事实回答:风格化军事战斗,无血腥、无脏话、无性内容、无赌博 |
 | SDK integration | Basic Launch 可选——**首次提交先不接**,保持零外部依赖;Full Launch 时再接(§5) |
-| Build | 上传 `promo/builds/irontide-portal-singleplayer.zip`(已剥离 service worker、隐藏联机入口,iframe 内 11 项检查全绿) |
+| Build | 上传 `promo/builds/irontide-crazygames.zip`(已剥离 service worker、隐藏联机入口、去掉站外水印与 manifest;iframe 内 11 项检查全绿) |
 | Covers | 上传 §1.6 的三张图 |
 | Video | 上传两条:`promo/assets/final/cg-preview-landscape-1920x1080.mp4` + `cg-preview-portrait-720x1080.mp4`(均已生成) |
 
