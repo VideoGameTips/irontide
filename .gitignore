@@ -2,3 +2,7 @@ node_modules/
 .DS_Store
 test-results/
 tests/sim/results-pilot.json
+
+# promo build artifacts (regenerate with tools/build-portal.js)
+promo/builds/
+promo/assets/

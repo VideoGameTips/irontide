@@ -4,6 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Iron Tide — Battleship Command</title>
+<meta name="description" content="Free browser naval-action game. Command a battleship, bolt extra cannons onto your own deck, then fly the planes, drive the tanks and storm the beach yourself. 31-theater campaign. No account, no ads, no install.">
+<!-- Link previews: without these, every share on Reddit/Discord/chat renders as a bare URL. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Iron Tide">
+<meta property="og:title" content="Iron Tide — Battleship Command">
+<meta property="og:description" content="Free browser naval-action game. Command a battleship, bolt extra cannons onto your own deck, then fly the planes, drive the tanks and storm the beach yourself. No account, no ads, no install.">
+<meta property="og:url" content="https://game.boobank.com/irontide/">
+<meta property="og:image" content="https://game.boobank.com/irontide/og-cover.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="675">
+<meta property="og:image:alt" content="A battleship firing a broadside at an enemy line across open water in Iron Tide">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Iron Tide — Battleship Command">
+<meta name="twitter:description" content="Free browser naval-action game. Command a battleship, then fly the planes, drive the tanks and storm the beach yourself.">
+<meta name="twitter:image" content="https://game.boobank.com/irontide/og-cover.jpg">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a1018">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -8934,7 +8951,7 @@ function loop(){
 // ---------- 舰船 ----------
 const SHIPS_ZH = {
 
-  // Andy 新增的其他舰船
+  // 上游新增的其他舰船
   frigate: { name:'导弹护卫舰', cls:'护航舰', desc:'灵活的导弹护卫舰——又快又轻,负责给舰队打掩护,把来袭的飞机从天上拍下来。' },
   battlecruiser: { name:'战列巡洋舰', cls:'快速主力舰', desc:'把战列舰的巨炮装在又瘦又快的船体上——火力赶得上主力舰,但装甲带很薄。打不过的就跑给它看。' },
   monitor: { name:'近岸浅水重炮舰', cls:'炮台舰', desc:'又矮又平、几乎不会动——但装甲厚得像碉堡,还扛着几门超大口径的炮。一座专打岸轰的浮动堡垒。' },
@@ -8942,7 +8959,7 @@ const SHIPS_ZH = {
   fletcher: { name:'弗莱彻号', cls:'集市驱逐舰', desc:'集市舰船。历史上著名的弗莱彻级驱逐舰:快、皮实,甲板空间特别实用。' },
   type055: { name:'055型', cls:'集市导弹巡洋舰', desc:'集市舰船。现代大型导弹驱逐舰/巡洋舰,武器甲板宽阔,生存能力出色。' },
   nimitz: { name:'尼米兹号', cls:'集市超级航母', desc:'集市舰船。核动力超级航母:巨大的飞行甲板、结实的船体,足够打一场像样的空中战争。' },
-  // 传奇旗舰(Andy 新增)
+  // 传奇旗舰(上游新增)
   bismarck: { name:'俾斯麦号', cls:'传奇战列舰', desc:'二战德国最令人生畏的战列舰——第三轮齐射就击沉了胡德号,随后整个皇家海军倾巢出动将她围猎。装甲带厚得能扛住轻型炮火,炮位充足,但转向比小船慢。' },
   enterprise: { name:'企业号', cls:'传奇航空母舰', desc:'"大E"——二战获得荣誉最多的战舰。中途岛、瓜岛……几乎每场太平洋大战都有她,而且从未被击沉。一块经得起打、始终能放飞机的均衡飞行甲板。' },
   missouri: { name:'密苏里号', cls:'传奇战列舰', desc:'"强大的密苏里"——衣阿华级战列舰,同类中的巅峰,1945年日本就是在她的甲板上签字投降的。全舰队最坚固的船体。' },
@@ -8996,7 +9013,7 @@ const WEAPONS_ZH = {
 
 // ---------- 飞机 ----------
 const PLANES_ZH = {
-  // Andy 新增的飞机与无人机
+  // 上游新增的飞机与无人机
   f14:  { name:'F-14 雄猫', desc:'集市图纸。可变后掠翼舰队截击机,导弹射程远,经典的航母剪影。' },
   harrier: { name:'AV-8B 海鹞II', desc:'集市图纸。短距起降攻击机:不算最快,但在拥挤的航母甲板上特别好用。' },
   mi24: { name:'米-24 雌鹿', desc:'集市图纸。苏联的"飞行步兵战车":比眼镜蛇结实,比堡垒直升机便宜。' },
@@ -9644,7 +9661,7 @@ const NAME_ZH = {
   // 集市物品名(战役选择界面的集市卡片)
   'Experimental Railgun':'实验电磁炮',
   'Aegis VLS Battery':'宙斯盾垂发导弹阵',
-  // Andy 新增的传奇旗舰(真实历史名舰,用通行中文舰名)
+  // 上游新增的传奇旗舰(真实历史名舰,用通行中文舰名)
   'Missile Frigate':'导弹护卫舰',
   'Battlecruiser':'战列巡洋舰',
   'Coastal Monitor':'近岸浅水重炮舰',
