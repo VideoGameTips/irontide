@@ -158,8 +158,10 @@
   #shopDPS{font-size:12px;color:#9fc6e8;white-space:nowrap;}
   #shopPause{font-size:11px;color:#8fc9e9;background:#10222f;border:1px solid #2a4660;border-radius:20px;padding:3px 10px;white-space:nowrap;}
   #shopPause.running{color:#ffc07a;background:#2a1a0f;border-color:#5c3a1c;}   /* warm = you are still exposed out there */
-  #shopToast{display:none;margin:0 0 10px;padding:8px 11px;border-radius:8px;font-size:12px;line-height:1.45;
-    border:1px solid #2a4660;background:#0e1a26;color:#cfe6fb;animation:toastIn .18s ease-out;}
+  /* Overlay, not in flow: it used to sit above #shopList, so every appearance shoved the
+     weapon list down under the player's cursor mid-click. */
+  #shopToast{display:none;position:absolute;left:12px;right:12px;z-index:3;padding:8px 11px;border-radius:8px;font-size:12px;line-height:1.45;
+    border:1px solid #2a4660;background:rgba(14,26,38,.97);color:#cfe6fb;box-shadow:0 6px 16px rgba(0,0,0,.45);animation:toastIn .18s ease-out;}
   #shopToast.ok{border-color:#3fae78;background:#10281c;color:#a6f2c3;}
   #shopToast.bad{border-color:#a8503f;background:#2a1512;color:#ffb3a4;}
   @keyframes toastIn{from{opacity:0;transform:translateY(-3px);}to{opacity:1;transform:none;}}
@@ -8250,7 +8252,10 @@ function shopBalance(){
 function installHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
   ? T('tap Install below','点下方的安装按钮')
   : T('press F (or click Install below)','按 F（或点下方的安装按钮）'); }
-function flashPrompt(msg,kind){ promptMsg=msg; promptT=2; if(shopOpen) shopMsg(msg,kind); }
+// Only deliberate feedback (kind 'ok'/'bad' — bought it, cannot afford it, no free mount)
+// mirrors into the armory. Kindless prompts are ambient combat chatter — fires, turret hits,
+// bounties, weather — and now that the war runs behind the panel they arrive constantly.
+function flashPrompt(msg,kind){ promptMsg=msg; promptT=2; if(shopOpen&&kind) shopMsg(msg,kind); }
 // ===== BANNER CARD — full-screen briefing card / boss warning, queued so only one shows at a time =====
 let _bannerQueue=[],_bannerT=0;
 function showBanner(title,sub,opts){ opts=opts||{}; _bannerQueue.push({title,sub,dur:opts.dur||2.6,tone:opts.tone||'brief'}); }
