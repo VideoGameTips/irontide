@@ -1297,6 +1297,15 @@ function sfxInit(){
   rainLowF.type='lowpass'; rainLowF.frequency.value=180; rainLowG.gain.value=0;
   rainLow.connect(rainLowF); rainLowF.connect(rainLowG); rainLowG.connect(SFX.master); rainLow.start();
   SFX.rainGain=rainG; SFX.rainLowGain=rainLowG; SFX.rainFilt=rainLP; SFX.rainLowFilt=rainLowF;
+  // (6) OCEAN — the sea itself. Always there, under everything: a band-passed noise swell that
+  // breathes in and out, plus a bow-wash layer that only opens up once you are making way.
+  const sea=loopNoise(), seaBP=ctx.createBiquadFilter(), seaG=ctx.createGain();
+  seaBP.type='bandpass'; seaBP.frequency.value=520; seaBP.Q.value=0.6;
+  seaG.gain.value=0; sea.connect(seaBP); seaBP.connect(seaG); seaG.connect(SFX.master); sea.start();
+  const wash=loopNoise(), washHP=ctx.createBiquadFilter(), washG=ctx.createGain();
+  washHP.type='highpass'; washHP.frequency.value=1400; washG.gain.value=0;
+  wash.connect(washHP); washHP.connect(washG); washG.connect(SFX.master); wash.start();
+  SFX.seaGain=seaG; SFX.seaFilt=seaBP; SFX.washGain=washG; SFX.seaPhase=0;
 }
 function _ramp(param,v){ param.setTargetAtTime(v, SFX.ctx.currentTime, 0.15); }
 function sfxResume(){ sfxInit(); if(SFX.ctx && SFX.ctx.state==='suspended') SFX.ctx.resume(); }
@@ -1626,6 +1635,19 @@ function sfxEngine(){   // called each frame — picks the right continuous laye
     _ramp(SFX.rainGain.gain, lvl*(0.03+Math.min(.025,sea*.007)));
     _ramp(SFX.rainLowGain.gain, lvl*(0.008+Math.min(.018,sea*.004)));
     _ramp(SFX.rainFilt.frequency, lvl?4200+lvl*1500+Math.random()*500:2600);
+  }
+  // Ocean ambience: present the whole time you are at sea, breathing on a slow swell, louder in
+  // a heavy sea. The bow wash only opens up once the ship is actually making way, so speeding up
+  // and slowing down is audible.
+  if(SFX.seaGain){
+    const seaState=(typeof weather==='object'&&weather.sea)?weather.sea:1;
+    SFX.seaPhase+=0.016;
+    const atSea=(phase==='play'&&!landCampaignMode)?1:0;
+    const swell=0.72+0.28*Math.sin(SFX.seaPhase*0.21)+0.09*Math.sin(SFX.seaPhase*0.53);
+    _ramp(SFX.seaGain.gain, atSea*swell*(0.016+Math.min(0.028,seaState*0.009)));
+    _ramp(SFX.seaFilt.frequency, 430+seaState*90+swell*70);
+    const speed=(atSea&&player&&!onFoot&&!piloting&&!drivingTank&&player.vel)?Math.min(1,player.vel.length()/16):0;
+    _ramp(SFX.washGain.gain, atSea*speed*0.014);
   }
 }
 
