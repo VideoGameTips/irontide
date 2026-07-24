@@ -16,7 +16,7 @@
 
 1. **隐私**:名字和 GitHub ID "VideoGameTips" 可以公开;**不出现**年龄、城市、学校、正脸、私人邮箱。所有账号由你注册、你发帖。
 2. **诚实**:不编数字、不喊 "best/revolutionary"、不组织刷好评。联机功能只字不提,或明确标注 experimental。
-3. **署名口径**(所有渠道统一):游戏绝大部分由孩子独立设计和开发;你维护打磨版 fork(修 bug、i18n、新手引导、成就、性能),用了 AI 辅助 code review。不多说一分,不少说一分。
+3. **署名口径**(所有渠道统一):游戏绝大部分由孩子独立设计和开发;你负责维护(修 bug、补完 EN/中文 i18n、新手引导、成就、性能),用了 AI 辅助 code review;全部代码都在同一个开源仓库 https://github.com/VideoGameTips/irontide,对外只给这一个链接。不多说一分,不少说一分。
 
 ## 本周发射时间表
 
@@ -63,7 +63,7 @@ I'd like to suggest a free browser game for your database:
 Name: Iron Tide (full title: "Iron Tide — Battleship Command")
 Play (free, no account, no ads, no install — loads in seconds):
 https://game.boobank.com/irontide/
-Open source: https://github.com/longmaolab/irontide
+Open source: https://github.com/VideoGameTips/irontide
 Platforms: browser (desktop + mobile), gamepad and touch supported, PWA installable
 
 Description (~100 words):
@@ -83,8 +83,9 @@ mobile, and packs an unusually large amount of game — a full world
 campaign with a story rival — into a single web page.
 
 One transparency note: this is a family project. My kid (GitHub handle
-VideoGameTips) designed and built the game solo; I maintain the polished
-open-source fork and handle all public accounts to protect their privacy.
+VideoGameTips) designed and built the game solo; I maintain the
+open-source repo (bug fixes, localization, onboarding) and handle all
+public accounts to protect their privacy.
 
 Three screenshots attached; more screenshots or a 30-60s gameplay clip
 available on request. Thanks for checking it out — no worries if it's
@@ -124,12 +125,12 @@ photo mode, adaptive quality with bloom, EN/中文. There's also an early
 multiplayer mode on the game's own site, clearly experimental for now (the portal builds are single-player).
 
 Family project: my kid (GitHub: VideoGameTips) designed and built the game
-solo — I maintain the polished open-source fork (bug fixes, i18n,
-onboarding, performance) and front the accounts for their privacy.
+solo — I maintain the repo (bug fixes, i18n, onboarding, performance)
+and front the accounts for their privacy.
 
 Play (free, no account, no ads): https://game.boobank.com/irontide/
-Source: https://github.com/longmaolab/irontide
-Original repo: https://github.com/VideoGameTips/irontide
+Source: https://github.com/VideoGameTips/irontide
+Source: https://github.com/VideoGameTips/irontide
 
 Feedback very welcome — especially on performance and the adaptive
 quality system on your hardware.
@@ -151,10 +152,10 @@ single-file architecture, procedural per-theater music (31 generated
 profiles), and the adaptive quality system.
 
 Play: https://game.boobank.com/irontide/
-Source: https://github.com/longmaolab/irontide
+Source: https://github.com/VideoGameTips/irontide
 
 Transparency: it's a family project — my kid (GitHub: VideoGameTips)
-designed and built the game solo, and I maintain the polished fork and
+designed and built the game solo; I handle maintenance and
 run the accounts to protect their privacy.
 
 Happy to provide screenshots, a 30-60s clip, or a short technical
@@ -195,8 +196,8 @@ Iron Tide — a free browser battleship-command game built with three.js
 libs. PWA-installable, desktop + mobile, gamepad and touch support.
 
 Play (free, no account, no ads): https://game.boobank.com/irontide/
-Source: https://github.com/longmaolab/irontide
-Original repo: https://github.com/VideoGameTips/irontide
+Source: https://github.com/VideoGameTips/irontide
+Source: https://github.com/VideoGameTips/irontide
 
 Angles that might interest your readers:
 - Single-file architecture: a full 31-theater world campaign, a story
@@ -207,9 +208,9 @@ Angles that might interest your readers:
 - Bilingual EN/中文; open source.
 
 Transparency: it's a family open-source project. My kid (GitHub handle
-VideoGameTips) designed and built the game solo; I maintain the polished
-fork (bug fixes, i18n completion, onboarding, performance), with
-AI-assisted code review. I run the accounts to protect their privacy.
+VideoGameTips) designed and built the game solo; I maintain the repo
+(bug fixes, i18n completion, onboarding, performance), with AI-assisted
+code review. I run the accounts to protect their privacy.
 
 Screenshots or a 30-60s gameplay clip available if useful. Thanks for
 twelve-plus years of the newsletter!
@@ -238,12 +239,12 @@ Iron Tide — a free battleship-command game that runs in your browser.
 No install, no account, no ads.
 
 Play: https://game.boobank.com/irontide/
-Open source: https://github.com/longmaolab/irontide
+Open source: https://github.com/VideoGameTips/irontide
 
 Command a battleship across a 31-theater world campaign — and leave the
 helm to fly planes, drive amphibious tanks, or fight on foot. Built with
 three.js. Designed and built by a young solo dev (GitHub:
-VideoGameTips); this channel and the polished fork are run by their
+VideoGameTips); this channel and the maintenance work are handled by their
 parent. New gameplay Short every Tuesday.
 ```
 
@@ -301,7 +302,7 @@ Iron Tide — free battleship-command game in your browser. No install,
 no account, no ads.
 
 Play: https://game.boobank.com/irontide/
-Open source: https://github.com/longmaolab/irontide
+Open source: https://github.com/VideoGameTips/irontide
 
 Built with three.js. Designed and built by a young solo dev (GitHub:
 VideoGameTips); channel run by their parent.

@@ -48,7 +48,7 @@ python3 -m http.server 8080
 ### 0.3 账号规则(务必遵守)
 
 - **由家长注册并持有账号**。NG 规定 13–17 岁需家长许可,而且站内其他分区有成人内容——**孩子不单独浏览 Newgrounds**,看评论一律经你过滤(见第 7 步)。
-- 用户名建议直接用 `longmaolab`(与 GitHub 一致,便于对得上开源仓库)。**不要**填年龄、城市、学校;名字可以出现,GitHub 手柄 "VideoGameTips" 也可以。
+- 用户名建议直接用 `longmaolab`(家长自己的 GitHub 手柄,和你在仓库里的维护提交对得上;仓库本身在孩子的 `VideoGameTips` 名下)。**不要**填年龄、城市、学校;名字可以出现,GitHub 手柄 "VideoGameTips" 也可以。
 - 注册用你自己的邮箱,完成邮箱验证。
 
 ---
@@ -100,7 +100,7 @@ FEATURES
 - English / 中文
 - Single-player campaign, quick battle, and sandbox maps
 
-Free, no account, no ads, loads in seconds. Built with three.js, and fully open source (links in the author comments).
+Free, no account, no ads, loads in seconds. Built with three.js, and fully open source (link in the author comments).
 ```
 
 ### 2.4 Author Comments(作者的话,英文,整块粘贴——孩子的故事放这里,克制而真诚)
@@ -108,11 +108,9 @@ Free, no account, no ads, loads in seconds. Built with three.js, and fully open 
 ```
 Hi Newgrounds! Parent here, posting on behalf of my kid.
 
-This game was designed and built almost entirely by my kid, solo (GitHub handle: VideoGameTips) — the 31-theater campaign, the boss rival, the vehicles, the deck-cannon shop, basically everything you'll actually play. My part is the parent-maintained fork: bug fixes, finishing the English/Chinese translations, onboarding, achievements and performance tuning, with some AI-assisted code review along the way.
+This game was designed and built almost entirely by my kid, solo (GitHub handle: VideoGameTips) — the 31-theater campaign, the boss rival, the vehicles, the deck-cannon shop, basically everything you'll actually play. My part is the maintenance: bug fixes, finishing the English/Chinese translations, onboarding, achievements and performance tuning, with some AI-assisted code review along the way.
 
-It's fully open source:
-- Original repo by the kid: https://github.com/VideoGameTips/irontide
-- Polished fork: https://github.com/longmaolab/irontide
+It's fully open source — one repo, everything in it: https://github.com/VideoGameTips/irontide
 
 A few notes:
 - The 12 medals are in-game medals, not Newgrounds API medals (maybe someday).
@@ -174,8 +172,7 @@ Newgrounds 的投稿表单**不是 ESRB 那种"轻/中/重"分级**,而是五个
 ## 第 3 步:上传 zip + 尺寸设置
 
 1. 在项目的文件/上传区选择 `/Users/longmao/projects/irontide/promo/builds/irontide-portal-singleplayer.zip`(几 MB,远低于 NG 上限,秒传)。
-2. **View
-port / Dimensions(嵌入尺寸)填:**
+2. **Viewport / Dimensions(嵌入尺寸)填:**
 
 ```
 Width: 1280
@@ -237,13 +234,13 @@ Thanks for playing, and for the kind words! I'll pass this along — my kid (who
 建设性批评类(哪怕语气冲,只回内容):
 
 ```
-Thanks for the honest feedback — this is exactly what we posted here for. You're right about [具体问题,如 "the early-game guidance"]; it's going on the fix list. The game is open source (links in the author comments) if you want to follow along.
+Thanks for the honest feedback — this is exactly what we posted here for. You're right about [具体问题,如 "the early-game guidance"]; it's going on the fix list. The game is open source (link in the author comments) if you want to follow along.
 ```
 
 Bug 报告类:
 
 ```
-Thanks for the report! Could you share your browser/device and roughly where it happened (which theater / vehicle)? You can also file it at https://github.com/longmaolab/irontide/issues — either way, we'll dig into it.
+Thanks for the report! Could you share your browser/device and roughly where it happened (which theater / vehicle)? You can also file it at https://github.com/VideoGameTips/irontide/issues — either way, we'll dig into it.
 ```
 
 多人模式抱怨类:

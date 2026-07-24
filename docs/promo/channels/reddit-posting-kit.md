@@ -12,11 +12,11 @@
 
 > 适用游戏:**Iron Tide — Battleship Command**
 > 试玩地址:https://game.boobank.com/irontide/ (免费、无需注册、无广告、无需安装)
-> 开源:孩子的原仓库 https://github.com/VideoGameTips/irontide / 家长维护的优化 fork https://github.com/longmaolab/irontide
+> 开源:https://github.com/VideoGameTips/irontide
 > 今天是 **2026-07-24(周五)**。本文所有日期均以此为起点。
 >
 > **三条铁律(每次发帖前默念):**
-> 1. **隐私**:永远不提孩子的真名、年龄、城市、学校、长相。可以用名字或 GitHub ID "VideoGameTips"。所有账号、所有帖子都由家长出面。
+> 1. **隐私**:名字或 GitHub ID "VideoGameTips" 可以公开(署名自己的作品是应得的);**永远不提年龄、城市、学校、照片/语音、私人邮箱**——名字、年龄、城市这三样里任意两样同时出现就是危险组合。所有账号、所有帖子都由家长出面。
 > 2. **诚实**:不编数字、不喊 "best/revolutionary"、不搞小号刷赞。联机模式只能标 "experimental" 或干脆不提。
 > 3. **发帖前花 2 分钟重新看一遍该版块的现行规则**(本文的版规信息基于 2025 年存档快照核实,Reddit 规则随时会变)。
 
@@ -101,7 +101,7 @@
 ```text
 Play (free, no account, no download, loads in seconds): https://game.boobank.com/irontide/
 
-My kid (GitHub: VideoGameTips) designed and built this naval action game almost entirely solo — the gameplay, the campaign, the systems. I'm the parent; I maintain a polished fork (bug fixes, translations, onboarding, performance). It's fully open source.
+My kid (GitHub: VideoGameTips) designed and built this naval action game almost entirely solo — the gameplay, the campaign, the systems. I'm the parent; I do the maintenance (bug fixes, translations, onboarding, performance). It's all one open-source repo.
 
 What's in it:
 - A 31-theater world campaign with a rival boss, "Grand Marshal Varga", who taunts you over story radio dialogue
@@ -118,7 +118,7 @@ What we'd love feedback on:
 3. Performance — what device/browser, and did it stay smooth? (There's a quality setting if not.)
 4. Controls — keyboard/mouse, gamepad, or touch: anything that felt wrong?
 
-Source code: original by my kid at https://github.com/VideoGameTips/irontide, my maintained fork at https://github.com/longmaolab/irontide
+Source code (one repo — my kid's, and where I push my maintenance work too): https://github.com/VideoGameTips/irontide
 
 Brutal honesty welcome. I'll pass every comment on (kindly worded or not — I'll translate the tone).
 ```
@@ -126,7 +126,7 @@ Brutal honesty welcome. I'll pass every comment on (kindly worded or not — I'l
 **发帖后立刻发的第一条评论(复制即用):**
 
 ```text
-A few tips if you jump in: Tab opens the armory — buy a deck gun there, then F bolts it onto your deck and E lets you man it, and L is photo mode if you catch a nice storm. If anything breaks, tell me your device + browser and I'll get it fixed — issues also welcome at https://github.com/longmaolab/irontide/issues
+A few tips if you jump in: Tab opens the armory — buy a deck gun there, then F bolts it onto your deck and E lets you man it, and L is photo mode if you catch a nice storm. If anything breaks, tell me your device + browser and I'll get it fixed — issues also welcome at https://github.com/VideoGameTips/irontide/issues
 ```
 
 **当天义务(版规要求):** 发完帖后 1 小时内,去玩 2~3 个别人的游戏并留下认真反馈(和养号周同样的三段式结构)。这不仅是规则,也是这个版的文化——礼尚往来的人帖子活得久。
@@ -155,7 +155,7 @@ Iron Tide — a browser naval action game my kid built with three.js: 31 theater
 **发帖后立刻发的第一条评论(link post 没有正文,这条评论就是你的"正文",复制即用):**
 
 ```text
-Dev's parent here. My kid (GitHub: VideoGameTips) designed and built this almost entirely solo; I maintain a polished fork (bug fixes, i18n, performance) and it's fully open source: https://github.com/VideoGameTips/irontide (original) / https://github.com/longmaolab/irontide (fork).
+Dev's parent here. My kid (GitHub: VideoGameTips) designed and built this almost entirely solo; I handle the maintenance (bug fixes, i18n, performance). It's all one open-source repo: https://github.com/VideoGameTips/irontide
 
 Quick orientation:
 - Campaign: 31 theaters across a world map, with a rival boss (Grand Marshal Varga) who talks to you over story radio
@@ -210,7 +210,7 @@ Iron Tide: a free browser naval action game my kid built with three.js — 31-th
 ```text
 Play it here (free, no account, no download): https://game.boobank.com/irontide/
 
-Context: my kid (GitHub: VideoGameTips) designed and built the vast majority of this solo — gameplay, the 31-theater campaign, all the systems. I'm the parent and I maintain a polished fork (bug fixes, translations, performance). Fully open source: https://github.com/VideoGameTips/irontide (original) / https://github.com/longmaolab/irontide (fork).
+Context: my kid (GitHub: VideoGameTips) designed and built the vast majority of this solo — gameplay, the 31-theater campaign, all the systems. I'm the parent and I handle the maintenance (bug fixes, translations, performance). Fully open source, one repo: https://github.com/VideoGameTips/irontide
 
 It's built with three.js, runs on desktop and mobile (touch controls + gamepad support), has English/中文, procedural music that changes per theater, and a photo mode (L key). Happy to answer anything about how it was made.
 ```
@@ -251,9 +251,7 @@ Some things that were fun to get working in that constraint:
 - i18n: full English/中文 switching
 - Content-wise it's a 31-theater campaign where you command a battleship but can also fly planes, drive amphibious tanks, and fight on foot
 
-Authorship, for transparency: my kid (GitHub: VideoGameTips) designed and built the vast majority of it solo. I'm the parent; I maintain a polished fork — bug fixes, i18n completion, onboarding, performance — with AI-assisted code review. Both repos are open source:
-- Original: https://github.com/VideoGameTips/irontide
-- Fork: https://github.com/longmaolab/irontide
+Authorship, for transparency: my kid (GitHub: VideoGameTips) designed and built the vast majority of it solo. I'm the parent; I do the maintenance — bug fixes, i18n completion, onboarding, performance — with AI-assisted code review. It's all one open-source repo: https://github.com/VideoGameTips/irontide
 
 Happy to answer questions about the single-file approach, the PWA setup, or what breaks first when an 800KB HTML file meets a mobile browser.
 ```
@@ -273,13 +271,13 @@ Thank you! I'll pass this straight to my kid — comments like this are exactly 
 **② "这是 AI 做的吧?" / 质疑作者身份:**
 
 ```text
-Fair question, so here's the honest breakdown: my kid (GitHub: VideoGameTips) designed and built the vast majority of the game solo — the gameplay, the 31-theater campaign, the systems. I'm the parent, and I maintain a polished fork where I've done bug fixes, translation completion, onboarding, and performance work, and yes, I use AI-assisted code review for that maintenance work. Both repos are public if you want to check the history: https://github.com/VideoGameTips/irontide and https://github.com/longmaolab/irontide
+Fair question, so here's the honest breakdown: my kid (GitHub: VideoGameTips) designed and built the vast majority of the game solo — the gameplay, the 31-theater campaign, the systems. I'm the parent, and I do the maintenance — bug fixes, translation completion, onboarding, and performance work — and yes, I use AI-assisted code review for that maintenance work. It's one public repo, so you can check the commit history yourself: https://github.com/VideoGameTips/irontide
 ```
 
 **③ Bug 反馈:**
 
 ```text
-Thanks for reporting this — genuinely helpful. Could you tell me: (1) device and browser, (2) what you were doing when it happened, (3) whether it happens every time? If you're up for it, filing it at https://github.com/longmaolab/irontide/issues makes it easiest to track, but a reply here works too and I'll file it myself.
+Thanks for reporting this — genuinely helpful. Could you tell me: (1) device and browser, (2) what you were doing when it happened, (3) whether it happens every time? If you're up for it, filing it at https://github.com/VideoGameTips/irontide/issues makes it easiest to track, but a reply here works too and I'll file it myself.
 ```
 
 **④ "我家孩子也想学编程":**
@@ -297,7 +295,7 @@ Appreciate you taking the time to say it straight — that's more useful to us t
 **⑥ 功能请求:**
 
 ```text
-Good idea — I've logged it at https://github.com/longmaolab/irontide/issues so it doesn't get lost. Being honest about expectations: this is a family project maintained in spare time, so I can't promise timelines, and big items (for example, multiplayer is still very experimental) move slowly. But requests like this genuinely shape what we work on next.
+Good idea — I've logged it at https://github.com/VideoGameTips/irontide/issues so it doesn't get lost. Being honest about expectations: this is a family project maintained in spare time, so I can't promise timelines, and big items (for example, multiplayer is still very experimental) move slowly. But requests like this genuinely shape what we work on next.
 ```
 
 ---
@@ -323,7 +321,7 @@ Good idea — I've logged it at https://github.com/longmaolab/irontide/issues so
 
 r/WebGames 版主有个著名的怪传统:**如果你被 ban 了,申诉时版主会要求你亲手画一只恐龙发过去,才给解封**。这不是段子,是他们多年来测试申诉者诚意(和幽默感)的方式。万一真被 ban:
 - 别争辩、别甩规则条文,先老老实实道歉并说明情况;
-- 版主提出画恐龙就认真画一只(手绘拍照即可;让孩子画一只反而更有诚意——但记住不透露孩子任何个人信息);
+- 版主提出画恐龙就认真画一只(手绘拍照即可;让孩子画一只反而更有诚意——照片里只拍画,别出现孩子本人,也别提年龄、城市、学校);
 - 态度好 + 恐龙到位,解封概率很高。
 
 ### 9.2 Shadowban(影子封禁)风险

@@ -63,7 +63,7 @@ longmaolab
 5. Settings → Profile,Display name 填 `longmaolab`,Bio 粘贴:
 
 ```
-Parent-run account. I publish and maintain games built by my kid (GitHub: VideoGameTips). Everything here is free and open source: https://github.com/longmaolab
+Parent-run account. I publish and maintain games built by my kid (GitHub: VideoGameTips). Everything here is free and open source: https://github.com/VideoGameTips/irontide
 ```
 
 6. 建议顺手在 Settings → Two-factor authentication 开二步验证。
@@ -147,7 +147,7 @@ naval, war, 3d, battleships, tanks, flight, shooter, singleplayer, arcade, open-
 - 选 **Yes**
 - 子选项只勾 **Code**(不勾 Graphics / Sound / Text & Dialog——游戏的画面、音乐、文本都不是 AI 生成的;音乐是程序化生成,不算 AI)
 
-如实披露的依据:fork 的维护工作用了 AI 辅助代码审查。第 3 节描述末尾也有一句对应的透明声明,两处口径一致。
+如实披露的依据:家长做的维护工作用了 AI 辅助代码审查。第 3 节描述末尾也有一句对应的透明声明,两处口径一致。
 
 **App store links:** 全部留空。
 
@@ -204,11 +204,9 @@ The copy at game.boobank.com also installs to your home screen and plays offline
 
 WHO MADE THIS
 
-This game was designed and built almost entirely by my kid, solo, under the GitHub handle VideoGameTips: the gameplay, the 31-theater campaign, the ship / plane / tank / infantry systems — all of it. I'm the parent. I maintain a polished fork of the game (bug fixes, completing the English/中文 translation, onboarding, achievements, performance), with AI-assisted code review along the way, and I run this account because the developer is a minor.
+This game was designed and built almost entirely by my kid, solo, under the GitHub handle VideoGameTips: the gameplay, the 31-theater campaign, the ship / plane / tank / infantry systems — all of it. I'm the parent. I contribute the unglamorous maintenance work (bug fixes, completing the English/中文 translation, onboarding, achievements, performance), with AI-assisted code review along the way, and I run this account because the developer is a minor.
 
-Both versions are open source:
-- Original, by the kid: https://github.com/VideoGameTips/irontide
-- Polished fork (the build you're playing): https://github.com/longmaolab/irontide
+It's open source: https://github.com/VideoGameTips/irontide
 
 The game also lives at https://game.boobank.com/irontide/ — same build, free either way.
 
@@ -236,7 +234,7 @@ Iron Tide is out today, free in your browser — no account, no install.
 
 It's a naval-action game with an unusual promise: the battleship you command is a place, not a menu. You buy cannons in port and bolt them onto your own deck. You can man those guns yourself, take off in a plane, drive an amphibious tank onto the beach, or hop ashore on foot — all inside one battle. The campaign spans 31 theaters and ends with a rival, Grand Marshal Varga, who taunts you over the radio as you close in.
 
-Full disclosure on who made it: my kid designed and built almost all of this solo (GitHub: VideoGameTips). I'm the parent — I maintain the polished fork this build comes from, and I run this account. Both repos are open source, links on the game page.
+Full disclosure on who made it: my kid designed and built almost all of this solo (GitHub: VideoGameTips). I'm the parent — I do the maintenance work and run this account. It's open source, link on the game page.
 
 What I'd love from you: play ten minutes, then tell me the first moment that confused you. Onboarding feedback is the most valuable thing a small game can get.
 
@@ -278,7 +276,7 @@ Ship, plane, tank, boots — one battle, four ways to fight. Free in your browse
 | 45–54 | 剧情感收尾 | 露一段 Varga 的电台对话字幕;N 打开战略地图扫一眼 31 个战区;闪一下勋章界面 |
 | 54–60 | 结尾卡 | 静帧(拍照模式取一张英雄镜头),叠字:**Iron Tide — free in your browser** + `https://longmaolab.itch.io/irontide` |
 
-**注意**:全程不要露出系统通知、书签栏、真名账号。剪辑用 CapCut/剪映即可,导出 MP4 1080p。传 YouTube(你现有 Google 账号,可见性选"公开"或"不公开列出"都行,itch 都能嵌),把链接填进项目页的 **Gameplay video or trailer** 字段。
+**注意**:全程不要露出系统通知、书签栏、私人邮箱和其他私人账号信息(名字本身可以出现;要藏的是年龄、城市、学校、照片和邮箱)。剪辑用 CapCut/剪映即可,导出 MP4 1080p。传 YouTube(你现有 Google 账号,可见性选"公开"或"不公开列出"都行,itch 都能嵌),把链接填进项目页的 **Gameplay video or trailer** 字段。
 
 ---
 
@@ -290,13 +288,13 @@ Ship, plane, tank, boots — one battle, four ways to fight. Free in your browse
 - [ ] 手机浏览器开一次,确认触屏可玩、横屏提示正常
 - [ ] 发第 4 节的 devlog
 - [ ] 在自己的 itch 主页建一个公开 Collection(如 "Our games"),把 Iron Tide 加进去
-- [ ] GitHub 两个仓库回链。fork 仓库 `longmaolab/irontide` 的 README「玩」小节里加一行:
+- [ ] GitHub 仓库回链。仓库 `VideoGameTips/irontide` 的 README「玩」小节里加一行:
 
 ```
 **itch.io:https://longmaolab.itch.io/irontide**
 ```
 
-- [ ] fork 仓库的 GitHub About(右上角齿轮)Website 字段保持 `https://game.boobank.com/irontide/` 不变,description 末尾可补 `| itch.io: longmaolab.itch.io/irontide`
+- [ ] 仓库的 GitHub About(右上角齿轮)Website 字段保持 `https://game.boobank.com/irontide/` 不变,description 末尾可补 `| itch.io: longmaolab.itch.io/irontide`
 - [ ] boobank 门户回链:在 `portal/index.html` 的 Iron Tide 卡片上加一个指向 itch 页面的链接(锚文本用 `Also on itch.io`),按 portal 现有卡片样式手改即可
 
 下周起(7/27 周一开始,每周花 20 分钟):
