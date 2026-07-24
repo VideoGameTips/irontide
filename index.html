@@ -184,6 +184,7 @@
   #shopBal{font-size:19px;color:#ffe08a;letter-spacing:1px;text-shadow:0 0 8px rgba(255,200,80,.35);}
   #shopDPS{font-size:12px;color:#9fc6e8;white-space:nowrap;}
   #shopPause{font-size:11px;color:#8fc9e9;background:#10222f;border:1px solid #2a4660;border-radius:20px;padding:3px 10px;white-space:nowrap;}
+  #shopPause.running{color:#ffc07a;background:#2a1a0f;border-color:#5c3a1c;}   /* warm = you are still exposed out there */
   #shopToast{display:none;margin:0 0 10px;padding:8px 11px;border-radius:8px;font-size:12px;line-height:1.45;
     border:1px solid #2a4660;background:#0e1a26;color:#cfe6fb;animation:toastIn .18s ease-out;}
   #shopToast.ok{border-color:#3fae78;background:#10281c;color:#a6f2c3;}
@@ -3367,11 +3368,13 @@ const wrecks=[];
 const MAX_WRECKS=7;
 let cameraShake=0,cameraShakePhase=0,hitFlashT=0;
 let settingsOpen=false;
-const gameSettings={combatFeedback:true,damageNumbers:false,cameraShake:true};
+// pauseInArmory defaults OFF: the war keeps running while you shop. Captains who want the
+// old breathing room can turn it back on in the K panel.
+const gameSettings={combatFeedback:true,damageNumbers:false,cameraShake:true,pauseInArmory:false};
 const damageNumbers=[];
 function loadGameSettings(){try{const s=JSON.parse(localStorage.getItem('ironTideSettings'));if(s&&typeof s==='object')Object.assign(gameSettings,s);}catch(e){}}
 function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
-function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
+function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
 function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;const sp=document.getElementById('settings');sp.style.display=settingsOpen?'block':'none';if(settingsOpen){
   sp.querySelector('h2').textContent=trText('⚙ SETTINGS'); sp.querySelector('p').innerHTML=isZh()?'战斗画面提示都可以自由开关。按 <b>K</b> 关闭。':'Visual combat feedback is optional. Press <b>K</b> to close.';mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
 function clearDamageNumbers(){while(damageNumbers.length){const d=damageNumbers.pop();d.el.remove();}}
@@ -3516,7 +3519,7 @@ function spawnMine(team,pos){
   return true;
 }
 function deployPlayerMine(){
-  if(phase!=='play'||gamePaused()||piloting||onFoot||drivingTank)return;
+  if(phase!=='play'||panelOpen()||piloting||onFoot||drivingTank)return;
   if(mineDeployCooldown>0){flashPrompt('Mine rack reloading — '+Math.ceil(mineDeployCooldown)+'s');return;}
   if(mines.filter(m=>m.team===0).length>=MAX_MINES_PER_TEAM){flashPrompt('Mine limit reached (5)');return;}
   const cost=220;if(money<cost){flashPrompt('A naval mine costs $'+cost);return;}
@@ -4765,7 +4768,7 @@ let _inputWired=false;
 function wireGameInput(){   // shared by startGame and resumeWar; must only attach once per page load
   if(_inputWired) return; _inputWired=true;
   const cv=document.getElementById('c');
-  cv.addEventListener('click',()=>{ sfxResume(); if(Date.now()-lastTouchInput<700||touchCapable())return; if(phase==='play' && !gamePaused()) try{const _pl=cv.requestPointerLock(); if(_pl&&_pl.catch)_pl.catch(()=>{});}catch(e){} });
+  cv.addEventListener('click',()=>{ sfxResume(); if(Date.now()-lastTouchInput<700||touchCapable())return; if(phase==='play' && !panelOpen()) try{const _pl=cv.requestPointerLock(); if(_pl&&_pl.catch)_pl.catch(()=>{});}catch(e){} });   // the armory leaves most of the canvas exposed — a click meant for the shop must never trap the cursor
   document.addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv){
     camYaw.v -= e.movementX*0.0023; camPitch.v -= e.movementY*0.0023;
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v)); }});
@@ -5529,7 +5532,7 @@ function enemyDetected(e){
   return enemyDetectedAt(e.pos,e.def&&e.def.kind==='sub'?0.42:1);
 }
 function sonarPing(){
-  if(phase!=='play'||gamePaused()) return;
+  if(phase!=='play'||panelOpen()) return;
   if(sonarCooldown>0){if(phase==='play')flashPrompt('SONAR recharging — '+Math.ceil(sonarCooldown)+'s');return;}
   sonarCooldown=8;sonarPulse=4;const p=activePlayerWorldPos().clone();
   const ring=new THREE.Mesh(new THREE.RingGeometry(8,10,48),new THREE.MeshBasicMaterial({color:0x62d7ff,transparent:true,opacity:0.8,side:THREE.DoubleSide,depthWrite:false}));
@@ -5964,7 +5967,8 @@ function toggleShop(){
   if(harborOpen) toggleHarbor(); if(buildOpen) toggleBuild();
   shopOpen=!shopOpen;
   document.getElementById('shop').style.display=shopOpen?'block':'none';
-  if(shopOpen){ if(document.pointerLockElement) document.exitPointerLock(); shopBalance();
+  if(shopOpen){ mouseDownFire=false;                       // the war may still be running — don't leave the guns held down
+    if(document.pointerLockElement) document.exitPointerLock(); shopBalance();
     const t=document.getElementById('shopToast'); if(t) t.style.display='none'; }
   updateMode();
 }
@@ -6100,7 +6104,7 @@ function nearestTurret(){
   return best;
 }
 function deleteTurret(){   // X next to a deck gun scraps it for a half refund
-  if(phase!=='play'||gamePaused()||onFoot||driving||piloting||drivingTank) return;
+  if(phase!=='play'||panelOpen()||onFoot||driving||piloting||drivingTank) return;
   const pl=nearestTurret(); if(!pl){ flashPrompt('Stand next to a deck gun, then X to scrap it'); return; }
   if(manning===pl) manning=null;
   destroyObject3D(pl.group);
@@ -6154,7 +6158,7 @@ function tryPlace(){
   // reported in the panel first; the panel only closes once the install is going ahead.
   const fromShop=shopOpen;
   if(fromShop&&!selectedWeapon){ shopMsg(T('Click a weapon first, then '+installHint()+' to install it','先点选一门武器，再'+installHint()+'安装它'),'bad'); return; }
-  if(!fromShop&&gamePaused()) return;   // the harbor / build / map / chat panels still hold the war
+  if(!fromShop&&panelOpen()) return;   // F outside the armory: any open panel owns the keystroke
   if(!selectedWeapon){ flashPrompt('Pick a weapon in the Armory (Tab)'); return; }
   const w=WEAPONS[selectedWeapon]; const cost=priceOf(w.cost);
   if(marketBlocked('weapon',selectedWeapon,w))return;
@@ -6245,7 +6249,7 @@ function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot 
   const pa=nearestPlane(); if(pa&&pa.def.uav){flashPrompt('UAVs need your remote pilot — press E to launch.');return;} if(pa) dispatchPlane(pa);
 }
 function toggleMan(){
-  if(phase!=='play'||gamePaused()) return;   // no state changes while a panel has the war frozen
+  if(phase!=='play'||panelOpen()) return;   // no state changes while a panel has the screen
   if(drivingTank){ dismountTank(); return; }
   if(onFoot){ const prize=boardableEnemyShip();if(prize){startBoarding(prize);return;} const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
     flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
@@ -7233,7 +7237,7 @@ function bailoutOrBoard(){
   else flashPrompt('P = parachute from aircraft, or request a replacement ship at harbor after yours is sunk.');
 }
 function toggleFoot(){
-  if(phase!=='play'||gamePaused()||manning||piloting) return;
+  if(phase!=='play'||panelOpen()||manning||piloting) return;
   if(landCampaignMode){ flashPrompt('No ship on this theater — this is an airborne ground assault. Capture the command posts.'); return; }
   if(playerShipLost){ flashPrompt('Your ship is gone — return to friendly harbor and press P for a replacement.'); return; }
   if(onFoot){ // re-board if standing near the ship
@@ -7349,7 +7353,7 @@ function updateWalk(dt){
 }
 // ---------- SUBMARINE: dive to run silent (stealthed but torpedoes only) ----------
 function toggleDive(){
-  if(phase!=='play'||gamePaused()) return;
+  if(phase!=='play'||panelOpen()) return;
   if(player.def.kind!=='sub'){ flashPrompt('Only submarines can dive (pick the Attack Submarine)'); return; }
   player.submerged=!player.submerged;
   flashPrompt(player.submerged?'🌊 DIVE! DIVE! — running silent · torpedoes only':'⬆ Surfacing — all weapons back online');
@@ -8207,6 +8211,9 @@ function shopMsg(msg,kind){
 }
 function shopBalance(){
   const el=document.getElementById('shopBal'); if(el) el.textContent='$'+money;
+  const pb=document.getElementById('shopPause');   // the badge states which it is — the war is only frozen if asked
+  if(pb){ pb.textContent=gameSettings.pauseInArmory?T('⏸ war paused','⏸ 战斗已暂停'):T('🔥 war running','🔥 战斗进行中');
+    pb.classList.toggle('running',!gameSettings.pauseInArmory); }
   const fp=document.getElementById('shopDPS');
   if(fp){ const cur=Math.round(fleetDPS()), w=selectedWeapon?WEAPONS[selectedWeapon]:null;
     if(w){ const next=Math.round(fleetDPS()+w.dmg/w.cd);
@@ -8446,6 +8453,9 @@ document.getElementById('minimap').addEventListener('click',()=>toggleTacticalMa
 function updateMode(){
   const el=document.getElementById('mode');
   el.innerHTML = drivingTank ? T('<b>TANK</b><br>W/S drive · A/D turn<br>Mouse aim · Click fire · E dismount','<b>坦克</b><br>W/S 前进后退 · A/D 转向<br>鼠标瞄准 · 点击开火 · E 下车')
+    : shopOpen ? (gameSettings.pauseInArmory                     // hoisted next to buildOpen: an open panel announces
+        ? T('<b>⏸ ARMORY OPEN — war paused</b><br>Click weapon/plane · Tab to close','<b>⏸ 军械库——战斗已暂停</b><br>点击武器/飞机购买 · Tab 关闭')
+        : T('<b>🔥 ARMORY OPEN — the fight goes on!</b><br>Click weapon/plane · Tab to close','<b>🔥 军械库——外面还在打！</b><br>点击武器/飞机购买 · Tab 关闭'))
     : buildOpen ? T('<b>⏸ ISLAND ENGINEERS — war paused</b><br>Click a defense to build<br>B to close','<b>⏸ 岛屿工程——战斗已暂停</b><br>点击建造防御设施<br>B 关闭')
     : onFoot ? (playerShipLost?T('<b>SURVIVOR</b><br>Get to friendly harbor<br>P replacement ship','<b>幸存者</b><br>回到我方海港<br>按 P 领取新船')
         : landCampaignMode?T('<b>AIRBORNE ASSAULT</b><br>WASD walk/swim · Click = rifle · B build<br>E board tank · Capture command posts','<b>空降突击</b><br>WASD 行走/游泳 · 点击开枪 · B 建造<br>E 上坦克 · 占领指挥所')
@@ -8455,7 +8465,6 @@ function updateMode(){
         : piloting.phase==='landing' ? T('<b>LANDING</b><br>Descend over the ship<br>E to abort','<b>降落</b><br>对准舰船上方下降<br>E 取消')
         : T('<b>IN FLIGHT</b><br>Mouse + A/D steer · W/S throttle<br>Click guns · Space bombs · P parachute · E land','<b>飞行中</b><br>鼠标 + A/D 操纵 · W/S 油门<br>点击开炮 · 空格投弹 · P 跳伞 · E 降落'))
     : manning ? T('<b>GUNNERY</b><br>Mouse aim · Click fire · E exit','<b>炮手位</b><br>鼠标瞄准 · 点击开火 · E 离开')
-    : shopOpen ? T('<b>⏸ ARMORY OPEN — war paused</b><br>Click weapon/plane · Tab to close','<b>⏸ 军械库——战斗已暂停</b><br>点击武器/飞机购买 · Tab 关闭')
     : harborOpen ? T('<b>⏸ HARBOR COMMAND — war paused</b><br>Click an upgrade to buy · H to close','<b>⏸ 海港指挥部——战斗已暂停</b><br>点击购买升级 · H 关闭')
     : T('<b>ON DECK</b><br>WASD walk · Mouse look<br>F install · E man/fly · G ashore<br>R sonar · V mine · Z damage control<br>N map · Tab shop · H harbor · Enter chat','<b>甲板上</b><br>WASD 走动 · 鼠标看四周<br>F 装炮 · E 上炮位/开飞机 · G 登岸<br>R 声呐 · V 水雷 · Z 损管<br>N 地图 · Tab 商店 · H 海港 · Enter 聊天');
   refreshTouchControls();
@@ -8734,7 +8743,7 @@ function touchAction2(){
 function touchLabels(){
   const L=(id,txt,show)=>{ const el=document.getElementById(id); if(!el) return;
     el.classList.toggle('hide',!show); if(show&&el.textContent!==txt) el.textContent=txt; };
-  const paused=gamePaused();
+  const paused=panelOpen();   // a panel covers the thumb controls whether or not it froze the war
   L('tClose', T('✕ Close','✕ 关闭'), paused);
   ['tStick','tFire','tAct','tAct2','tShop','tMap'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.style.display=paused?'none':''; });
@@ -8778,11 +8787,11 @@ function touchInit(){
   // movementX) and an edge dead-zone: touches starting within 18px of the physical edge are
   // ignored so iOS/Android system gestures (home swipe, back swipe) can't hijack the camera.
   const TOUCH_LOOK=0.0042, EDGE=18;
-  cv.addEventListener('pointerdown',e=>{ if(_lookId!=null||gamePaused()) return;
+  cv.addEventListener('pointerdown',e=>{ if(_lookId!=null||panelOpen()) return;
     if(e.clientX<EDGE||e.clientY<EDGE||e.clientX>innerWidth-EDGE||e.clientY>innerHeight-EDGE) return;
     sfxResume();   // any first gesture — stick, button OR drag — must unlock iOS audio
     _lookId=e.pointerId; _lookX=e.clientX; _lookY=e.clientY; capture(cv,e.pointerId); });
-  cv.addEventListener('pointermove',e=>{ if(e.pointerId!==_lookId||gamePaused()) return;   // a second finger opening a panel must stop the drag
+  cv.addEventListener('pointermove',e=>{ if(e.pointerId!==_lookId||panelOpen()) return;   // a second finger opening a panel must stop the drag
     camYaw.v -= (e.clientX-_lookX)*TOUCH_LOOK; camPitch.v -= (e.clientY-_lookY)*TOUCH_LOOK;
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v));
     _lookX=e.clientX; _lookY=e.clientY; });
@@ -8886,7 +8895,16 @@ function updateTutorial(dt){
   tutShow();
 }
 
-function gamePaused(){ return shopOpen||harborOpen||buildOpen||tacticalOpen||chatOpen||settingsOpen; }   // any open panel freezes the war
+// Two different questions, deliberately separate:
+//   panelOpen()  — a panel OWNS THE SCREEN. Input belongs to it, never to the world, whether
+//                  or not the war is frozen. Guards every discrete action a stray keypress or
+//                  click could trigger (scrapping a gun, going ashore, grabbing pointer lock).
+//   gamePaused() — the SIMULATION is frozen. Only loop(), audio and quality adaption care.
+// They used to be one thing. The armory split them: the fight carries on behind it by
+// default, opt back in via the K panel → "Pause the war in the armory".
+function freezingPanelOpen(){ return harborOpen||buildOpen||tacticalOpen||chatOpen||settingsOpen; }
+function panelOpen(){ return shopOpen||freezingPanelOpen(); }
+function gamePaused(){ return freezingPanelOpen()||(shopOpen&&gameSettings.pauseInArmory); }
 // ---------- gamepad (#42) — a parallel input source writing into the same state keyboard/touch use ----------
 // Left stick → WASD flags · right stick → look · RT/A hold → fire · X=E · B=G · Y=T · Start=Tab.
 // Chrome only updates axes/buttons on getGamepads() reads, so we poll every frame; with no
@@ -8903,14 +8921,14 @@ function pollGamepad(dt){
   const want={ KeyW:ax(1)<-GP_DEAD?1:0, KeyS:ax(1)>GP_DEAD?1:0, KeyA:ax(0)<-GP_DEAD?1:0, KeyD:ax(0)>GP_DEAD?1:0 };
   for(const k in want){ if(want[k]!==(_gpPrev[k]||0)){ keys[k]=want[k]; _gpPrev[k]=want[k]; } }
   // right stick → look
-  if(phase==='play'&&!gamePaused()){
+  if(phase==='play'&&!panelOpen()){
     camYaw.v   -= ax(2)*2.4*dt;
     camPitch.v -= ax(3)*1.7*dt;
     camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v));
   }
   // held fire: right trigger or A/Cross
   const fireHeld=!!((gp.buttons[7]&&gp.buttons[7].pressed)||(gp.buttons[0]&&gp.buttons[0].pressed));
-  if(fireHeld!==_gpFire){ mouseDownFire=fireHeld&&phase==='play'&&!gamePaused(); _gpFire=fireHeld; }
+  if(fireHeld!==_gpFire){ mouseDownFire=fireHeld&&phase==='play'&&!panelOpen(); _gpFire=fireHeld; }
   // edge-triggered taps ride the real keyboard handler via synthetic events
   const tapMap={2:'KeyE',1:'KeyG',3:'KeyT',9:'Tab',8:'KeyM'};
   for(const b in tapMap){ const pressed=!!(gp.buttons[b]&&gp.buttons[b].pressed);
@@ -9319,6 +9337,7 @@ const ZH_EXACT_KID = {
   'Hit marker & kill feed': '命中标记和击杀播报',
   'Floating damage numbers': '飘出的伤害数字',
   'Camera shake': '镜头震动',
+  'Pause the war in the armory': '进军械库时暂停战斗',
 
   // ---- 联机(MP)状态 ----
   'Connection failed.': '连接失败。',
@@ -9549,6 +9568,7 @@ const KPANEL_ZH = {
   'Hit marker & kill feed':'命中标记和击杀播报',
   'Floating damage numbers':'飘出的伤害数字',
   'Camera shake':'镜头震动',
+  'Pause the war in the armory':'进军械库时暂停战斗',
   'ON':'开',
   'OFF':'关'
 };
@@ -10481,7 +10501,7 @@ function applyStaticI18n(){
   set('#tacticalHint',T('Select a friendly R-36M silo, then select a target area. Press N to close.','先选中我方 R-36M 发射井，再选择目标区域。按 N 关闭。'));
   set('#shop h2',T('ARMORY','军械库'));
   set('#shop .hint',T('Click a weapon, then '+installHint()+' to install it.','点一件武器，再'+installHint()+'安装。'));
-  set('#shopPause',T('⏸ war paused','⏸ 战斗已暂停'));
+  shopBalance();   // the pause badge is state-dependent — let its owner re-render it in the new language
   set('#harbor h2',T('⚓ HARBOR COMMAND','⚓ 海港指挥部'));
   set('#harbor .hint',T('Spend funds to fortify and supply your harbor. Press <b>H</b> to close.','花钱加固和补给你的海港。按 <b>H</b> 关闭。'));
   set('#build h2',T('🏝️ ISLAND ENGINEERS','🏝️ 岛屿工程队'));
@@ -10511,9 +10531,14 @@ initMobileControls();
 function start3D(){ try{ initThree(); initWaterBase(); loop(); consumeRetryIntent(); }catch(e){ console.error(e);
   const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent=trText('Could not start the 3D engine — try GitHub Pages or open the file directly.'); } }
 // PWA (#32): offline cache + install. file:// and unsupported browsers skip silently.
-if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+// Skipped on localhost: the cache is version-keyed, so during development it happily serves
+// yesterday's index.html and your edits appear to do nothing. Add ?sw=1 to test the PWA locally.
+(()=>{ if(!('serviceWorker' in navigator) || !location.protocol.startsWith('http')) return;
+  const local=/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  const forced=new URLSearchParams(location.search).get('sw')==='1';
+  if(local && !forced){ navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); return; }
   try{ navigator.serviceWorker.register('sw.js'); }catch(e){}
-}
+})();
 if(window.THREE){ start3D(); }
 else { let n=0, cdnTried=false; (function wait(){ if(window.THREE){ start3D(); }
   else if(n++<200){
