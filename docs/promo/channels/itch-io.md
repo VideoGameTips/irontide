@@ -1,7 +1,17 @@
 # Iron Tide — itch.io 发布全套材料(Launch Kit)
 
+
+> **文件路径基准**：下面所有 `promo/...` 路径都相对于 **`/Users/longmao/projects/irontide/`**
+> （不是仓库目录）。开始之前先执行一次，后面的路径就都能直接用：
+>
+> ```bash
+> cd /Users/longmao/projects/irontide
+> ```
+>
+> 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
+
 > 生成日期:2026-07-24(周五)。所有英文文案可直接整块复制粘贴;中文部分是给你看的操作说明。
-> **隐私红线(贯穿全文)**:任何地方都不出现孩子的真名、年龄、城市、学校、照片。只说 "my kid" 或 GitHub ID "VideoGameTips"。所有账号由家长注册和发言。
+> **隐私口径**（家里 2026-07-24 定的）：**名字可以公开**，孩子署名自己的作品是应得的。**不公开**：年龄、城市、学校、真人照片/录音，以及私人邮箱。所有平台账号由家长注册和发言（Reddit/HN/PH/Discord 本身也要求 13+ 或成年）。名字 + 年龄 + 城市这个组合才是真正危险的，任何两项别同时出现。
 
 ---
 
@@ -23,14 +33,14 @@
 确认以下文件已就位:
 
 - `promo/assets/final/01-menu.png` … `final/06-briefing.png`(截图 6 张)
-- `promo/builds/irontide-itch.zip（与门户版一样是单机版）`(网页版构建包)
+- `promo/builds/irontide-itch.zip`(网页版构建包)
 - 封面图:需要一张 **630×500**(最低 315×250)的 PNG。从 screenshot 里裁一张最有戏剧性的,或进游戏按 **L** 开拍照模式专门取景一张再裁
 - 视频:`promo/assets/final/iron-tide-hero-45s.mp4`(**已生成**,48 秒;短版和竖版同目录)
 
 **检查 zip 结构(关键)**:`index.html` 必须在 zip 的**根目录**,不能套一层文件夹。同包应含 `vendor/`、`manifest.json`、`sw.js`、`icons/`。验证命令:
 
 ```
-unzip -l promo/builds/irontide-itch.zip（与门户版一样是单机版） | head
+unzip -l promo/builds/irontide-itch.zip | head
 ```
 
 第一列文件里应直接看到 `index.html`,而不是 `irontide/index.html`。
@@ -102,7 +112,7 @@ Command a battleship — then fly the planes, drive the tanks, and storm the bea
 
 ### 2.3 Uploads(上传构建包)
 
-1. 点 **Upload files**,选 `promo/builds/irontide-itch.zip（与门户版一样是单机版）`
+1. 点 **Upload files**,选 `promo/builds/irontide-itch.zip`
 2. 上传后**必须勾选**该文件旁的 "**This file will be played in the browser**"
 
 ### 2.4 Embed options(嵌入设置——三维全屏游戏的推荐值)

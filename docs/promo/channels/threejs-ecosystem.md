@@ -1,5 +1,15 @@
 # Iron Tide × three.js 生态发布包(r/threejs + discourse.threejs.org)
 
+
+> **文件路径基准**：下面所有 `promo/...` 路径都相对于 **`/Users/longmao/projects/irontide/`**
+> （不是仓库目录）。开始之前先执行一次，后面的路径就都能直接用：
+>
+> ```bash
+> cd /Users/longmao/projects/irontide
+> ```
+>
+> 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
+
 本文档是一份**可直接复制粘贴**的发布材料。所有要贴到平台上的内容都是英文、放在代码块里(一键复制);操作说明是中文。
 
 **隐私红线(每次发帖前默念一遍):**

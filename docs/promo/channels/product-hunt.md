@@ -1,5 +1,15 @@
 # Iron Tide — Product Hunt 发布全套(复制即用)
 
+
+> **文件路径基准**：下面所有 `promo/...` 路径都相对于 **`/Users/longmao/projects/irontide/`**
+> （不是仓库目录）。开始之前先执行一次，后面的路径就都能直接用：
+>
+> ```bash
+> cd /Users/longmao/projects/irontide
+> ```
+>
+> 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
+
 > 使用说明:所有「操作步骤」用中文写给你看;所有**要粘贴到 Product Hunt 页面上的文字都是英文**,放在代码块里,点一下复制即可。
 > 今天是 **2026-07-24(周五)**。本文所有日期都已换算成星期和北京时间。
 
@@ -13,9 +23,9 @@
 | 备选日 | 2026-08-17(周一 PT)= 北京时间周一 15:01;若 Reddit/HN 档期顺延,则改 08-23(周日)/08-24(周一) |
 | 预热 | **7月26日(周日)前**建好产品页并排期到 8/23;PH 已取消 Coming Soon 页面,改用产品自带的 Product Forum 帖预热 |
 | 谁来发 | 家长本人账号,自己 hunt 自己(2025-26 年约 60% 都是自发,完全正常) |
-| 孩子的身份 | 只用 GitHub ID「VideoGameTips」称呼,**绝不出现真名、年龄、城市、学校、照片**;PH 规定 16 岁以下不能注册,**不要给孩子建账号** |
+| 孩子的身份 | 名字或 GitHub ID「VideoGameTips」都可以;**不出现年龄、城市、学校、照片**。PH 规定 16 岁以下不能注册,**不要给孩子建账号** |
 | 核心认知 | PH 现在是编辑精选制,只有约 10% 产品被 feature;没被选中≈几乎没流量。把这次当作**给孩子的一日鼓励活动 + 一条永久反链**,不是流量豪赌 |
-| 素材位置 | 截图 `promo/assets/final/01-menu.png … 06-briefing.png`;视频**已生成好**:`promo/assets/final/iron-tide-hero-45s.mp4`(48 秒全片)、`iron-tide-clip-20s.mp4`(20 秒短版,Reddit/Discord 用)、`iron-tide-short-vertical.mp4`(竖版无音轨,Shorts/TikTok 用)、`preview.gif`(7 秒动图)。想重录:`node tools/capture-hero-video.js && node tools/cut-video-variants.js`;`promo/builds/irontide-itch.zip（与门户版一样是单机版）` 是给 itch.io 用的,**PH 不需要上传构建包** |
+| 素材位置 | 截图 `promo/assets/final/01-menu.png … 06-briefing.png`;视频**已生成好**:`promo/assets/final/iron-tide-hero-45s.mp4`(48 秒全片)、`iron-tide-clip-20s.mp4`(20 秒短版,Reddit/Discord 用)、`iron-tide-short-vertical.mp4`(竖版无音轨,Shorts/TikTok 用)、`preview.gif`(7 秒动图)。想重录:`node tools/capture-hero-video.js && node tools/cut-video-variants.js`;`promo/builds/irontide-itch.zip` 是给 itch.io 用的,**PH 不需要上传构建包** |
 
 ---
 

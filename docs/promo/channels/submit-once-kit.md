@@ -1,10 +1,20 @@
 # Iron Tide 「一次提交、长期受益」渠道投放包 + YouTube Shorts 起步计划
 
+
+> **文件路径基准**：下面所有 `promo/...` 路径都相对于 **`/Users/longmao/projects/irontide/`**
+> （不是仓库目录）。开始之前先执行一次，后面的路径就都能直接用：
+>
+> ```bash
+> cd /Users/longmao/projects/irontide
+> ```
+>
+> 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
+
 生成日期:2026-07-24(周五)。所有英文文案可直接整块复制粘贴;中文部分是给你(家长)看的操作说明。
 
 ## 铁律(每次发帖前默念)
 
-1. **隐私**:永远不出现孩子的真名、年龄、城市、学校、正脸。只说 "my kid" 或 GitHub ID "VideoGameTips"。所有账号由你注册、你发帖。
+1. **隐私**:名字和 GitHub ID "VideoGameTips" 可以公开;**不出现**年龄、城市、学校、正脸、私人邮箱。所有账号由你注册、你发帖。
 2. **诚实**:不编数字、不喊 "best/revolutionary"、不组织刷好评。联机功能只字不提,或明确标注 experimental。
 3. **署名口径**(所有渠道统一):游戏绝大部分由孩子独立设计和开发;你维护打磨版 fork(修 bug、i18n、新手引导、成就、性能),用了 AI 辅助 code review。不多说一分,不少说一分。
 
@@ -373,7 +383,7 @@ No install. No account. No ads.
 
 ### 5.5 其他备好的资产
 
-- `promo/builds/irontide-itch.zip（与门户版一样是单机版）` — 本轮三个渠道都不需要上传构建包(全部只要 URL),留着给以后 itch.io 等需要传包的平台。
+- `promo/builds/irontide-itch.zip` — 本轮三个渠道都不需要上传构建包(全部只要 URL),留着给以后 itch.io 等需要传包的平台。
 
 ---
 
