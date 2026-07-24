@@ -8912,7 +8912,9 @@ function pollGamepad(dt){
   const fireHeld=!!((gp.buttons[7]&&gp.buttons[7].pressed)||(gp.buttons[0]&&gp.buttons[0].pressed));
   if(fireHeld!==_gpFire){ mouseDownFire=fireHeld&&phase==='play'&&!panelOpen(); _gpFire=fireHeld; }
   // edge-triggered taps ride the real keyboard handler via synthetic events
-  const tapMap={2:'KeyE',1:'KeyG',3:'KeyT',9:'Tab',8:'KeyM'};
+  // 12-15 are the D-pad. They were unmapped, so a pad-only player could not reach the map,
+  // harbour, build menu or sonar at all — every one of those was keyboard-only.
+  const tapMap={2:'KeyE',1:'KeyG',3:'KeyT',9:'Tab',8:'KeyM',12:'KeyN',13:'KeyR',14:'KeyH',15:'KeyB'};
   for(const b in tapMap){ const pressed=!!(gp.buttons[b]&&gp.buttons[b].pressed);
     if(pressed&&!_gpBtnPrev[b]) dispatchEvent(new KeyboardEvent('keydown',{code:tapMap[b]}));
     _gpBtnPrev[b]=pressed; }
