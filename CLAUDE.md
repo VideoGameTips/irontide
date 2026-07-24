@@ -17,13 +17,18 @@
 
 ```
 irontide/
-├── repo/          主仓库，停在 main，保持干净——不在这里开发
+├── repo/          主仓库，游戏代码就在这里的 main 上直接改
 ├── repo-promo/    推广模块 worktree，常驻 claude/promo-idle
 ├── promo/         物料与构建产物（不进版本库，两个 worktree 都软链到这里）
 └── kid-backup.git 改写 git 历史前的完整镜像备份
 ```
 
-- **worktree 文件夹长期保留，不要删**。依赖装好了，删了下次重装；正在里面跑的 session 也会悬空。
+**游戏代码直接在 `repo/` 的 main 上开发**，不要为它另开 worktree——项目就一个
+`index.html`，多开 worktree 反而带来两处麻烦：依赖要重装，而且 playwright 配置是
+`reuseExistingServer: true`，3000 端口上若有别的 worktree 起的服务，测试测的就是**别人的代码**。
+下面这套 worktree/idle 分支约定只适用于 `repo-promo` 的推广工作流。
+
+- **`repo-promo/` 文件夹长期保留，不要删**。依赖装好了，删了下次重装；正在里面跑的 session 也会悬空。
 - **idle 分支只用来停靠，绝不在上面开发或提交**。真要干活就开新分支
   `claude/promo-<这次干啥>`，干完合并、切回 idle：
   ```bash
