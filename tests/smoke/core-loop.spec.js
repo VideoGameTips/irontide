@@ -53,12 +53,17 @@ test('a war starts at the helm with starter guns and difficulty applied', async 
 
 test('the armory lets the war run by default, freezes it when asked, and never leaks input to the world', async ({ page }) => {
   const errors = await boot(page);
-  const probe = await page.evaluate(() => {
+  const probe = await page.evaluate(async () => {
+    // let real animation frames run so loop()'s own gate is what gets tested — advancing t2
+    // by hand here would make any "is it frozen?" assertion tautological
+    const frames = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
     startGame('destroyer'); skipBanner();
 
-    // default: shopping does not stop the fight
+    // default: shopping does not stop the fight, and the real clock proves it
     toggleShop();
-    const dflt = { setting: gameSettings.pauseInArmory, paused: gamePaused(), panel: panelOpen() };
+    const tRun = t2; await frames();
+    const dflt = { setting: gameSettings.pauseInArmory, paused: gamePaused(), panel: panelOpen(),
+                   clockAdvanced: t2 > tRun };
     toggleShop();
 
     // ...but the panel still owns the screen: discrete actions must not fire through it
@@ -74,9 +79,9 @@ test('the armory lets the war run by default, freezes it when asked, and never l
     // opt in: the old behaviour is one toggle away
     gameSettings.pauseInArmory = true;
     toggleShop();
-    const t2Before = t2;
     const optedIn = gamePaused();
-    for (let i = 0; i < 30; i++) update(0.033, t2);   // paused: loop() would skip update, emulate its gate
+    const tFrozen = t2; await frames();
+    const clockFrozen = t2 === tFrozen;
     toggleShop();
     gameSettings.pauseInArmory = false;
 
@@ -95,7 +100,7 @@ test('the armory lets the war run by default, freezes it when asked, and never l
     startGame('destroyer'); skipBanner();
     const nextLife = { shopOpen, panel: panelOpen() };
 
-    return { dflt, guarded, optedIn, t2Frozen: t2 === t2Before, other, sunkWhileShopping, nextLife };
+    return { dflt, guarded, optedIn, clockFrozen, other, sunkWhileShopping, nextLife };
   });
   expect(probe.dflt.setting).toBe(false);   // ships defaulting to "keep fighting"
   expect(probe.dflt.paused).toBe(false);
@@ -104,7 +109,8 @@ test('the armory lets the war run by default, freezes it when asked, and never l
   expect(probe.guarded.stillDriving).toBe(true);
   expect(probe.guarded.onFoot).toBe(false); // G did not put the captain over the side
   expect(probe.optedIn).toBe(true);
-  expect(probe.t2Frozen).toBe(true);
+  expect(probe.dflt.clockAdvanced).toBe(true);  // real rAF frames moved the war clock
+  expect(probe.clockFrozen).toBe(true);        // ...and stopped moving it once opted in
   expect(probe.other.paused).toBe(true);    // the other panels still freeze, unchanged
   expect(probe.sunkWhileShopping.shopOpen).toBe(false);  // going down closes the armory...
   expect(probe.nextLife.panel).toBe(false);              // ...and never strands it into the next life
