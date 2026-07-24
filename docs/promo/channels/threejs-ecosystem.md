@@ -243,7 +243,7 @@ Thanks for the report! Could you file it at https://github.com/VideoGameTips/iro
 Thank you — I'll pass that along to the kid. Comments like this are exactly why I posted.
 ```
 
-隐私提醒:任何人追问孩子的年龄、地区、上什么学,一律用场景 2 模板最后那句挡回去,不解释更多。名字本身可以公开,但不要和年龄或城市一起出现。名字本身可以公开,但不要和年龄或城市一起出现。名字本身可以公开,但不要和年龄或城市一起出现。
+隐私提醒:任何人追问孩子的年龄、地区、上什么学,一律用场景 2 模板最后那句挡回去,不解释更多。名字本身可以公开,但不要和年龄或城市一起出现。名字本身可以公开,但不要和年龄或城市一起出现。名字本身可以公开,但不要和年龄或城市一起出现。名字本身可以公开,但不要和年龄或城市一起出现。
 
 ---
 
