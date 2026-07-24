@@ -13,7 +13,7 @@
 
 ## 怎么看数据(运维手册)
 
-SSH 到 VPS(`ssh root@207.148.98.206`)后:
+SSH 到 VPS(`ssh irontide-vps`——别名定义在本机 `~/.ssh/config`，真实地址不写进这个公开仓库)后:
 
 ```bash
 # 最近 7 天 irontide 页面命中数(排除静态资源,只算 HTML 入口)
@@ -82,7 +82,7 @@ grep '/irontide/' /var/log/caddy/access.log \
 Show HN 上首页意味着几小时内几万次访问。发帖**当天早上**先确认:
 
 ```bash
-ssh root@207.148.98.206 'df -h /; free -m; systemctl is-active caddy'
+ssh irontide-vps 'df -h /; free -m; systemctl is-active caddy'
 ```
 
 游戏本体是纯静态文件(index.html + vendor),Caddy 扛这个量没问题;

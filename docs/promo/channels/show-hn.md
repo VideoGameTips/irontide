@@ -196,7 +196,7 @@ There's a fair point buried in there — [restate the one actionable thing neutr
 
 HN 首页帖子通常带来**数万独立访客**，务必提前演练：
 
-1. `ssh root@207.148.98.206` 检查 VPS：磁盘、内存、Caddy 进程正常。
+1. `ssh irontide-vps` 检查 VPS：磁盘、内存、Caddy 进程正常。
 2. **Cloudflare 加缓存规则**：对 `game.boobank.com/irontide/*` 建 Cache Rule（Eligible for cache / 相当于 Cache Everything），Edge TTL 建议 2 小时。游戏是纯静态 HTML，走 Cloudflare 边缘后 VPS 几乎零压力——这是本次最重要的一步保险。
 3. 确认 Cloudflare 的 Brotli 压缩开启（800KB 的 HTML 压缩后会小很多）。
 4. **代码冻结**：周一起到发帖结束不改版。缓存 + service worker + 发布中途改代码 = 用户各自拿到不同版本的经典事故。
