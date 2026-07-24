@@ -6,3 +6,5 @@ tests/sim/results-pilot.json
 # promo build artifacts (regenerate with tools/build-portal.js)
 promo/builds/
 promo/assets/
+tools/trailer/frames/
+tools/trailer/out/
