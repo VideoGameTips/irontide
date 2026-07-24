@@ -908,9 +908,20 @@ function updateAdaptiveQuality(rawDt){
   if(qualitySlowT>4){
     const next=Math.max(.75,renderer.getPixelRatio()-.25);
     if(next<renderer.getPixelRatio()){renderer.setPixelRatio(next);renderer.setSize(innerWidth,innerHeight);resizePostFX();flashPrompt('⚙ Performance mode: render detail reduced');}
-    if(gfxQuality>0)setGfxQuality(0);qualitySlowT=0;
+    if(gfxQuality>0)setGfxQuality(0);
+    // last rung: resolution is on the floor and bloom/AO are already off, and it is STILL slow.
+    // Nothing was left to give before — MAX_FX was a hard constant — so an old iPad just stayed
+    // slow. Halve the effect budget and drop the oldest effects already on screen.
+    else if(renderer.getPixelRatio()<=.75 && MAX_FX>FX_LEAN){
+      MAX_FX=FX_LEAN;
+      while(fx.length>MAX_FX) removeFxAt(0);
+      flashPrompt(T('⚙ Performance mode: fewer effects','⚙ 性能模式：减少特效'));
+    }
+    qualitySlowT=0;
   }else if(qualityFastT>12&&renderer.getPixelRatio()<maxPR-.01&&phase==='play'&&!gamePaused()){   // menus/pause render cheap frames — never treat them as GPU headroom
-    renderer.setPixelRatio(Math.min(maxPR,renderer.getPixelRatio()+.25));renderer.setSize(innerWidth,innerHeight);resizePostFX();qualityFastT=0;
+    if(MAX_FX<FX_FULL) MAX_FX=FX_FULL;   // give the effects back before spending frames on resolution
+    else { renderer.setPixelRatio(Math.min(maxPR,renderer.getPixelRatio()+.25));renderer.setSize(innerWidth,innerHeight);resizePostFX(); }
+    qualityFastT=0;
   }
 }
 const baseW=[];
@@ -3477,7 +3488,8 @@ const mines=[];
 const MAX_MINES_PER_TEAM=5;
 let mineDeployCooldown=0,mineLayTimers=[18,18];
 const MAX_SHELLS=360;       // late-game safety limits: prevent burst fire from overwhelming the GPU
-const MAX_FX=260;
+const FX_FULL=260, FX_LEAN=140;
+let MAX_FX=FX_FULL;   // adaptive: the last rung of the quality ladder trims the effect budget itself
 const _disposedGeometries=new WeakSet(),_disposedMaterials=new WeakSet();
 function destroyObject3D(obj){
   if(!obj) return;
