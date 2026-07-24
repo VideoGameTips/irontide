@@ -3055,7 +3055,8 @@ const RANKS=[
   {name:'Fleet Admiral', score:2400, perk:0.35},
 ];
 let career={ sunk:0, planes:0, islands:0, wins:0, losses:0, bosses:0, rivalPhase:'intro',
-  flawless:0, fast:0, hardWins:0, captures:0, quickWins:0, flew:0, drove:0, marched:0, dove:0 };   // extra medal counters (read with ||0, so old saves are fine)
+  flawless:0, fast:0, hardWins:0, captures:0, quickWins:0, flew:0, drove:0, marched:0, dove:0,
+  nukes:0, kamikazes:0, mines:0, sonars:0, fires:0, flagship:0 };   // extra medal counters (read with ||0, so old saves are fine)
 // ---- persistence schema versions: bump when a shape changes, add a step to migrateCareer ----
 const CAREER_VER=2;   // v1(implicit)=original counters · v2=+rivalPhase/seenIntro/credits/marketOwned/licenses/mapsUnlocked
 function migrateCareer(c){
@@ -3352,13 +3353,14 @@ const ACHIEVEMENTS=(()=>{
   const _sunk=c=>c.sunk||0,_pl=c=>c.planes||0,_isl=c=>c.islands||0,_win=c=>c.wins||0,_boss=c=>c.bosses||0,
     _fl=c=>c.flawless||0,_fa=c=>c.fast||0,_hw=c=>c.hardWins||0,_cap=c=>c.captures||0,_qw=c=>c.quickWins||0,
     _flew=c=>c.flew||0,_drove=c=>c.drove||0,_mar=c=>c.marched||0,_dove=c=>c.dove||0,_loss=c=>c.losses||0,
+    _nuke=c=>c.nukes||0,_kami=c=>c.kamikazes||0,_mine=c=>c.mines||0,_son=c=>c.sonars||0,_fire=c=>c.fires||0,_flag=c=>c.flagship||0,
     _stars=c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return n;},
     _tri=c=>{let n=0;const t=c.theaters||{};for(const k in t)if((t[k].stars||0)>=3)n++;return n;},
     _s=(n,x)=>n>1?x:'';
   // ladder(statFn, descBuilder, rows[[goal,id,icon,en,zh]...]) → one medal per tier, each with a progress bar.
   // Existing ids are kept at their old thresholds so no earned medal is lost — the Ship Destroyer line just
   // renumbers (old I/II/III at 250/500/1000 become IV/V/VI as the ladder now starts far lower, at 10 kills).
-  const L=(fn,mk,rows)=>rows.map(r=>({id:r[1],icon:r[2],name:()=>T(r[3],r[4]),desc:()=>mk(r[0]),check:c=>fn(c)>=r[0],prog:c=>[fn(c),r[0]]}));
+  const L=(fn,mk,rows)=>rows.map(r=>({id:r[1],icon:r[2],name:()=>T(r[3],r[4]),desc:()=>mk(r[0]),check:c=>fn(c)>=r[0],prog:c=>[fn(c),r[0]],kid:r[5]}));
   return [].concat(
     L(_sunk, n=>n===1?T('Sink your first enemy warship','击沉第一艘敌舰'):T('Sink '+n+' warships','击沉 '+n+' 艘敌舰'), [
       [1,'first_blood','🩸','First Blood','首开纪录'],
@@ -3421,6 +3423,23 @@ const ACHIEVEMENTS=(()=>{
       [1,'dove_1','🤿','Silent Running','首次下潜'],[10,'dove_10','🐳','Deep Diver','深潜专家']]),
     L(_loss, n=>T('Lose '+n+' wars — and keep fighting','输掉 '+n+' 场仍不放弃'), [
       [10,'loss_10','🩹','Battle-Scarred','身经百战'],[25,'loss_25','🆘','Never Surrender','永不言弃']]),
+    // ---- special action medals. nukes & kamikaze are exactly what kid-safe mode hides (see CLAUDE.md),
+    // so they carry kid:false and drop off the wall — and out of the earned-toast — when the filter is on. ----
+    L(_nuke, n=>T('Detonate '+n+' nuclear warhead'+_s(n,'s'),'引爆 '+n+' 枚核弹头'), [
+      [1,'nuke_1','☢️','Fallout','蘑菇云初现',false],[5,'nuke_5','☣️','Doomsday Clock','末日时钟',false],
+      [15,'nuke_15','⚛️','Nuclear Winter','核冬天',false]]),
+    L(_kami, n=>T('Land '+n+' kamikaze strike'+_s(n,'s'),'完成 '+n+' 次神风撞击'), [
+      [1,'kami_1','💨','Divine Wind','神风初袭',false],[10,'kami_10','🌸','Cherry Blossom','樱花飘落',false],
+      [50,'kami_50','🎌','Sky Samurai','空中武士',false]]),
+    L(_mine, n=>T('Deploy '+n+' naval mines','布下 '+n+' 枚水雷'), [
+      [10,'mine_10','⚓','Minelayer','布雷手'],[50,'mine_50','🌊','Minefield','雷区大师'],
+      [150,'mine_150','💣','Sea Denial','海域封锁']]),
+    L(_son, n=>T('Fire '+n+' sonar pings','使用声呐 '+n+' 次'), [
+      [25,'son_25','📡','Sonar Operator','声呐操作员'],[100,'son_100','🔊','Deep Listener','深海之耳']]),
+    L(_fire, n=>T('Put out '+n+' fires with damage control','用损管扑灭 '+n+' 处火灾'), [
+      [10,'fire_10','🧯','Damage Control','损管能手'],[50,'fire_50','🚒','Fire Marshal','消防总长']]),
+    L(_flag, n=>T('Command the Leviathan flagship','亲自指挥利维坦旗舰'), [
+      [1,'flagship','🐋','Kraken Captain','海妖舰长']]),
     [
       {id:'comeback', icon:'💪', name:()=>T('Comeback Captain','逆风翻盘'), desc:()=>T('Win a war right after losing one','在一场战败后立刻赢回来'), check:c=>c.wins>=1&&c.losses>=1&&(c.lossStreak||0)===0},
       {id:'all_rounder', icon:'🎭', name:()=>T('Jack of All Trades','全能舰长'), desc:()=>T('Fly, drive a tank, go ashore and dive a sub','开过飞机、坦克，登过陆，也潜过水'), check:c=>(c.flew||0)>=1&&(c.drove||0)>=1&&(c.marched||0)>=1&&(c.dove||0)>=1},
@@ -3433,13 +3452,15 @@ function checkAchievements(quiet){
   const newly=[];
   for(const a of ACHIEVEMENTS){ if(!career.achievements.includes(a.id)&&a.check(career)){ career.achievements.push(a.id); newly.push(a); } }
   if(newly.length){ saveCareer();
-    if(!quiet) newly.forEach((a,i)=>setTimeout(()=>{ flashPrompt('🎖 '+T('MEDAL EARNED — ','获得奖章——')+a.icon+' '+a.name()); if(typeof sfxClick==='function')sfxClick(); }, 400+i*2600)); }
+    if(!quiet) newly.filter(a=>a.kid!==false||!contentFilterOn()).forEach((a,i)=>setTimeout(()=>{ flashPrompt('🎖 '+T('MEDAL EARNED — ','获得奖章——')+a.icon+' '+a.name()); if(typeof sfxClick==='function')sfxClick(); }, 400+i*2600)); }
   return newly;
 }
 function showMedals(){
   career.achievements=career.achievements||[];
+  // kid-safe mode hides the nuke/kamikaze medals (kid:false) entirely — off the wall and out of the count
+  const shown=ACHIEVEMENTS.filter(a=>a.kid!==false||!contentFilterOn());
   let html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin-top:6px;text-align:left">';
-  for(const a of ACHIEVEMENTS){ const got=career.achievements.includes(a.id);
+  for(const a of shown){ const got=career.achievements.includes(a.id);
     html+='<div style="padding:12px;border:1px solid '+(got?'#7a622a':'#1c3145')+';border-radius:10px;background:'+(got?'rgba(255,208,96,0.06)':'rgba(255,255,255,0.02)')+';'+(got?'':'filter:grayscale(1);opacity:.55')+'">'+
       '<div style="font-size:26px">'+a.icon+'</div>'+
       '<div style="color:'+(got?'#ffd060':'#7e93a8')+';font-size:12px;letter-spacing:1px;margin-top:4px">'+a.name()+'</div>'+
@@ -3453,7 +3474,8 @@ function showMedals(){
       '</div>';
   }
   html+='</div>';
-  showStory(T('🎖 MEDAL WALL — ','🎖 奖章墙——')+career.achievements.length+'/'+ACHIEVEMENTS.length, html, T('CLOSE','关闭'));
+  const gotN=shown.filter(a=>career.achievements.includes(a.id)).length;
+  showStory(T('🎖 MEDAL WALL — ','🎖 奖章墙——')+gotN+'/'+shown.length, html, T('CLOSE','关闭'));
 }
 loadCareer();
 checkAchievements(true);   // retroactive unlocks for veterans' existing save data — quiet, no toast storm
@@ -3669,7 +3691,7 @@ function deployPlayerMine(){
   if(mines.filter(m=>m.team===0).length>=MAX_MINES_PER_TEAM){flashPrompt('Mine limit reached (5)');return;}
   const cost=220;if(money<cost){flashPrompt('A naval mine costs $'+cost);return;}
   const back=new THREE.Vector3(-Math.sin(player.heading),0,-Math.cos(player.heading)).multiplyScalar(player.def.len*0.65+8);
-  if(spawnMine(0,player.pos.clone().add(back))){money-=cost;mineDeployCooldown=7;updateHUD();flashPrompt('⚓ Naval mine deployed (5 maximum)');}
+  if(spawnMine(0,player.pos.clone().add(back))){money-=cost;mineDeployCooldown=7;warRecord('mines');updateHUD();flashPrompt('⚓ Naval mine deployed (5 maximum)');}
 }
 function detonateMine(m){
   const targets=shipsOf(1-m.team);targets.forEach(t=>{const d=t.pos.distanceTo(m.pos);if(d>24)return;
@@ -4921,7 +4943,7 @@ function startGame(shipId){
     if(currentMapIdx>=CAMPAIGN.length-4) rivalAdvance('showdown');
     _introStageT=5; _introStage=0;   // stagger the opening voices: banner first, Varga ~5s, nemesis ~11s
     if(M.boss) spawnBoss(1,true);
-    if(shipId==='boss')friendlyBossUsed=true;else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
+    if(shipId==='boss'){friendlyBossUsed=true;warRecord('flagship');}else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
     flashPrompt('⚔ '+M.name.toUpperCase()+' — '+M.theme);
     startDrive();          // spawn already at the helm: W moves the ship within seconds of clicking a card
     startTutorial();       // first-ever battle walks through W → mouse → first kill → armory (no-op once completed)
@@ -5707,7 +5729,7 @@ function sonarPing(){
   const ring=new THREE.Mesh(new THREE.RingGeometry(8,10,48),new THREE.MeshBasicMaterial({color:0x62d7ff,transparent:true,opacity:0.8,side:THREE.DoubleSide,depthWrite:false}));
   ring.rotation.x=-Math.PI/2;ring.position.copy(p).setY(1);scene.add(ring);
   fx.push({mesh:ring,life:1.4,max:1.4,op:0.8,fade:true,grow:true,growRate:3.4});
-  sfxSonar(p);
+  sfxSonar(p); warRecord('sonars');
   flashPrompt('◉ SONAR PING — contacts revealed for 4 seconds');
 }
 function updateFogOfWar(dt){
@@ -6532,12 +6554,12 @@ function playerKamikaze(P){ // ram an enemy ship / land unit / harbor by diving 
     const bp=p.clone().setY(1.5);
     returnFromUAV(true,'Nuclear strike drone expended');   // recall the pilot & remove the drone BEFORE the blast so it can't self-damage a live pilot
     blastAll(bp, 9999, def.nukeRadius||250, true, true);
-    flashPrompt('☢ NUCLEAR STRIKE DRONE DETONATED'); return true; }
+    warRecord('nukes'); flashPrompt('☢ NUCLEAR STRIKE DRONE DETONATED'); return true; }
   // Ramming stays possible (you can always fly into something), but kid-safe mode does not
   // narrate it as a suicide attack.
-  if(hitShip){ damageTarget(hitShip,kd,null); crashPlane(contentFilterOn()?('Crashed into the '+hitShip.def.name+'!'):('Kamikaze run on the '+hitShip.def.name+'!')); return true; }
-  if(hitUnit){ hitUnit.hp-=kd; if(hitUnit.hp<=0) killLandUnit(hitUnit); crashPlane(contentFilterOn()?'Crashed!':'Kamikaze!'); return true; }
-  damageHarbor(enemyHarbor,kd*1.2); crashPlane('Kamikaze into the harbor!'); return true;
+  if(hitShip){ warRecord('kamikazes'); damageTarget(hitShip,kd,null); crashPlane(contentFilterOn()?('Crashed into the '+hitShip.def.name+'!'):('Kamikaze run on the '+hitShip.def.name+'!')); return true; }
+  if(hitUnit){ warRecord('kamikazes'); hitUnit.hp-=kd; if(hitUnit.hp<=0) killLandUnit(hitUnit); crashPlane(contentFilterOn()?'Crashed!':'Kamikaze!'); return true; }
+  warRecord('kamikazes'); damageHarbor(enemyHarbor,kd*1.2); crashPlane('Kamikaze into the harbor!'); return true;
 }
 function planeMaxSpeed(P,def){
   if(def.fuelSpeed){const f=Math.max(0,Math.min(1,P.fuel/P.fuelMax));return (def.minFuelSpeed||def.speed)+(def.maxSpeed-(def.minFuelSpeed||def.speed))*(1-f);}
@@ -7053,7 +7075,7 @@ function tickCrit(s,dt){
       if(r<0.38){ c.engine=Math.min(2,c.engine+1); critMsg(s,'🔥 fire reached the engine!'); }
       else if(r<0.66){ c.guns=Math.min(2,c.guns+1); koTurret(s); critMsg(s,'🔥 fire reached a magazine!'); }
       else c.fire=Math.min(shipFireCap(s,4),c.fire+1); }
-    c.fireBurn+=dt; if(c.fireBurn>4.5){ c.fireBurn=0; c.fire--; if(c.fire<=0&&s===player) flashPrompt('🧯 Fire out.'); } }
+    c.fireBurn+=dt; if(c.fireBurn>4.5){ c.fireBurn=0; c.fire--; if(c.fire<=0&&s===player){ warRecord('fires'); flashPrompt('🧯 Fire out.'); } } }
   // flooding — drains, but damage-control crews steadily bail it out (no longer needs a perfect lull)
   if(c.flood>0){ critHurt(s, c.flood*3*dt);
     c.floodT+=dt; if(c.floodT>5){ c.floodT=0; c.flood--; if(s===player) flashPrompt(c.flood>0?'Flooding slowing…':'💧 Flooding contained.'); } }
@@ -7630,6 +7652,7 @@ function detonateNuclearShell(s){
   if(!s||s.detonated)return;
   s.detonated=true;s.mesh.visible=false;
   blastAll(s.pos.clone(),9999,900,true,true); // five times the Tu-95V Tsar Bomba radius; harbors are protected objectives
+  if((s.team||0)===0) warRecord('nukes');
   flashPrompt('☢ R-36M WARHEAD DETONATED');
 }
 // Scratch vectors for the shell loop. Up to MAX_SHELLS projectiles are integrated every
