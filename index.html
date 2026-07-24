@@ -4026,6 +4026,7 @@ function refreshTouchControls(){
 }
 function touchActionDown(act){
   touchMark();sfxResume();
+  if(panelOpen())return;                       // a panel owns the screen — mouse and gamepad are held off too
   if(act==='fire'){mouseDownFire=true;return;}
   if(act==='special'){
     if(piloting){pulseKey('Space',160);return;}
@@ -4038,6 +4039,9 @@ function touchActionUp(act){
 }
 function touchActionTap(act){
   if(phase!=='play'&&act!=='shop')return;
+  // the panel's own buttons must keep working (that is how you close it on a tablet);
+  // everything else is world input and belongs to the panel while it is up
+  if(panelOpen()&&!(act==='shop'||act==='harbor'||act==='build'||act==='map'))return;
   if(act==='action'){toggleMan();return;}
   if(act==='special'){
     if(piloting||drivingTank)return;
