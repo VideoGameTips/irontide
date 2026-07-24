@@ -4473,7 +4473,10 @@ function mpConnect(url){
 }
 function mpJoinRoom(serverName,side,shipId){
   if(!MP.ws||!MP.connected) return;
-  if(phase==='play'){ const st=document.querySelector('#mpStatus'); if(st)st.textContent=T('Finish or abandon the current war first (reload the page), then join.','先结束当前战局（刷新页面），再加入联机。'); return; }
+  // A war world already exists once islands/harbours are built, and nothing tears them down —
+  // joining now would stack a second theatre on the first. 'play' was not enough: the reachable
+  // path is the mid-war replacement-ship menu, which sits at phase 'respawn'.
+  if(phase==='play'||phase==='respawn'||islands.length){ const st=document.querySelector('#mpStatus'); if(st)st.textContent=T('Finish or abandon the current war first (reload the page), then join.','先结束当前战局（刷新页面），再加入联机。'); return; }
   MP.pendingShip=shipId;
   MP.ws.send(JSON.stringify({type:'join',server:serverName,side,name:MP.name}));
 }
