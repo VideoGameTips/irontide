@@ -188,12 +188,15 @@ async function serveStatic(res, urlPath) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // Route on the PATH alone. req.url carries the query string, so every route below used
+  // to miss on a documented debug flag — /?touch=1 and /?sw=1 both 404'd on this server.
+  const path0 = (req.url || '/').split('?')[0];
   if (req.method === 'OPTIONS') return writeJson(res, 204, {});
-  if (req.url === '/' || req.url === '/index.html') return serveGame(res);
-  if (req.url === '/favicon.ico') { res.writeHead(204); return res.end(); }
-  if ((req.url.startsWith('/vendor/') || req.url.startsWith('/js/')) && req.url.endsWith('.js')) return serveStatic(res, req.url);
-  if (req.url === '/manifest.json' || req.url === '/sw.js' || (req.url.startsWith('/icons/') && req.url.endsWith('.png'))) return serveStatic(res, req.url);
-  if (req.url === '/health') {
+  if (path0 === '/' || path0 === '/index.html') return serveGame(res);
+  if (path0 === '/favicon.ico') { res.writeHead(204); return res.end(); }
+  if ((path0.startsWith('/vendor/') || path0.startsWith('/js/')) && path0.endsWith('.js')) return serveStatic(res, path0);
+  if (path0 === '/manifest.json' || path0 === '/sw.js' || (path0.startsWith('/icons/') && path0.endsWith('.png'))) return serveStatic(res, path0);
+  if (path0 === '/health') {
     return writeJson(res, 200, {
       ok: true,
       service: 'iron-tide-relay',
@@ -203,8 +206,8 @@ const server = http.createServer(async (req, res) => {
       websocket: '/play',
     });
   }
-  if (req.url === '/servers' && req.method === 'GET') return writeJson(res, 200, { servers: allRooms() });
-  if (req.url === '/servers' && req.method === 'POST') {
+  if (path0 === '/servers' && req.method === 'GET') return writeJson(res, 200, { servers: allRooms() });
+  if (path0 === '/servers' && req.method === 'POST') {
     const body = await parseBody(req);
     const room = getOrCreateRoom(body.name, body.mode);
     if (!room) return writeJson(res, 429, { error: 'Too many rooms are already active.' });

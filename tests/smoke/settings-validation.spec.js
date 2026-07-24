@@ -20,7 +20,7 @@ test('corrupt settings fall back to defaults instead of poisoning the game', asy
   expect(r.SETTINGS.simpleHud).toBe(null);      // {} rejected
   expect(r.SETTINGS.contentFilter).toBe(false); // 'yes' rejected
   expect(r.gameSettings.combatFeedback).toBe(true);   // 1 rejected
-  expect(r.gameSettings.damageNumbers).toBe(false);   // null rejected
+  expect(r.gameSettings.damageNumbers).toBe(true);    // null rejected, default (on since #41) kept
   expect(r.gameSettings.cameraShake).toBe(true);      // 'on' rejected
   expect(r.gameSettings.pauseInArmory).toBe(false);   // [] rejected
   expect('evilExtraKey' in r.SETTINGS).toBe(false);

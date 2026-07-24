@@ -222,8 +222,8 @@
   #settings{position:fixed;z-index:26;top:50%;left:50%;transform:translate(-50%,-50%);display:none;width:min(390px,92vw);padding:18px;border:1px solid #42627c;border-radius:10px;background:rgba(8,17,27,.97);box-shadow:0 12px 55px #000;}
   #settings h2{font-size:17px;letter-spacing:2px;color:#9fd8ff;margin-bottom:5px;}#settings p{font-size:12px;color:#8ea3b7;line-height:1.45;margin-bottom:12px;}
   #settingsList{display:flex;flex-direction:column;gap:7px}.setitem{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 10px;border:1px solid #21384e;border-radius:7px;background:#0d1925;color:#d9e8f5;font-size:13px;cursor:pointer}.setitem b{color:#7fd0a0;font-size:11px;letter-spacing:1px}.setitem.off b{color:#ff9b88;}
-  .dmgnum{position:fixed;z-index:12;pointer-events:none;font:bold 16px ui-monospace,monospace;color:#ffe08a;text-shadow:0 2px 3px #000;transition:opacity .12s;}
-  .dmgnum.crit{font-size:20px;color:#ffb15f;text-shadow:0 0 8px rgba(255,120,30,.55),0 2px 3px #000;}
+  .dmgnum{position:fixed;z-index:12;pointer-events:none;font:bold 16px ui-monospace,monospace;color:#f2f7fb;text-shadow:0 2px 3px #000;transition:opacity .12s;}
+  .dmgnum.kill{font-size:22px;color:#ffd166;text-shadow:0 0 9px rgba(255,180,40,.6),0 2px 3px #000;}   /* the blow that sinks it reads gold and larger */
   /* ---- Full-screen banner (briefing card / boss warning) ---- */
   #bannerCard{position:fixed;inset:0;z-index:25;display:flex;flex-direction:column;align-items:center;justify-content:center;
     text-align:center;pointer-events:none;opacity:0;background:rgba(4,9,15,0);transition:opacity .25s ease-out,background .25s ease-out;}
@@ -3353,7 +3353,7 @@ let cameraShake=0,cameraShakePhase=0,hitFlashT=0;
 let settingsOpen=false;
 // pauseInArmory defaults OFF: the war keeps running while you shop. Captains who want the
 // old breathing room can turn it back on in the K panel.
-const gameSettings={combatFeedback:true,damageNumbers:false,cameraShake:true,pauseInArmory:false};
+const gameSettings={combatFeedback:true,damageNumbers:true,cameraShake:true,pauseInArmory:false};
 const damageNumbers=[];
 const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool'};
 function loadGameSettings(){ applySettingsBlob(gameSettings, readSettingsBlob(), GAMESETTINGS_SPEC); }   // same validated read as SETTINGS
@@ -3362,7 +3362,30 @@ function refreshSettings(){const list=document.getElementById('settingsList');if
 function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;const sp=document.getElementById('settings');sp.style.display=settingsOpen?'block':'none';if(settingsOpen){
   sp.querySelector('h2').textContent=trText('⚙ SETTINGS'); sp.querySelector('p').innerHTML=isZh()?'战斗画面提示都可以自由开关。按 <b>K</b> 关闭。':'Visual combat feedback is optional. Press <b>K</b> to close.';mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
 function clearDamageNumbers(){while(damageNumbers.length){const d=damageNumbers.pop();d.el.remove();}}
-function showDamageNumber(pos,dmg,friendly=true,crit=false){if(!gameSettings.damageNumbers||!camera||damageNumbers.length>=14||!pos)return;const el=document.createElement('div');el.className='dmgnum'+(crit?' crit':'');el.textContent=(crit?'CRIT ':'-')+Math.max(1,Math.round(dmg));el.style.color=crit?'#ffb15f':(friendly?'#ffe08a':'#ff8f82');document.body.appendChild(el);damageNumbers.push({el,pos:pos.clone().add(new THREE.Vector3((Math.random()-.5)*1.5,2+Math.random()*1.2,(Math.random()-.5)*1.5)),life:crit?1.05:.85});}
+const DMG_MERGE_MS=500, DMG_MAX=8;
+// Numbers only appear for hits the CAPTAIN landed (see causedByPlayer) — an allied broadside
+// used to pop them too, which is what made the screen unreadable. Repeat hits on the same
+// target inside half a second add into the number already floating instead of stacking new
+// ones, and at most DMG_MAX are alive: on overflow the OLDEST goes, so your latest shot is
+// always the one you can still read.
+function showDamageNumber(pos,dmg,target,kill){
+  if(!gameSettings.damageNumbers||!camera||!pos)return;
+  const now=performance.now();
+  const prev=target?damageNumbers.find(d=>d.target===target&&now-d.born<DMG_MERGE_MS):null;
+  if(prev){
+    prev.total+=dmg; prev.born=now; prev.life=Math.max(prev.life,kill?1.05:.85);
+    if(kill&&!prev.kill){ prev.kill=true; prev.el.classList.add('kill'); }
+    prev.el.textContent='-'+Math.max(1,Math.round(prev.total));
+    return;
+  }
+  while(damageNumbers.length>=DMG_MAX){ const oldest=damageNumbers.shift(); oldest.el.remove(); }
+  const el=document.createElement('div'); el.className='dmgnum'+(kill?' kill':'');
+  el.textContent='-'+Math.max(1,Math.round(dmg));
+  document.body.appendChild(el);
+  damageNumbers.push({el,target:target||null,total:dmg,kill:!!kill,born:now,
+    pos:pos.clone().add(new THREE.Vector3((Math.random()-.5)*1.5,2+Math.random()*1.2,(Math.random()-.5)*1.5)),
+    life:kill?1.05:.85});
+}
 function updateDamageNumbers(dt){for(let i=damageNumbers.length-1;i>=0;i--){const d=damageNumbers[i];d.life-=dt;d.pos.y+=dt*2.5;const p=d.pos.clone().project(camera);if(d.life<=0||p.z<-1||p.z>1){d.el.remove();damageNumbers.splice(i,1);continue;}d.el.style.left=(p.x*.5+.5)*innerWidth+'px';d.el.style.top=(-p.y*.5+.5)*innerHeight+'px';d.el.style.opacity=Math.min(1,d.life/.2).toFixed(2);}}
 loadGameSettings();
 function addCameraShake(pos,power=1){
@@ -7001,10 +7024,11 @@ function damageTarget(t,dmg,owner,hitPos){
   if(t===player){ const pd=pDmg(dmg); player.hp-=pd; damageCompartment(player,pd,hitPos); applyCrit(player,pd); calledShot(player,pd,hitPos,false); if(player.hp<=0){ player.hp=0; playerSunk(); } updateHUD(); return; }
   const friendlyHit=owner===null||!owner||owner.team!==1, critical=dmg>=70||Math.random()<Math.min(.28,dmg/260);
   const catastrophic=shipBreakupLikely(t,dmg,hitPos);
-  showDamageNumber(hitPos||t.pos,dmg,friendlyHit,critical);
-  if(friendlyHit&&t.build&&t.build.group&&t.build.group.visible)flashHitTarget(t.build.group);
+  const byPlayer=causedByPlayer(owner), willSink=(t.hp-dmg)<=0&&t.sinkT===0;
+  if(byPlayer){ showDamageNumber(hitPos||t.pos,dmg,t,willSink);
+    if(t.build&&t.build.group&&t.build.group.visible)flashHitTarget(t.build.group); }   // whose shot it was, not merely whose side
   t.hp-=dmg; damageCompartment(t,dmg,hitPos); applyCrit(t,dmg); calledShot(t,dmg,hitPos,friendlyHit); if(t.hp<=0 && t.sinkT===0){ t.hp=0; t.sinkT=0.001; if(catastrophic&&!t.proxy){ if(t.build&&t.build.group)t.build.group.visible=false; spawnCatastrophicWreck(t,hitPos,1.2); } spawnSalvage(t.pos.clone());
-    if(owner===null||!owner||owner.team!==1)showHit(t.def.name||'ENEMY SHIP',true);
+    if(byPlayer)showHit(t.def.name||'ENEMY SHIP',true);
     const bounty=t.def.boss?30000:t.def.hp>400?700:t.def.hp>250?500:350;
     sunk++;warRecord('sunk');money+=bounty;if(t.def.boss){warRecord('bosses');flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');
       if(t.team===1){ rivalAdvance('angry'); rivalSpeak(career.rivalPhase); } }
@@ -7506,7 +7530,7 @@ function updateShells(dt){
 }
 function onShellHit(s,pos,target){
   const mode=s.aa?'aa':(s.kind==='missile'?'missile':(s.dmg>=115||/rail/i.test(s.weaponName||'')?'rail':(s.dmg>=70?'crit':'')));
-  if(s.team===0)showHit(target&&target.def?target.def.name:'TARGET',false,mode);
+  if(playerCausedShell(s))showHit(target&&target.def?target.def.name:'TARGET',false,mode);   // your shell, not merely your side's
   impactFx(s,pos);
   if(s.strategic)blastAll(pos,s.dmg,s.splash,true,s.spareHarbors);
   else if(s.splash) explodeAt(pos,s.team,s.dmg,s.splash,s.owner);
@@ -7596,6 +7620,14 @@ function hitSpark(pos){
 }
 // shots the PLAYER personally caused (own turrets fire with owner=null; ally/land AI pass themselves)
 function playerCausedShell(s){ return s.team===0 && !allies.includes(s.owner) && !landUnits.includes(s.owner); }
+// Same question, asked of a damage owner rather than a shell. team 0 covers the player AND
+// the allied AI, so the fleet has to be excluded by identity — otherwise every ally broadside
+// pops the captain's hit marker and damage numbers. A null owner is the player's own gunnery.
+function causedByPlayer(owner){
+  if(owner==null||owner===player) return true;
+  if(owner.team===1) return false;
+  return !allies.includes(owner) && !landUnits.includes(owner);
+}
 // ===== TARGET FLASH — the hit hull blinks white for ~90ms so you know WHICH ship you struck =====
 let _hitFlashes=[];
 function flashHitTarget(root){
