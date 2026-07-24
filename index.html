@@ -3999,29 +3999,31 @@ function resetTouchMove(){
   const k=document.querySelector('#touchMove .knob');if(k)k.style.transform='translate(0,0)';
 }
 function pulseKey(code,ms=120){setKey(code,1);setTimeout(()=>setKey(code,0),ms);}
+// Every label the thumb sees. Kept short on purpose — these sit in 58px pills.
 function touchButtonLabel(act){
-  if(act==='fire')return piloting&&piloting.plane&&piloting.plane.def.uav?'CAM':'FIRE';
+  if(act==='fire')return piloting&&piloting.plane&&piloting.plane.def.uav?T('CAM','镜头'):T('FIRE','开火');
   if(act==='action'){
-    if(piloting)return piloting.plane.def.uav?'RECALL':(piloting.phase==='landing'?'ABORT':'LAND');
-    if(driving||manning||drivingTank)return 'EXIT';
-    if(onFoot)return nearestFieldTank()?'TANK':'USE';
-    return 'USE';
+    if(piloting)return piloting.plane.def.uav?T('RECALL','召回'):(piloting.phase==='landing'?T('ABORT','中止'):T('LAND','降落'));
+    if(driving||manning||drivingTank)return T('EXIT','离开');
+    if(onFoot)return nearestFieldTank()?T('TANK','坦克'):T('USE','使用');
+    return T('USE','使用');
   }
   if(act==='special'){
-    if(piloting)return piloting.plane.def.bomb?'BOMB':'—';
-    if(drivingTank)return 'REPAIR';
-    if(driving&&player&&player.def.kind==='sub')return player.submerged?'SURFACE':'DIVE';
-    if(onFoot)return 'GUN';
-    return 'INSTALL';
+    if(piloting)return piloting.plane.def.bomb?T('BOMB','投弹'):'—';
+    if(drivingTank)return T('REPAIR','维修');
+    if(driving&&player&&player.def.kind==='sub')return player.submerged?T('SURFACE','上浮'):T('DIVE','下潜');
+    if(onFoot)return T('GUN','换枪');
+    return T('INSTALL','安装');
   }
   if(act==='board'){
-    if(drivingTank)return drivingTank.onDeck?'LAND':'SHIP';
-    if(onFoot)return playerShipLost?'HARBOR':'BOARD';
-    return 'ASHORE';
+    if(drivingTank)return drivingTank.onDeck?T('LAND','登陆'):T('SHIP','回舰');
+    if(onFoot)return playerShipLost?T('HARBOR','海港'):T('BOARD','登舰');
+    return T('ASHORE','登岸');
   }
-  if(act==='bail')return piloting?'BAIL':(playerShipLost?'SHIP':'P');
-  if(act==='view')return fpv?'CHASE':'VIEW';
-  return act.toUpperCase();
+  if(act==='bail')return piloting?T('BAIL','跳伞'):(playerShipLost?T('SHIP','换船'):'P');
+  if(act==='view')return fpv?T('CHASE','跟随'):T('VIEW','视角');
+  const UTIL={shop:['SHOP','商店'],harbor:['HARBOR','海港'],build:['BUILD','建造'],map:['MAP','地图'],sonar:['SONAR','声呐'],mine:['MINE','布雷']};
+  return UTIL[act]?T(UTIL[act][0],UTIL[act][1]):act.toUpperCase();
 }
 function refreshTouchControls(){
   if(!mobileControlsReady)return;
@@ -4031,7 +4033,7 @@ function refreshTouchControls(){
     b.style.visibility=(act==='special'&&piloting&&(!piloting.plane.def.bomb))?'hidden':'visible';
   });
   const hint=document.getElementById('touchHint');
-  if(hint)hint.textContent=drivingTank?'left stick controls tracks · right pad aims':piloting?'left stick throttle/turn · right pad pitch/look':'left stick moves · right pad aims';
+  if(hint)hint.textContent=drivingTank?T('left stick controls tracks · right pad aims','左摇杆控制履带 · 右侧区域瞄准'):piloting?T('left stick throttle/turn · right pad pitch/look','左摇杆油门/转向 · 右侧区域俯仰视角'):T('left stick moves · right pad aims','左摇杆移动 · 右侧区域瞄准');
 }
 function touchActionDown(act){
   touchMark();sfxResume();
@@ -10457,6 +10459,7 @@ function applyStaticI18n(){
   set('#shop h2',T('ARMORY','军械库'));
   set('#shop .hint',T('Click a weapon, then '+installHint()+' to install it.','点一件武器，再'+installHint()+'安装。'));
   shopBalance();   // the pause badge is state-dependent — let its owner re-render it in the new language
+  if(typeof refreshTouchControls==='function') refreshTouchControls();   // thumb labels are state-dependent too
   set('#harbor h2',T('⚓ HARBOR COMMAND','⚓ 海港指挥部'));
   set('#harbor .hint',T('Spend funds to fortify and supply your harbor. Press <b>H</b> to close.','花钱加固和补给你的海港。按 <b>H</b> 关闭。'));
   set('#build h2',T('🏝️ ISLAND ENGINEERS','🏝️ 岛屿工程队'));
