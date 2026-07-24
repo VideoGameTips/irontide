@@ -44,7 +44,7 @@ Join a server and choose a side:
 {
   "type": "join",
   "server": "Pacific One",
-  "name": "Andy",
+  "name": "Captain",
   "side": "blue"
 }
 ```
