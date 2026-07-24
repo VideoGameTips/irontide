@@ -1,7 +1,7 @@
 // Checks the factual claims the store copy makes against the shipped game.
 //
 // The launch kits in docs/promo/channels/ hard-code numbers — 31 theaters, 29
-// playable warships, 12 medals — and name specific features and keybinds. When the
+// playable warships, 86 medals — and name specific features and keybinds. When the
 // game changes, those go stale silently and the next thing that happens is a player
 // correcting us in public on a store page. Worse, a claim can be wrong from the start:
 // the copy advertised a "family high-score board" that never existed in any build.
@@ -51,7 +51,7 @@ const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
     ['29 playable warships',            g.playableShips === 29,   g.playableShips],
     ['61 aircraft',                     g.planes === 61,          g.planes],
     ['22 tanks',                        g.tanks === 22,           g.tanks],
-    ['12 medals',                       g.medals === 12,          g.medals],
+    ['86 medals',                       g.medals === 86,          g.medals],
     ['7 sandbox maps',                  g.sandbox === 7,          g.sandbox],
     ['music profile per theater',       g.musicProfiles === g.theaters + 1, `${g.musicProfiles} profiles / ${g.theaters} theaters`],
     ['three.js r128',                   g.three === '128',        g.three],
