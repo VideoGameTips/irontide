@@ -3360,6 +3360,14 @@ const ACHIEVEMENTS=[
   {id:'comeback',    icon:'💪', name:()=>T('Comeback Captain','逆风翻盘'), desc:()=>T('Win a war right after losing one','在一场战败后立刻赢回来'), check:c=>c.wins>=1&&c.losses>=1&&(c.lossStreak||0)===0},
   {id:'star_ten',    icon:'⭐', name:()=>T('Shining Fleet','群星舰队'), desc:()=>T('Earn 10 theater stars','拿到 10 颗战区星星'), check:c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return n>=10;}, prog:c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return [n,10];}},
   {id:'admiral',     icon:'👑', name:()=>T('Fleet Admiral','舰队司令'), desc:()=>T('Complete the entire campaign','通关整个战役'), check:c=>!!c.completed},
+  {id:'sink_250',  icon:'💥', name:()=>T('Ship Destroyer I','击舰能手 I'),   desc:()=>T('Sink 250 warships','击沉 250 艘敌舰'),  check:c=>(c.sunk||0)>=250,  prog:c=>[c.sunk||0,250]},
+  {id:'sink_500',  icon:'☠️', name:()=>T('Ship Destroyer II','击舰能手 II'), desc:()=>T('Sink 500 warships','击沉 500 艘敌舰'),  check:c=>(c.sunk||0)>=500,  prog:c=>[c.sunk||0,500]},
+  {id:'sink_1000', icon:'🌩️', name:()=>T('Ship Destroyer III','击舰能手 III'),desc:()=>T('Sink 1000 warships','击沉 1000 艘敌舰'),check:c=>(c.sunk||0)>=1000, prog:c=>[c.sunk||0,1000]},
+  {id:'sky_master',icon:'🦅', name:()=>T('Sky Sweeper','制空霸主'),     desc:()=>T('Shoot down 100 aircraft','击落 100 架飞机'), check:c=>(c.planes||0)>=100, prog:c=>[c.planes||0,100]},
+  {id:'island_lord',icon:'🗺️',name:()=>T('Island Warlord','群岛霸主'),  desc:()=>T('Capture 25 islands','占领 25 座岛屿'),      check:c=>(c.islands||0)>=25, prog:c=>[c.islands||0,25]},
+  {id:'war_hero',  icon:'🎗️', name:()=>T('War Hero','常胜将军'),        desc:()=>T('Win 25 wars','赢下 25 场战争'),            check:c=>(c.wins||0)>=25,   prog:c=>[c.wins||0,25]},
+  {id:'legend',    icon:'🏆', name:()=>T('Living Legend','传奇统帅'),   desc:()=>T('Win 50 wars','赢下 50 场战争'),            check:c=>(c.wins||0)>=50,   prog:c=>[c.wins||0,50]},
+  {id:'levi_bane', icon:'🐉', name:()=>T('Leviathan Bane','巨兽克星'),  desc:()=>T('Sink 10 Leviathans','击沉 10 艘利维坦'),   check:c=>(c.bosses||0)>=10, prog:c=>[c.bosses||0,10]},
 ];
 function checkAchievements(quiet){
   career.achievements=career.achievements||[];
