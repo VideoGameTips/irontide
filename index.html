@@ -3054,7 +3054,8 @@ const RANKS=[
   {name:'Admiral',       score:1600, perk:0.30},
   {name:'Fleet Admiral', score:2400, perk:0.35},
 ];
-let career={ sunk:0, planes:0, islands:0, wins:0, losses:0, bosses:0, rivalPhase:'intro' };
+let career={ sunk:0, planes:0, islands:0, wins:0, losses:0, bosses:0, rivalPhase:'intro',
+  flawless:0, fast:0, hardWins:0, captures:0, quickWins:0, flew:0, drove:0, marched:0, dove:0 };   // extra medal counters (read with ||0, so old saves are fine)
 // ---- persistence schema versions: bump when a shape changes, add a step to migrateCareer ----
 const CAREER_VER=2;   // v1(implicit)=original counters · v2=+rivalPhase/seenIntro/credits/marketOwned/licenses/mapsUnlocked
 function migrateCareer(c){
@@ -3347,28 +3348,86 @@ function careerRank(){ const s=careerScore(); let r=RANKS[0]; for(const k of RAN
 function nextRank(){ const s=careerScore(); for(const k of RANKS){ if(s<k.score) return k; } return null; }
 function warRecord(k,n){ career[k]=(career[k]||0)+(n||1); saveCareer(); checkAchievements(); }
 // ===== MEDALS (#33) — discrete milestones layered on the stats career already tracks =====
-const ACHIEVEMENTS=[
-  {id:'first_blood', icon:'🩸', name:()=>T('First Blood','首开纪录'),   desc:()=>T('Sink your first enemy warship','击沉第一艘敌舰'), check:c=>c.sunk>=1, prog:c=>[c.sunk||0,1]},
-  {id:'sea_wolf',    icon:'⚔️', name:()=>T('Sea Wolf','海上之狼'),     desc:()=>T('Sink 25 warships','击沉 25 艘敌舰'), check:c=>c.sunk>=25, prog:c=>[c.sunk||0,25]},
-  {id:'deep_terror', icon:'🌊', name:()=>T('Terror of the Deep','深海梦魇'), desc:()=>T('Sink 100 warships','击沉 100 艘敌舰'), check:c=>c.sunk>=100, prog:c=>[c.sunk||0,100]},
-  {id:'ace',         icon:'✈️', name:()=>T('Ace Defender','防空王牌'), desc:()=>T('Shoot down 25 aircraft','击落 25 架飞机'), check:c=>c.planes>=25, prog:c=>[c.planes||0,25]},
-  {id:'beachhead',   icon:'🏝️', name:()=>T('Beachhead','抢滩登陆'),    desc:()=>T('Capture your first island','占领第一座岛屿'), check:c=>c.islands>=1, prog:c=>[c.islands||0,1]},
-  {id:'conqueror',   icon:'🚩', name:()=>T('Conqueror','征服者'),      desc:()=>T('Capture 10 islands','占领 10 座岛屿'), check:c=>c.islands>=10, prog:c=>[c.islands||0,10]},
-  {id:'levi_slayer', icon:'🐋', name:()=>T('Leviathan Slayer','利维坦猎手'), desc:()=>T('Sink a Leviathan','击沉一艘利维坦'), check:c=>c.bosses>=1, prog:c=>[c.bosses||0,1]},
-  {id:'first_win',   icon:'🏅', name:()=>T('First Victory','首胜'),    desc:()=>T('Win your first war','赢下第一场战争'), check:c=>c.wins>=1, prog:c=>[c.wins||0,1]},
-  {id:'veteran',     icon:'🎖️', name:()=>T('Veteran','百战老兵'),      desc:()=>T('Win 10 wars','赢下 10 场战争'), check:c=>c.wins>=10, prog:c=>[c.wins||0,10]},
-  {id:'comeback',    icon:'💪', name:()=>T('Comeback Captain','逆风翻盘'), desc:()=>T('Win a war right after losing one','在一场战败后立刻赢回来'), check:c=>c.wins>=1&&c.losses>=1&&(c.lossStreak||0)===0},
-  {id:'star_ten',    icon:'⭐', name:()=>T('Shining Fleet','群星舰队'), desc:()=>T('Earn 10 theater stars','拿到 10 颗战区星星'), check:c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return n>=10;}, prog:c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return [n,10];}},
-  {id:'admiral',     icon:'👑', name:()=>T('Fleet Admiral','舰队司令'), desc:()=>T('Complete the entire campaign','通关整个战役'), check:c=>!!c.completed},
-  {id:'sink_250',  icon:'💥', name:()=>T('Ship Destroyer I','击舰能手 I'),   desc:()=>T('Sink 250 warships','击沉 250 艘敌舰'),  check:c=>(c.sunk||0)>=250,  prog:c=>[c.sunk||0,250]},
-  {id:'sink_500',  icon:'☠️', name:()=>T('Ship Destroyer II','击舰能手 II'), desc:()=>T('Sink 500 warships','击沉 500 艘敌舰'),  check:c=>(c.sunk||0)>=500,  prog:c=>[c.sunk||0,500]},
-  {id:'sink_1000', icon:'🌩️', name:()=>T('Ship Destroyer III','击舰能手 III'),desc:()=>T('Sink 1000 warships','击沉 1000 艘敌舰'),check:c=>(c.sunk||0)>=1000, prog:c=>[c.sunk||0,1000]},
-  {id:'sky_master',icon:'🦅', name:()=>T('Sky Sweeper','制空霸主'),     desc:()=>T('Shoot down 100 aircraft','击落 100 架飞机'), check:c=>(c.planes||0)>=100, prog:c=>[c.planes||0,100]},
-  {id:'island_lord',icon:'🗺️',name:()=>T('Island Warlord','群岛霸主'),  desc:()=>T('Capture 25 islands','占领 25 座岛屿'),      check:c=>(c.islands||0)>=25, prog:c=>[c.islands||0,25]},
-  {id:'war_hero',  icon:'🎗️', name:()=>T('War Hero','常胜将军'),        desc:()=>T('Win 25 wars','赢下 25 场战争'),            check:c=>(c.wins||0)>=25,   prog:c=>[c.wins||0,25]},
-  {id:'legend',    icon:'🏆', name:()=>T('Living Legend','传奇统帅'),   desc:()=>T('Win 50 wars','赢下 50 场战争'),            check:c=>(c.wins||0)>=50,   prog:c=>[c.wins||0,50]},
-  {id:'levi_bane', icon:'🐉', name:()=>T('Leviathan Bane','巨兽克星'),  desc:()=>T('Sink 10 Leviathans','击沉 10 艘利维坦'),   check:c=>(c.bosses||0)>=10, prog:c=>[c.bosses||0,10]},
-];
+const ACHIEVEMENTS=(()=>{
+  const _sunk=c=>c.sunk||0,_pl=c=>c.planes||0,_isl=c=>c.islands||0,_win=c=>c.wins||0,_boss=c=>c.bosses||0,
+    _fl=c=>c.flawless||0,_fa=c=>c.fast||0,_hw=c=>c.hardWins||0,_cap=c=>c.captures||0,_qw=c=>c.quickWins||0,
+    _flew=c=>c.flew||0,_drove=c=>c.drove||0,_mar=c=>c.marched||0,_dove=c=>c.dove||0,_loss=c=>c.losses||0,
+    _stars=c=>{let n=0;const t=c.theaters||{};for(const k in t)n+=t[k].stars||0;return n;},
+    _tri=c=>{let n=0;const t=c.theaters||{};for(const k in t)if((t[k].stars||0)>=3)n++;return n;},
+    _s=(n,x)=>n>1?x:'';
+  // ladder(statFn, descBuilder, rows[[goal,id,icon,en,zh]...]) → one medal per tier, each with a progress bar.
+  // Existing ids are kept at their old thresholds so no earned medal is lost — the Ship Destroyer line just
+  // renumbers (old I/II/III at 250/500/1000 become IV/V/VI as the ladder now starts far lower, at 10 kills).
+  const L=(fn,mk,rows)=>rows.map(r=>({id:r[1],icon:r[2],name:()=>T(r[3],r[4]),desc:()=>mk(r[0]),check:c=>fn(c)>=r[0],prog:c=>[fn(c),r[0]]}));
+  return [].concat(
+    L(_sunk, n=>n===1?T('Sink your first enemy warship','击沉第一艘敌舰'):T('Sink '+n+' warships','击沉 '+n+' 艘敌舰'), [
+      [1,'first_blood','🩸','First Blood','首开纪录'],
+      [10,'sd_1','💥','Ship Destroyer I','击舰能手 I'],[30,'sd_2','🔪','Ship Destroyer II','击舰能手 II'],
+      [100,'deep_terror','🌊','Ship Destroyer III','击舰能手 III'],[250,'sink_250','⚔️','Ship Destroyer IV','击舰能手 IV'],
+      [500,'sink_500','☠️','Ship Destroyer V','击舰能手 V'],[1000,'sink_1000','🌩️','Ship Destroyer VI','击舰能手 VI'],
+      [2000,'sd_7','🌪️','Ship Destroyer VII','击舰能手 VII'],[3500,'sd_8','⚡','Ship Destroyer VIII','击舰能手 VIII'],
+      [5500,'sd_9','☄️','Ship Destroyer IX','击舰能手 IX'],[8000,'sd_10','💀','Ship Destroyer X','击舰能手 X'],
+      [11000,'sd_11','👹','Ship Destroyer XI','击舰能手 XI'],[15000,'sd_12','🔱','Ship Destroyer XII','击舰能手 XII']]),
+    L(_pl, n=>T('Shoot down '+n+' aircraft','击落 '+n+' 架飞机'), [
+      [5,'sa_1','🎯','Sky Ace I','制空能手 I'],[15,'sa_2','🛩️','Sky Ace II','制空能手 II'],
+      [25,'ace','✈️','Sky Ace III','制空能手 III'],[50,'sa_4','🚀','Sky Ace IV','制空能手 IV'],
+      [100,'sky_master','🦅','Sky Ace V','制空能手 V'],[250,'sa_6','⚡','Sky Ace VI','制空能手 VI'],
+      [600,'sa_7','🌠','Sky Ace VII','制空能手 VII'],[1500,'sa_8','☄️','Sky Ace VIII','制空能手 VIII']]),
+    L(_isl, n=>n===1?T('Capture your first island','占领第一座岛屿'):T('Capture '+n+' islands','占领 '+n+' 座岛屿'), [
+      [1,'beachhead','🏝️','Beachhead','抢滩登陆'],[3,'ic_1','⛱️','Island Conqueror I','夺岛能手 I'],
+      [10,'conqueror','🚩','Island Conqueror II','夺岛能手 II'],[25,'island_lord','🗺️','Island Conqueror III','夺岛能手 III'],
+      [50,'ic_4','🏴','Island Conqueror IV','夺岛能手 IV'],[100,'ic_5','🌐','Island Conqueror V','夺岛能手 V'],
+      [200,'ic_6','🏰','Island Conqueror VI','夺岛能手 VI']]),
+    L(_win, n=>n===1?T('Win your first war','赢下第一场战争'):T('Win '+n+' wars','赢下 '+n+' 场战争'), [
+      [1,'first_win','🏅','First Victory','首胜'],[3,'wc_1','🥉','War Commander I','战地指挥 I'],
+      [10,'veteran','🎖️','War Commander II','战地指挥 II'],[25,'war_hero','🎗️','War Commander III','战地指挥 III'],
+      [50,'legend','🏆','War Commander IV','战地指挥 IV'],[100,'wc_5','🥇','War Commander V','战地指挥 V'],
+      [200,'wc_6','🌟','War Commander VI','战地指挥 VI'],[400,'wc_7','💫','War Commander VII','战地指挥 VII'],
+      [700,'wc_8','🎇','War Commander VIII','战地指挥 VIII'],[1200,'wc_9','🌌','War Commander IX','战地指挥 IX']]),
+    L(_boss, n=>n===1?T('Sink a Leviathan','击沉一艘利维坦'):T('Sink '+n+' Leviathans','击沉 '+n+' 艘利维坦'), [
+      [1,'levi_slayer','🐋','Leviathan Bane I','巨兽克星 I'],[3,'lb_1','🦈','Leviathan Bane II','巨兽克星 II'],
+      [10,'levi_bane','🐉','Leviathan Bane III','巨兽克星 III'],[25,'lb_3','🐙','Leviathan Bane IV','巨兽克星 IV'],
+      [50,'lb_4','🦑','Leviathan Bane V','巨兽克星 V'],[100,'lb_5','🐊','Leviathan Bane VI','巨兽克星 VI']]),
+    L(_stars, n=>T('Earn '+n+' theater stars','拿到 '+n+' 颗战区星星'), [
+      [3,'star_3','✨','First Stars','初获星徽'],[10,'star_ten','⭐','Shining Fleet','群星舰队'],
+      [20,'star_20','💠','Stellar Fleet','星辉舰队'],[40,'star_40','🌠','Constellation','星座舰队'],
+      [60,'star_60','🎆','Galaxy Fleet','银河舰队'],[90,'star_90','🌌','Perfect Armada','完美舰队']]),
+    L(_tri, n=>T('Earn 3★ on '+n+' theater'+_s(n,'s'),n+' 个战区拿满三星'), [
+      [1,'tri_1','🏵️','Flawless Theater','完美战区'],[5,'tri_5','🎀','Perfect Streak','连战全胜'],
+      [10,'tri_10','🎯','Master Tactician','战术大师']]),
+    L(_fl, n=>T('Win '+n+' war'+_s(n,'s')+' without losing a ship','零损舰赢下 '+n+' 场'), [
+      [1,'fl_1','🛡️','Unscathed','毫发无伤'],[5,'fl_5','🔰','Iron Hull','铁壁之师'],
+      [10,'fl_10','⚜️','Untouchable','无懈可击'],[25,'fl_25','💎','Flawless Admiral','完美统帅']]),
+    L(_fa, n=>T('Win '+n+' war'+_s(n,'s')+' under par time','限时内赢下 '+n+' 场'), [
+      [1,'fa_1','⏱️','Quick Work','速战速决'],[5,'fa_5','🏇','Blitz','闪电突击'],
+      [10,'fa_10','🚄','Lightning War','雷霆攻势'],[25,'fa_25','🌀','Tempo Master','节奏大师']]),
+    L(_hw, n=>T('Win '+n+' war'+_s(n,'s')+' on Hard','困难难度赢下 '+n+' 场'), [
+      [1,'hw_1','😤','Trial by Fire','烈火淬炼'],[5,'hw_5','🔥','Hardened','千锤百炼'],
+      [15,'hw_15','🌋','No Mercy','铁血无情'],[25,'hw_25','⛓️','Iron Will','钢铁意志']]),
+    L(_cap, n=>T('Capture '+n+' ship'+_s(n,'s')+' by boarding','接舷俘获 '+n+' 艘敌舰'), [
+      [1,'cap_1','🪝','Prize Crew','接舷夺舰'],[5,'cap_5','🏴‍☠️','Corsair','私掠船长'],
+      [15,'cap_15','⚓','Fleet Thief','夺舰高手'],[25,'cap_25','🗝️','Master Boarder','接舷大师']]),
+    L(_qw, n=>T('Win '+n+' quick battle'+_s(n,'s'),'赢下 '+n+' 场快速战斗'), [
+      [1,'qw_1','⏳','Pick-up Game','小试身手'],[10,'qw_10','🎮','Coffee-Break Captain','碎片时间舰长'],
+      [25,'qw_25','🕹️','Speedrunner','速通舰长']]),
+    L(_flew, n=>n===1?T('Take to the skies','首次驾机翱翔'):T('Fly '+n+' sorties','出击 '+n+' 架次'), [
+      [1,'flew_1','🛫','Take to the Skies','首次翱翔'],[25,'flew_25','🕊️','Naval Aviator','舰载机飞行员'],
+      [100,'flew_100','🛸','Sky Veteran','空战老兵']]),
+    L(_drove, n=>n===1?T('Take the wheel of a tank','首次驾驶坦克'):T('Crew a tank '+n+' times','驾驶坦克 '+n+' 次'), [
+      [1,'drove_1','🛞','Tread Ahead','首次驾坦克'],[25,'drove_25','🚜','Armored Commander','装甲指挥官']]),
+    L(_mar, n=>n===1?T('Set boots on the ground','首次登陆上岸'):T('Go ashore '+n+' times','登陆上岸 '+n+' 次'), [
+      [1,'march_1','🥾','Boots on the Ground','首次登陆'],[10,'march_10','🪖','Marine','陆战老兵']]),
+    L(_dove, n=>n===1?T('Run silent, run deep','首次下潜潜航'):T('Dive '+n+' times','下潜 '+n+' 次'), [
+      [1,'dove_1','🤿','Silent Running','首次下潜'],[10,'dove_10','🐳','Deep Diver','深潜专家']]),
+    L(_loss, n=>T('Lose '+n+' wars — and keep fighting','输掉 '+n+' 场仍不放弃'), [
+      [10,'loss_10','🩹','Battle-Scarred','身经百战'],[25,'loss_25','🆘','Never Surrender','永不言弃']]),
+    [
+      {id:'comeback', icon:'💪', name:()=>T('Comeback Captain','逆风翻盘'), desc:()=>T('Win a war right after losing one','在一场战败后立刻赢回来'), check:c=>c.wins>=1&&c.losses>=1&&(c.lossStreak||0)===0},
+      {id:'all_rounder', icon:'🎭', name:()=>T('Jack of All Trades','全能舰长'), desc:()=>T('Fly, drive a tank, go ashore and dive a sub','开过飞机、坦克，登过陆，也潜过水'), check:c=>(c.flew||0)>=1&&(c.drove||0)>=1&&(c.marched||0)>=1&&(c.dove||0)>=1},
+      {id:'admiral', icon:'👑', name:()=>T('Fleet Admiral','舰队司令'), desc:()=>T('Complete the entire campaign','通关整个战役'), check:c=>!!c.completed}
+    ]
+  );
+})();
 function checkAchievements(quiet){
   career.achievements=career.achievements||[];
   const newly=[];
@@ -5191,7 +5250,7 @@ function nearestDeckTank(){ let b=null,bd=7; playerTanks.forEach(tk=>{ if(!tk.on
   const d=Math.hypot(walkPos.x-tk.group.position.x, walkPos.z-tk.group.position.z); if(d<bd){bd=d;b=tk;} }); return b; }
 function nearestFieldTank(){ let b=null,bd=8; if(!onFoot)return null;
   playerTanks.forEach(tk=>{ if(tk.onDeck||tk.hp<=0)return; const p=tk.pos||tk.group.position, d=Math.hypot(footPos.x-p.x,footPos.z-p.z); if(d<bd){bd=d;b=tk;} }); return b; }
-function mountTank(tk){ drivingTank=tk; onFoot=false;
+function mountTank(tk){ drivingTank=tk; onFoot=false; warRecord('drove');
   camYaw.v = tk.onDeck ? (player.heading + tk.heading) : tk.heading; camPitch.v=0.08;
   flashPrompt('Crewing the '+(tk.name||'tank')+' — WASD drive · Mouse aim · Click fire · E to dismount.'); updateMode();
   startTankTutorial(); }
@@ -6352,6 +6411,7 @@ function captureEnemyShip(e){
   e.callsign='PRIZE-'+(_callsignN+1);e.role='attack';e._sos=0;e.commsT=12;e.upgT=1e9;e.planeT=99;
   allies.push(e);money+=750;updateHUD();refreshShop();sfxClick();
   if(typeof comms==='function')comms(e.callsign,'Prize crew aboard — captured hull joining the fleet.','#8fd0a0');
+  warRecord('captures');
   flashPrompt('⚓ SHIP CAPTURED — '+e.def.name.toUpperCase()+' JOINS YOUR FLEET · +$750');return true;
 }
 function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot up in it
@@ -6430,7 +6490,7 @@ function flyPlane(pa){
   const fuel=pa.def.fuel||200;
   piloting={ plane:pa, pos:wp.clone(), speed:pa.def.speed*0.35, gunCd:0, bombCd:0, roll:0, lastYaw:player.heading||0, phase:'takeoff', taxiT:0, hp:pa.def.hp, maxhp:pa.def.hp,
     fuel,fuelMax:fuel,engineOn:true,gLoad:0,stallT:0,parts:initPlaneParts(pa.def) };
-  pa.parked=false; camYaw.v=player.heading||0; camPitch.v=0.05;
+  pa.parked=false; camYaw.v=player.heading||0; camPitch.v=0.05; warRecord('flew');
   if(pa.def.uav) fpv=true;
   const cv=document.getElementById('c'); if(document.pointerLockElement!==cv) try{const _pl=cv.requestPointerLock(); if(_pl&&_pl.catch)_pl.catch(()=>{});}catch(e){}
   flashPrompt('Takeoff roll…'); updateMode();
@@ -7372,7 +7432,7 @@ function toggleFoot(){
   landSpots().forEach(o=>{ const d=islandEdgeDistance(player.pos,o); if(d<bd){bd=d;best=o;} });
   if(best && bd<80){
     if(driving) stopDrive();   // G at the helm: step off the wheel and go ashore in one press
-    onFoot=true; resetFootHealth(); footLand=best.island||best.harbor||best;
+    onFoot=true; resetFootHealth(); footLand=best.island||best.harbor||best; warRecord('marched');
     footPos.copy(player.pos); clampToIsland(footPos,footLand,0.82); footPos.y=groundHeightAt(footPos,footLand)+EYE;
     flashPrompt('Ashore'+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.','ok'); updateMode();
   } else flashPrompt('Sail right up alongside an island or harbor, then press G to go ashore.','bad');
@@ -7476,6 +7536,7 @@ function toggleDive(){
   if(phase!=='play'||panelOpen()) return;
   if(player.def.kind!=='sub'){ flashPrompt('Only submarines can dive (pick the Attack Submarine)'); return; }
   player.submerged=!player.submerged;
+  if(player.submerged) warRecord('dove');
   flashPrompt(player.submerged?'🌊 DIVE! DIVE! — running silent · torpedoes only':'⬆ Surfacing — all weapons back online');
 }
 function updateSub(dt){
@@ -8644,6 +8705,15 @@ function endGame(win,msg){
   if(win&&!mpMatch) recordShipWear();                // note how battered the ship ended up, for next mission
   const oldRank=careerRank();
   if(!mpMatch) warRecord(win?'wins':'losses');
+  if(win&&!mpMatch){                                            // medal counters: quick wins, and flawless / fast / hard campaign wins
+    if(quickMode) warRecord('quickWins');
+    else if(currentSandboxIdx<0){
+      const _M=CAMPAIGN[currentMapIdx]||{}, _dur=Math.max(0,t2-warStartT2-armoryT), _par=240+(_M.enemies||3)*80;
+      if(shipsLostThisWar===0) warRecord('flawless');
+      if(_dur<=_par) warRecord('fast');
+      if(difficulty==='hard') warRecord('hardWins');
+    }
+  }
   if(!mpMatch){ career.lossStreak = win?0:(career.lossStreak||0)+1; saveCareer(); }
   if(win&&!mpMatch){ rivalAdvance('frustrated'); if(currentMapIdx+1>=Math.floor(CAMPAIGN.length/2)) rivalAdvance('respect'); }
   const r=careerRank(), nx=nextRank();
