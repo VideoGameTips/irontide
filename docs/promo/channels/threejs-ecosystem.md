@@ -13,8 +13,8 @@
 本文档是一份**可直接复制粘贴**的发布材料。所有要贴到平台上的内容都是英文、放在代码块里(一键复制);操作说明是中文。
 
 **隐私红线(每次发帖前默念一遍):**
-- 永远不提孩子的真实姓名、年龄、城市、学校,不出现人脸。
-- 只用「my kid」或 GitHub ID「VideoGameTips」指代孩子。
+- 孩子的名字可以公开(署名是他应得的);不公开的是年龄、城市、学校、照片/声音、私人邮箱。
+- 名字、年龄、城市这三项里,任意两项都不要在同一处同时出现;帖子里直接用「my kid」或 GitHub ID「VideoGameTips」指代最省事。
 - 所有账号、所有帖子都由家长(你)出面。
 
 **诚实红线:** 不编数字、不吹「best / revolutionary」、多人模式只能标注 experimental 或干脆不提。
@@ -82,7 +82,7 @@ A 31-theater battleship campaign in a single ~800 KB index.html — three.js r12
 标题 B(故事 + 技术):
 
 ```
-My kid built a battleship campaign game in one index.html with three.js r128 — I maintain the polished fork. Here's 30 seconds of it [sound on]
+My kid built a battleship campaign game in one index.html with three.js r128 — I'm the parent who maintains it. Here's 30 seconds [sound on]
 ```
 
 ### 一楼评论(发布后立刻贴)
@@ -100,10 +100,9 @@ Some tech notes, since this is r/threejs:
 - **Adaptive quality.** A per-frame monitor scales quality (including toggling bloom) to hold frame rate; there are manual quality settings too.
 - **PWA + inputs.** Installable (manifest + service worker), runs on desktop and mobile, with keyboard/mouse, gamepad, and touch controls. Bilingual English/中文.
 
-Honest credit: the vast majority of the game — gameplay, campaign, systems — was designed and built solo by my kid (GitHub: VideoGameTips). I maintain a polished fork (bug fixes, i18n completion, onboarding, achievements, performance), with AI-assisted code review.
+Honest credit: the vast majority of the game — gameplay, campaign, systems — was designed and built solo by my kid (GitHub: VideoGameTips). It's all one open-source repo; I'm the parent and I maintain it (bug fixes, i18n completion, onboarding, achievements, performance), with AI-assisted code review.
 
-- Original repo (the kid's): https://github.com/VideoGameTips/irontide
-- Polished fork (what's deployed): https://github.com/longmaolab/irontide
+- Source (one repo — game, docs, tools): https://github.com/VideoGameTips/irontide
 
 Happy to answer questions — and for deep engine questions I may relay them to the repo issues.
 ````
@@ -121,7 +120,7 @@ Happy to answer questions — and for deep engine questions I may relay them to 
 ### 注册与准备
 1. 打开 https://discourse.threejs.org → Sign Up。用户名建议 `longmaolab`(和 GitHub 一致,增加可信度),邮箱用你常用邮箱。
 2. 注册后**先浏览 10–15 分钟**,点开几个 Showcase 帖读一读。Discourse 对全新账号有链接数量限制,浏览可以升到基础信任等级。
-3. 如果发帖时提示「new users can only put N links in a post」:先删掉原始仓库那条链接发出去,等帖子过审后再用回复补上。
+3. 如果发帖时提示「new users can only put N links in a post」:先把 GitHub 仓库那条链接删掉、只留 Play 链接发出去,等帖子过审后再用回复补上。
 
 ### 发帖表单字段
 | 字段 | 填写值 |
@@ -146,7 +145,7 @@ Iron Tide is a WWII-style naval campaign game: command a battleship through a 31
 
 [拖入截图 final/01-menu.png]
 
-**Who made it (honest credit):** the vast majority of the game — gameplay, the whole campaign, the systems — was designed and built solo by my kid (GitHub: [VideoGameTips](https://github.com/VideoGameTips/irontide)). I'm the parent; I maintain a polished fork (bug fixes, i18n completion, onboarding, achievements, performance), with AI-assisted code review. This post is about the tech, because I think some of it is genuinely interesting.
+**Who made it (honest credit):** the vast majority of the game — gameplay, the whole campaign, the systems — was designed and built solo by my kid (GitHub: [VideoGameTips](https://github.com/VideoGameTips/irontide)). I'm the parent; it's all one open-source repo and I maintain it (bug fixes, i18n completion, onboarding, achievements, performance), with AI-assisted code review. This post is about the tech, because I think some of it is genuinely interesting.
 
 ## Architecture: one HTML file, no bundler
 
@@ -192,10 +191,9 @@ Bloom uses the vendored r128 `UnrealBloomPass`. A per-frame `updateAdaptiveQuali
 ## Links
 
 - Play: https://game.boobank.com/irontide/
-- Original repo (the kid's): https://github.com/VideoGameTips/irontide
-- Polished fork (what's deployed): https://github.com/longmaolab/irontide
+- Source (one repo — game, docs, tools): https://github.com/VideoGameTips/irontide
 
-Feedback very welcome — especially on the adaptive-quality approach, and from anyone who has migrated a large single-file r128 project to a current three.js release: advice appreciated, it's on the fork's roadmap.
+Feedback very welcome — especially on the adaptive-quality approach, and from anyone who has migrated a large single-file r128 project to a current three.js release: advice appreciated, it's on the roadmap.
 ````
 
 ### 审核期望
@@ -207,18 +205,18 @@ Feedback very welcome — especially on the adaptive-quality approach, and from 
 
 ## 4. 发帖后:英文回复模板
 
-你能答的就自己答;答不了的技术问题,统一转到 fork 仓库的 issues。以下模板按场景取用。
+你能答的就自己答;答不了的技术问题,统一转到仓库的 issues。以下模板按场景取用。
 
 **场景 1:太深的引擎/代码问题,答不上来**
 
 ```
-Great question — that part is deeper in the engine than I can speak to off the top of my head. Would you mind opening an issue at https://github.com/longmaolab/irontide/issues? I'll dig into it there and reply with actual code references.
+Great question — that part is deeper in the engine than I can speak to off the top of my head. Would you mind opening an issue at https://github.com/VideoGameTips/irontide/issues? I'll dig into it there and reply with actual code references.
 ```
 
 **场景 2:有人问「真的是小孩做的吗?」**
 
 ```
-Fair question, and I want to be precise: the game itself — gameplay, the 31-theater campaign, the systems — was designed and built solo by my kid (GitHub: VideoGameTips; the original repo's history is public). What I did as the parent is the polished fork: bug fixes, finishing the i18n, onboarding, achievements, and performance work, with AI-assisted code review. So the game is the kid's; the polish pass is mine. For privacy reasons I won't share anything identifying about them.
+Fair question, and I want to be precise: the game itself — gameplay, the 31-theater campaign, the systems — was designed and built solo by my kid (GitHub: VideoGameTips; the repo's commit history is public, so you can check). What I do as the parent is maintenance: bug fixes, finishing the i18n, onboarding, achievements, and performance work, with AI-assisted code review. So the game is the kid's; the upkeep is mine. They're a minor, so I won't get into age, location, or school.
 ```
 
 **场景 3:有人问多人模式**
@@ -230,13 +228,13 @@ There is a very early multiplayer prototype in the codebase, but it's experiment
 **场景 4:有人问为什么用 r128 这么老的版本**
 
 ```
-Honest answer: r128 is what the game was originally built on, and the single-file no-bundler architecture made "just keep the vendored lib" the path of least resistance. Migrating to a current release is on the fork's roadmap — if you've done a large r128 → modern migration, I'd genuinely love pointers.
+Honest answer: r128 is what the game was originally built on, and the single-file no-bundler architecture made "just keep the vendored lib" the path of least resistance. Migrating to a current release is on the roadmap — if you've done a large r128 → modern migration, I'd genuinely love pointers.
 ```
 
 **场景 5:有人报 bug**
 
 ```
-Thanks for the report! Could you file it at https://github.com/longmaolab/irontide/issues with your device/browser and what happened? That's the fork where fixes land, and I'll follow up there.
+Thanks for the report! Could you file it at https://github.com/VideoGameTips/irontide/issues with your device/browser and what happened? That's where fixes land, and I'll follow up there.
 ```
 
 **场景 6:单纯的夸奖/鼓励**
@@ -245,7 +243,7 @@ Thanks for the report! Could you file it at https://github.com/longmaolab/ironti
 Thank you — I'll pass that along to the kid. Comments like this are exactly why I posted.
 ```
 
-隐私提醒:任何人追问孩子的年龄、地区、上什么学,一律用场景 2 模板最后那句挡回去,不解释更多。
+隐私提醒:任何人追问孩子的年龄、地区、上什么学,一律用场景 2 模板最后那句挡回去,不解释更多。名字本身可以公开,但不要和年龄或城市一起出现。名字本身可以公开,但不要和年龄或城市一起出现。名字本身可以公开,但不要和年龄或城市一起出现。名字本身可以公开,但不要和年龄或城市一起出现。
 
 ---
 
@@ -253,7 +251,7 @@ Thank you — I'll pass that along to the kid. Comments like this are exactly wh
 
 首页项目从 Showcase 里选,约每半年刷新一次。现在发帖就是「入池」,以下是能提高被选中概率的事(按性价比排序):
 
-1. **升级 three.js 版本。** 首页倾向展示技术上「现在时」的项目,r128 是 2021 年的版本。把 fork 迁到近期 release 是最大的单项加分,而且正好可以在论坛帖里更新进展(「we migrated from r128 to rXXX, here's what broke」这种跟帖本身就很受欢迎)。
+1. **升级 three.js 版本。** 首页倾向展示技术上「现在时」的项目,r128 是 2021 年的版本。把游戏迁到近期 release 是最大的单项加分,而且正好可以在论坛帖里更新进展(「we migrated from r128 to rXXX, here's what broke」这种跟帖本身就很受欢迎)。
 2. **保持论坛帖活跃。** 版主选项目时会看帖子:及时回复、贴更新截图、发 changelog 式跟帖。一个持续更新的帖子比一个发完就沉的帖子显眼得多。
 3. **首屏 10 秒的观感。** 评审者只会点开玩几十秒:确保加载快、默认画质在普通电脑上就好看、手机打开不翻车、console 里没有报错刷屏。
 4. **一张高质量预览图。** 首页是缩略图墙,准备一张构图干净的横版截图(黄昏 bloom 海战那种),同时设置好页面的 Open Graph 预览图。

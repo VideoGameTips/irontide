@@ -35,12 +35,12 @@
 
 ![舷侧齐射](docs/images/hero-broadside.png)
 
-**原作者：[VideoGameTips](https://github.com/VideoGameTips/irontide)** —— 29 艘可选战舰、61 种飞机、22 种坦克、31 关战役、会自己买武器升级的 AI 舰队、损管与天气系统，全部装在一个 HTML 文件里。
+29 艘可选战舰、61 种飞机、22 种坦克、31 关战役、会自己买武器升级的 AI 舰队、损管与天气系统，**全部装在一个 HTML 文件里**，没有任何构建步骤。
 
 - **29 艘可选战舰**，从护卫舰到超无畏舰，还有大和、武藏、俾斯麦、密苏里、企业号、胡德号、致远、定远、辽宁这些历史名舰
 - **31 个战区的世界战役**，尽头站着宿敌瓦尔加大元帅（Grand Marshal Varga）——他会在电台里跟你说话
 - **一场战斗里四种打法无缝切换**：军舰、飞机、坦克、步兵
-- **12 枚勋章 + 每个战区三星评价 + 家庭高分榜**
+- **12 枚勋章 + 每个战区三星评价 + 可存成 PNG 的战报卡片**
 - **快速战斗**和 **7 张沙盒地图**，想打一架就打一架
 - 动态天气 + 每个战区各自不同的程序化配乐；L 键拍照模式
 - 中英双语随时切换
@@ -49,9 +49,10 @@
 
 ---
 
-## 这个 fork 改了什么
+## 为了让新玩家上手，后来补了这些
 
-这个 fork 只做一件事：**让第一次打开游戏的小朋友也能马上玩得开心。**
+游戏本体是 [VideoGameTips](https://github.com/VideoGameTips) 一个人做的。下面这些是后来补的，
+目标只有一个：**让第一次打开游戏的小朋友也能马上玩得开心。**
 
 | | |
 |---|---|
@@ -85,7 +86,7 @@ tests/            node:test 单测 + Playwright 冒烟测试（npm test）
 tools/            推广物料生产工具（截图/视频/门户构建包，见下）
 server/           可选的 WebSocket 中继服务器（多人游戏用，实验性）
 docs/             设计文档（DIRECTION.md：穿透/打击感/组装/成就/故事的方向规划）
-promo/            推广渠道执行手册与物料（见 promo/README.md）
+docs/promo/       推广渠道执行手册（逐字可复制的上架文案）
 ```
 
 ### 推广物料工具
@@ -93,18 +94,14 @@ promo/            推广渠道执行手册与物料（见 promo/README.md）
 ```bash
 npm install                            # 需要 @playwright/test
 node tools/capture-screenshots.js      # 从线上站点抓一组宣传截图
-node tools/capture-hero-video.js       # 录 45 秒 hero 视频（运镜脚本化）
-node tools/build-portal.js             # 生成 itch.io / 门户两个发行 zip
-node tools/verify-portal-build.js      # 在 iframe 里实测两个 zip（10 项检查）
+node tools/render-covers.js            # 各平台规格的封面图
+node tools/build-portal.js             # 生成 itch.io / CrazyGames 等发行 zip
+node tools/verify-portal-build.js      # 在 iframe 里实测每个 zip（11 项检查）
+node tools/verify-copy-claims.js       # 核对文案里的数字与游戏是否还一致
+node tools/trailer/capture-shot.js     # 预告片逐帧采集（见 tools/trailer/TRAILER-BRIEF.md）
 ```
 
-门户版 zip 会自动去掉 service worker 注册（第三方 iframe 源下会失败）并隐藏联机入口（CrazyGames 对联机游戏有额外 UX 要求，按单机提交）。
-
----
-
-## 给原作者的话
-
-改进建议都提在了[原仓库的 issue](https://github.com/VideoGameTips/irontide/issues) 里，每条都附了这里对应的实现作为参考。这个游戏是你的，怎么改由你决定。
+门户版 zip 会自动去掉 service worker 注册（第三方 iframe 源下装不上）并隐藏联机入口（CrazyGames 对联机游戏有额外 UX 要求，按单机提交）。生成的物料不进版本库，随时可以重新跑出来。
 
 ---
 

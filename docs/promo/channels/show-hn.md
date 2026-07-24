@@ -67,11 +67,11 @@ Hi HN — poster (and parent) here.
 
 Iron Tide is a naval action game that runs entirely in the browser: you command a battleship through a 31-theater world campaign, and along the way you can also fly planes, drive amphibious tanks, fight on foot, and mount extra cannons onto your deck at port. There's a rival, Grand Marshal Varga, who talks to you over story radio; each theater gets its own procedurally generated music (31 profiles); plus dynamic weather, a photo mode (L key), quick battle and sandbox modes, gamepad and touch support, and English/Chinese localization. Free, no account, no ads, no install.
 
-Transparency up front, since I know the question is coming: my kid (GitHub handle VideoGameTips) designed and built the vast majority of this solo — the gameplay, the campaign, the systems. Original repo: https://github.com/VideoGameTips/irontide
+Transparency up front, since I know the question is coming: my kid (GitHub handle VideoGameTips) designed and built the vast majority of this solo — the gameplay, the campaign, the systems.
 
-I'm the parent. I maintain a polished fork — bug fixes, finishing the i18n, onboarding, achievements, performance — and I used AI-assisted code review for that polish work. The game itself is the kid's. Fork: https://github.com/longmaolab/irontide
+I'm the parent. I do the unglamorous maintenance — bug fixes, finishing the i18n, onboarding, achievements, performance — with AI-assisted code review for that work. The game is the kid's, and it all lives in one open-source repo: https://github.com/VideoGameTips/irontide
 
-We deliberately keep my kid's name, age, and everything else private, so I front the accounts and I'll be the one answering here.
+We keep the private things private — my kid's age, location, school, and photos — and I front every public account, so I'll be the one answering here.
 
 Tech: three.js (r128), essentially one ~800KB index.html plus vendored libs — no build step; what you view-source is the game. It's an installable PWA (manifest + service worker) and runs on desktop and mobile. There's an early multiplayer mode too, but it's experimental — please judge the single-player.
 
@@ -92,10 +92,10 @@ Play: https://game.boobank.com/irontide/
 
 ### 3.1 AI 质疑（"这是 AI 写的吧？" / "又一个 AI 生成游戏"）
 
-必然出现，是 2025–26 年同类帖的头号死因。策略：不辩解、不受伤，直接给可验证的事实（公开的 commit 历史），并主动区分"孩子的游戏本体"和"家长 fork 里用了 AI 辅助的部分"——主动坦白比被挖出来强一百倍。
+必然出现，是 2025–26 年同类帖的头号死因。策略：不辩解、不受伤，直接给可验证的事实（公开的 commit 历史），并主动区分"孩子写的游戏本体"和"家长做维护时用了 AI 辅助的部分"——主动坦白比被挖出来强一百倍。
 
 ```text
-Fair question, and I'd rather answer it head-on. The game — gameplay, campaign, systems — was designed and built by my kid; the commit history on the original repo (https://github.com/VideoGameTips/irontide) is public if you want to look. Where AI *was* involved: on my fork I used AI-assisted code review for the polish work (bug fixes, i18n, performance). I'm not going to claim the project is AI-free, because my part isn't — but the game is the kid's.
+Fair question, and I'd rather answer it head-on. The game — gameplay, campaign, systems — was designed and built by my kid; the commit history in the repo (https://github.com/VideoGameTips/irontide) is public if you want to look. Where AI *was* involved: I used AI-assisted code review for my own maintenance work (bug fixes, i18n, performance). I'm not going to claim the project is AI-free, because my part isn't — but the game is the kid's.
 ```
 
 ### 3.2 "单文件？为什么？"（"800KB 的 HTML？这是反模式吧"）
@@ -111,7 +111,7 @@ Honest answer: it grew that way, and we kept it. For a project like this the zer
 这是最有价值的反馈，回复要像收 bug report 一样感谢并追问环境。游戏有画质设置和自适应画质（含 bloom），先指过去，再请对方提 issue。
 
 ```text
-Thanks — this is exactly the feedback I wanted. Could you share device / OS / browser (and GPU if you know it)? There's a quality settings menu, and adaptive quality should step things down automatically (including bloom) — I'd like to know if it isn't kicking in for you. If you have a minute, an issue at https://github.com/longmaolab/irontide would be gold.
+Thanks — this is exactly the feedback I wanted. Could you share device / OS / browser (and GPU if you know it)? There's a quality settings menu, and adaptive quality should step things down automatically (including bloom) — I'd like to know if it isn't kicking in for you. If you have a minute, an issue at https://github.com/VideoGameTips/irontide would be gold.
 ```
 
 ### 3.4 依赖安全（"vendored three.js r128 太老了，有没有安全问题"）
@@ -124,10 +124,10 @@ Legitimate point — r128 is old. Context on the risk surface: it's a static, cl
 
 ### 3.5 COPPA / 隐私方向的指责（"让小孩上网公开项目合适吗" / "收集儿童数据？"）
 
-多数是真关心，少数是找茬。策略：**回答一次，事实清楚，然后离开那个线程**。核心事实：游戏无账号无广告没什么可收集；孩子的姓名/年龄/地点/长相零公开；所有对外账号都由家长出面。不解释育儿观，不接续辩论。
+多数是真关心，少数是找茬。策略：**回答一次，事实清楚，然后离开那个线程**。核心事实：游戏无账号无广告没什么可收集；孩子的年龄/城市/学校/照片零公开（姓名可以署在自己的作品上，但绝不与年龄、城市同时出现）；所有对外账号都由家长出面。不解释育儿观，不接续辩论。
 
 ```text
-Reasonable thing to raise. The game has no accounts, no sign-up, and no ads — there's nothing to hand over to play it. On the family side: we publish zero identifying details about my kid (no name, age, location, or photos — the GitHub handle is just a handle), and I, the parent, front every public account including this one. That's a line we decided on before publishing anything.
+Reasonable thing to raise. The game has no accounts, no sign-up, and no ads — there's nothing to hand over to play it. On the family side: we don't publish my kid's age, location, school, or photos, and I, the parent, front every public account including this one. That's a line we decided on before publishing anything.
 ```
 
 （如果对方继续纠缠或上升到人身：停止回复。见 3.8。）
@@ -141,7 +141,7 @@ The honest version of what worked for us:
 
 1. The project belongs to the kid — their repo, their design calls, their game. I never "took over the keyboard."
 2. Ship early. A rough playable thing that a family member actually plays teaches more than any tutorial.
-3. I took the maintainer role, not the director role: bug fixes, deployment, i18n — the unglamorous stuff — on a fork, so the kid's repo stays theirs.
+3. I took the maintainer role, not the director role: bug fixes, deployment, i18n — the unglamorous stuff. The direction stays theirs.
 4. Feedback is encouragement-first. "This boss fight is cool — and here's a bug I hit" lands very differently from a code review.
 
 No curriculum, no bootcamp — just a game they wanted to exist. Happy to answer specifics.
@@ -149,10 +149,10 @@ No curriculum, no bootcamp — just a game they wanted to exist. Happy to answer
 
 ### 3.7 功能建议（"应该加潜艇" / "求 VR 支持"）
 
-策略：一律感谢，引到 GitHub issue，同时说清方向由原作者定——这既诚实又再次强化"孩子是作者"的事实。
+策略：一律感谢，引到 GitHub issue，同时说清方向由孩子定——这既诚实又再次强化"游戏是他的"这个事实。
 
 ```text
-Thanks — noted! Best place for this is a GitHub issue (https://github.com/VideoGameTips/irontide for the original, or my fork at https://github.com/longmaolab/irontide). Fair warning on roadmap: the game's direction is the original author's call, not mine — I just keep the fork polished. But real player suggestions are exactly what I hoped to collect today.
+Thanks — noted! Best place for this is a GitHub issue: https://github.com/VideoGameTips/irontide . Fair warning on roadmap: the game's direction is my kid's call, not mine — I mostly fix things. But real player suggestions are exactly what I hoped to collect today.
 ```
 
 ### 3.8 恶意贬低（"垃圾" / "这也配上 HN" / 阴阳怪气）

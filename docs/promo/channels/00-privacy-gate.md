@@ -11,34 +11,34 @@
 > 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
 
 > **这一页没做完，任何渠道都不要发。**
-> 推广的本质是把陌生人引向这两个仓库和这个站点。引流之前，先确认它们不会泄露不该泄露的东西。
+> 推广的本质是把陌生人引向这个仓库和这个站点。引流之前，先确认它们不会泄露不该泄露的东西。
 > 下面每一条都是 2026-07-24 实际检查出来的结果，不是假想风险。
 
 ## 家里定的口径（2026-07-24）
 
 - **名字（Andy）可以公开**。这是家长的决定：一个名字不构成风险，而且孩子署名自己的作品是应得的。
-- **私人邮箱不可以**。`zianandyli@gmail.com` 出现在两个仓库的每一条提交里，任何人用 GitHub 公开 API 就能一次性拉走，是垃圾邮件、钓鱼和身份关联的直接入口。
-- **不公开的**：年龄、城市、学校、真人照片/录音。这三样组合起来才真正定位到一个孩子，比名字危险得多。
+- **私人邮箱不可以**。<孩子的旧私人邮箱> 出现在仓库的每一条提交里，任何人用 GitHub 公开 API 就能一次性拉走，是垃圾邮件、钓鱼和身份关联的直接入口。
+- **不公开的**：年龄、城市、学校、真人照片/录音。这些东西组合起来才真正定位到一个孩子，比名字危险得多。
 
 按这个口径，下面各条的处理方式都已相应调整。
 
 ## 已经处理的
 
-### 1. 提交历史里的私人邮箱 —— 已重写（fork 仓库）
+### 1. 提交历史里的私人邮箱 —— 已重写
 
-`longmaolab/irontide` 的全部提交作者邮箱已改写成 GitHub 的 noreply 地址，**作者名 `Andy Li` / `VideoGameTips` 原样保留**。验证：
+`VideoGameTips/irontide`（合并之后唯一的仓库）里孩子的提交作者邮箱已全部改写成 GitHub 的 noreply 地址，**作者名 `Andy Li` / `VideoGameTips` 原样保留**，30 个提交的文件内容逐一比对未变。验证：
 
 ```bash
 git log --format='%an <%ae>' | sort -u
 ```
 
-输出里不应再出现任何 `@gmail.com`。
+输出里不应再出现孩子那个私人 gmail 地址（家长自己账号的邮箱不在此列）。
 
-> **孩子自己的仓库 `VideoGameTips/irontide` 还没改** —— 那是他的仓库，需要他本人操作或明确授权。做法与这边完全一样，命令见文末附录。在他改之前，"去看提交历史"这类邀请仍然会把人引到有邮箱的地方。
+> 现在提交历史里已经没有私人邮箱了，所以各渠道文案里"提交历史是公开的，你自己看"这类邀请是安全的——那条路径通向的是 `Andy Li` / `VideoGameTips` 的署名和家长的维护提交，不通向任何私人邮箱。
 
 ### 2. 游戏源码里的注释 —— 已改，等部署
 
-`index.html` 原有四处中文注释写着孩子的名字。按新口径名字本身没问题，但这四处注释的内容是"谁写了哪段代码"，对读源码的人没有意义，已统一改成「上游新增…」。`server/README.md` 的示例玩家名同步改成 `Captain`。
+`index.html` 原有四处中文注释写着孩子的名字。按新口径名字本身没问题，但这四处注释的内容是"谁写了哪段代码"，对读源码的人没有意义，已统一改成不带人名的中性注释。`server/README.md` 的示例玩家名同步改成 `Captain`。
 
 （这条只在部署后生效：`curl -s https://game.boobank.com/irontide/ | grep -c gmail` 应为 0。）
 
@@ -46,11 +46,11 @@ git log --format='%an <%ae>' | sort -u
 
 ### 孩子的仓库（`VideoGameTips/irontide`）
 
-`longmaolab/irontide` 已经改完了，但孩子的原始仓库里每条提交仍带着 `zianandyli@gmail.com`。而所有渠道文案在回应"真的是小孩做的吗"时都会说"提交历史是公开的，你自己看"——那条路径目前仍然通向邮箱。
+`VideoGameTips/irontide` 已经改完了，但孩子的原始仓库里每条提交仍带着 <孩子的旧私人邮箱>。而所有渠道文案在回应"真的是小孩做的吗"时都会说"提交历史是公开的，你自己看"——那条路径目前仍然通向邮箱。
 
 需要孩子本人（或经他同意）执行，命令见文末附录。这是他的仓库，不该由别人代改历史。
 
-**在他改完之前**，两个选择：要么暂时只放 fork 的链接（`github.com/longmaolab/irontide`），要么就接受邮箱可见。不要在他不知情的情况下 force push 他的仓库。
+已完成：作者名 `Andy Li` 保留，邮箱换成 GitHub 的 noreply 地址，30 个提交的文件内容逐一比对未变。
 
 ### 顺手把源头堵住
 
@@ -104,14 +104,14 @@ unzip -p irontide-portal-singleplayer.zip index.html | grep -ci "gmail\|@qinfund
 
 ## 附录：重写提交历史里的邮箱（保留名字）
 
-在仓库目录下执行。**会改变所有 commit 哈希**，需要 force push。
+这一步已经在 `VideoGameTips/irontide` 上做完了，记在这里备查：万一以后有新提交又把真实邮箱带进历史，按同样的步骤再跑一次。在仓库目录下执行。**会改变所有 commit 哈希**，需要 force push。
 
 ```bash
 brew install git-filter-repo        # 或 pip install git-filter-repo
 
 cat > /tmp/irontide.mailmap <<'EOF'
-Andy Li <videogametips@users.noreply.github.com> <zianandyli@gmail.com>
-VideoGameTips <videogametips@users.noreply.github.com> <zianandyli@gmail.com>
+Andy Li <videogametips@users.noreply.github.com> <孩子的旧私人邮箱>
+VideoGameTips <videogametips@users.noreply.github.com> <孩子的旧私人邮箱>
 EOF
 
 git filter-repo --mailmap /tmp/irontide.mailmap --force
@@ -126,6 +126,6 @@ git push --force origin main
 git log --format='%an <%ae>' | sort -u
 ```
 
-不应再出现 `@gmail.com`。
+不应再出现孩子那个私人 gmail 地址。
 
-> 注意：`filter-repo` 跑完会把 `origin` remote 删掉（它的安全设计，防止误推）。上面的 `git push` 之前如果报 "no such remote"，先 `git remote add origin git@github.com:<owner>/irontide.git`。
+> 注意：`filter-repo` 跑完会把 `origin` remote 删掉（它的安全设计，防止误推）。上面的 `git push` 之前如果报 "no such remote"，先 `git remote add origin git@github.com:VideoGameTips/irontide.git`。

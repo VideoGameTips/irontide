@@ -19,8 +19,8 @@
 
 | 事项 | 结论 |
 |---|---|
-| 建议发布日 | **2026-08-23(周日,太平洋时间)**,即北京时间 **8月16日(周日)15:01 上线** |
-| 备选日 | 2026-08-17(周一 PT)= 北京时间周一 15:01;若 Reddit/HN 档期顺延,则改 08-23(周日)/08-24(周一) |
+| 建议发布日 | **2026-08-23(周日,太平洋时间)**,即北京时间 **8月23日(周日)15:01 上线** |
+| 备选日 | 2026-08-24(周一 PT)= 北京时间周一 15:01;若 Reddit/HN 档期顺延,则改 08-30(周日)/08-31(周一) |
 | 预热 | **7月26日(周日)前**建好产品页并排期到 8/23;PH 已取消 Coming Soon 页面,改用产品自带的 Product Forum 帖预热 |
 | 谁来发 | 家长本人账号,自己 hunt 自己(2025-26 年约 60% 都是自发,完全正常) |
 | 孩子的身份 | 名字或 GitHub ID「VideoGameTips」都可以;**不出现年龄、城市、学校、照片**。PH 规定 16 岁以下不能注册,**不要给孩子建账号** |
@@ -29,7 +29,7 @@
 
 ---
 
-## 1. 提前准备(现在 → 8月15日)
+## 1. 提前准备(现在 → 8月22日)
 
 ### 1.1 账号(本周末就做,7/25–7/26)
 
@@ -37,7 +37,7 @@
 2. 完善个人资料:真实头像(家长自己的,不是孩子的)、简介。简介可直接粘贴:
 
 ```text
-Parent and maintainer of Iron Tide — a browser battleship game my kid built. I keep the polished open-source fork running.
+Parent and maintainer of Iron Tide — a browser battleship game my kid built. I keep the open-source project running.
 ```
 
 3. 从现在到发布日,**每周花 30 分钟真实地用 PH**:给别人的产品点赞、留 2–3 条认真评论、关注 Games / Open Source 话题。这既是养账号,也是学习别人的发布页怎么写的。
@@ -59,7 +59,7 @@ Parent and maintainer of Iron Tide — a browser battleship game my kid built. I
 - **时区对家长极其友好**:12:01 AM PT(夏令时 UTC-7)= 北京时间 **同一个周日的 15:01**。周日下午上线、晚上盯盘,孩子也在家,可以一起看(但别让 TA 盯排名,见 §6)。
 - 免费浏览器游戏在 PH 是可行的:2026 年 7 月就有免费浏览器游戏(San Fran Sim)拿过当日 #3。
 
-### 1.4 发布前一周终检(8/9–8/12)
+### 1.4 发布前一周终检(8/16–8/19)
 
 - [ ] 6 张截图按 §2.7 规格重截/确认,上传到产品页
 - [ ] 30–60 秒视频按 §2.8 录好,传 YouTube(公开或 unlisted),链接填入产品页
@@ -67,7 +67,7 @@ Parent and maintainer of Iron Tide — a browser battleship game my kid built. I
 - [ ] 所有表单字段按 §2 填完,预览检查错别字
 - [ ] 第一条评论(§2.6)、回复模板(§4)、当天分享文案(§3.4)全部存到一个随手能开的文档里
 
-### 1.5 发布前一晚 QA(8/15 周六晚)
+### 1.5 发布前一晚 QA(8/22 周六晚)
 
 - [ ] 手机(iOS Safari + Android Chrome)和桌面(Chrome/Safari/Firefox)各开一次 https://game.boobank.com/irontide/ ,确认秒开、能进战斗
 - [ ] 语言切换正常,英文界面无明显漏翻(PH 访客默认看英文)
@@ -106,10 +106,10 @@ Command a battleship across 31 theaters — free, no install
 Sea, air & land combat in one browser tab, built by a kid
 ```
 
-### 2.3 Description(≤260 字符,以下 254 字符)
+### 2.3 Description(≤260 字符,以下 245 字符)
 
 ```text
-Iron Tide is a free browser battleship game: a 31-theater world campaign where you command a warship, fly planes, drive amphibious tanks, and fight on foot. No account, no ads, no install. Built mostly by my kid; I maintain the polished open-source fork.
+Iron Tide is a free browser battleship game: a 31-theater world campaign where you command a warship, fly planes, drive amphibious tanks, and fight on foot. No account, no ads, no install. Built mostly by my kid; I maintain the open-source repo.
 ```
 
 ### 2.4 Links / Topics / Pricing 等字段
@@ -117,11 +117,11 @@ Iron Tide is a free browser battleship game: a 31-theater world campaign where y
 | 字段 | 填写值 |
 |---|---|
 | Website / main link | `https://game.boobank.com/irontide/` |
-| 附加链接(如有栏位) | `https://github.com/VideoGameTips/irontide`(原仓库)、`https://github.com/longmaolab/irontide`(维护 fork) |
+| 附加链接(如有栏位) | `https://github.com/VideoGameTips/irontide`(唯一的开源仓库:游戏 + 文档 + 工具都在里面) |
 | Topics(选 3 个) | **Games**(必选)、**Open Source**、**Web App**(若无此项,备选:GitHub、Tech) |
 | Pricing | **Free** |
 | Promo code / 折扣 | 无,留空 |
-| Makers | 只添加家长自己。孩子不加(未满 16 不能有账号),署名方式是在文案里写 GitHub ID |
+| Makers | 只添加家长自己。孩子不加(未满 16 不能有账号),署名方式是在文案里写名字或 GitHub ID(名字可以公开;年龄/城市/学校/照片/邮箱一律不写) |
 | Hunter | 自己(self-hunt,现在是主流做法) |
 
 ### 2.5 上传顺序
@@ -135,9 +135,9 @@ Hi Product Hunt — parent here, posting on behalf of the actual builder: my kid
 
 The honest story, because I'd rather over-share than have you wonder:
 
-- My kid designed and built the vast majority of Iron Tide solo — the gameplay, the 31-theater world campaign, the rival "Grand Marshal Varga" and his radio chatter, the vehicles, the progression systems. The original repo is github.com/VideoGameTips/irontide.
-- I maintain a polished fork (github.com/longmaolab/irontide): bug fixes, completing the English/Chinese localization, onboarding, achievements, and performance work. I used AI-assisted code review on that polish. The game itself is my kid's work.
-- Product Hunt requires account holders to be 16+, so I own this account and front the launch. My kid will read every comment here.
+- My kid designed and built the vast majority of Iron Tide solo — the gameplay, the 31-theater world campaign, the rival "Grand Marshal Varga" and his radio chatter, the vehicles, the progression systems. It's all one open-source repo: github.com/VideoGameTips/irontide.
+- I handle maintenance on that repo: bug fixes, completing the English/Chinese localization, onboarding, achievements, and performance work. I used AI-assisted code review on that maintenance work. The game itself is my kid's work.
+- Product Hunt's account rules mean this account has to be mine, so I own it and front the launch. My kid will read every comment here.
 
 What the game actually is: a free 3D naval-combat game that runs in your browser — no account, no ads, no install (it's a PWA if you do want to install it). You command a battleship, but you're not stuck on it: you can take off in planes, drive amphibious tanks onto the beach, and fight on foot. In port you can buy extra cannons and mount them on your own deck. There are 31 theaters, each with its own procedurally generated music profile, plus dynamic weather, a photo mode, gamepad and touch support, English/Chinese localization, and a shareable battle report card. It's essentially one ~800KB index.html plus three.js — the whole thing is readable in an afternoon. There's also an early multiplayer mode, but to be upfront: it's experimental and rough.
 
@@ -147,7 +147,7 @@ Feedback that would mean the most:
 2. Performance on your hardware, especially older laptops and phones.
 3. If you show it to a kid who's learning to code: what did they ask?
 
-Ask us anything, including about the AI part — I'm happy to be specific about what was human-built (almost everything) and where AI helped (code review on my fork).
+Ask us anything, including about the AI part — I'm happy to be specific about what was human-built (almost everything) and where AI helped (code review on my maintenance work).
 
 Play: https://game.boobank.com/irontide/
 ```
@@ -202,7 +202,7 @@ A rival with a voice: Grand Marshal Varga taunts you over the radio
 ```bash
 ffmpeg -ss 5 -t 3 -i promo/assets/final/iron-tide-hero-45s.mp4 \
   -vf "crop=ih:ih,scale=240:240:flags=lanczos,fps=12,split[a][b];[a]palettegen[p];[b][p]paletteuse" \
-  -loop 0 promo/assets/final/thumb-ph-240x240.png
+  -loop 0 promo/assets/final/thumb-ph-240x240.gif
 ```
 
 ### 2.8 视频(30–60 秒)镜头清单
@@ -218,7 +218,7 @@ ffmpeg -ss 5 -t 3 -i promo/assets/final/iron-tide-hero-45s.mp4 \
 | 23–30s | 两栖坦克出海登陆、开火 | `Drive amphibious tanks ashore` |
 | 30–36s | 下船步行作战片段 | `Fight on foot` |
 | 36–43s | 港口商店买炮 → 甲板副炮全开齐射 | `Mount extra cannons on your deck` |
-| 43–50s | 勋章页 + 三星评价 + 可分享的战报卡片 | `Medals, stars, family scoreboard` |
+| 43–50s | 勋章页 + 三星评价 + 可分享的战报卡片 | `Medals, stars, and a shareable battle report` |
 | 50–58s | 最帅的一段海战收尾 → 结束卡 | `Free in your browser. No install, no ads. Open source.` 下一行 `game.boobank.com/irontide — built by a kid` |
 
 ---
@@ -256,7 +256,7 @@ ffmpeg -ss 5 -t 3 -i promo/assets/final/iron-tide-hero-45s.mp4 \
 - 只私信「**注册满 1 年以上、平时真实活跃**」的 PH 用户朋友;话术是「我们上线了,欢迎去玩玩、留条反馈」——**请求反馈,不是请求投票**。私信模板:
 
 ```text
-Hey! Today we launched Iron Tide on Product Hunt — a browser battleship game my kid built (I maintain the fork). If you have 5 minutes I'd love your honest take, especially on the first-five-minutes experience: https://www.producthunt.com/posts/iron-tide
+Hey! Today we launched Iron Tide on Product Hunt — a browser battleship game my kid built (I handle the maintenance). If you have 5 minutes I'd love your honest take, especially on the first-five-minutes experience: https://www.producthunt.com/posts/iron-tide
 ```
 
 **绝对不做:**
@@ -286,31 +286,31 @@ Thank you — I'll pass this straight to the builder. Comments like this are exa
 **4.2 「真的是孩子做的?」(善意好奇):**
 
 ```text
-Yes — and the receipts are public. The original repo with its full commit history is github.com/VideoGameTips/irontide; that's my kid's work: the design, the 31-theater campaign, the vehicles, the systems. My part is the maintenance fork (github.com/longmaolab/irontide): bug fixes, finishing the EN/中文 localization, onboarding, achievements, performance. Happy to answer specifics.
+Yes — and the receipts are public. The full commit history is public at github.com/VideoGameTips/irontide, and the game is my kid's work: the design, the 31-theater campaign, the vehicles, the systems. My part is maintenance: bug fixes, finishing the EN/中文 localization, onboarding, achievements, performance. Happy to answer specifics.
 ```
 
 **4.3 「是不是 AI 做的?」(质疑向):**
 
 ```text
-Fair question and I'd rather over-answer: the game itself — gameplay, campaign, systems — was designed and built by my kid. Where AI came in: I used AI-assisted code review on my maintenance fork's polish work (bug fixes, i18n, performance). I won't claim more credit for my kid than is true, and I won't hide the AI part either. The commit history of both repos is public if you want to dig.
+Fair question and I'd rather over-answer: the game itself — gameplay, campaign, systems — was designed and built by my kid. Where AI came in: I used AI-assisted code review on my maintenance work (bug fixes, i18n, performance). I won't claim more credit for my kid than is true, and I won't hide the AI part either. The full commit history is public if you want to dig.
 ```
 
 **4.4 技术问题(单文件/three.js/架构):**
 
 ```text
-It's essentially one index.html (~800KB) plus vendored three.js r128 — no build step, no bundler. The PWA pieces (manifest + service worker) sit alongside it, so it's installable and works on desktop and mobile. Source is public and honestly fun to read in one sitting: github.com/VideoGameTips/irontide (original) and github.com/longmaolab/irontide (maintained fork).
+It's essentially one index.html (~800KB) plus vendored three.js r128 — no build step, no bundler. The PWA pieces (manifest + service worker) sit alongside it, so it's installable and works on desktop and mobile. Source is public and honestly fun to read in one sitting: github.com/VideoGameTips/irontide.
 ```
 
 **4.5 Bug 反馈:**
 
 ```text
-Thank you — this is exactly the feedback we hoped for. Could you share your device / browser / OS? If you're up for it, an issue at github.com/longmaolab/irontide/issues would be perfect; otherwise I'll file one from your comment so it doesn't get lost.
+Thank you — this is exactly the feedback we hoped for. Could you share your device / browser / OS? If you're up for it, an issue at github.com/VideoGameTips/irontide/issues would be perfect; otherwise I'll file one from your comment so it doesn't get lost.
 ```
 
 **4.6 功能建议:**
 
 ```text
-Love this idea — logging it. I can't promise a timeline (it's a family hobby project, not a startup), but the tracker is where plans live: github.com/longmaolab/irontide/issues. If you open it there, the original builder will see it too.
+Love this idea — logging it. I can't promise a timeline (it's a family hobby project, not a startup), but the tracker is where plans live: github.com/VideoGameTips/irontide/issues. If you open it there, my kid will see it too.
 ```
 
 **4.7 多人模式提问:**
@@ -334,14 +334,14 @@ Thanks for taking the time to write this — genuinely. You may well be right ab
 **4.10 「怎么支持你们?」:**
 
 ```text
-Three free ways: play it and tell us where you got confused (game.boobank.com/irontide), star the repos (github.com/VideoGameTips/irontide and github.com/longmaolab/irontide), and if you know a kid who's learning to code, show them the source — the whole game is readable in one file.
+Three free ways: play it and tell us where you got confused (game.boobank.com/irontide), star the repo (github.com/VideoGameTips/irontide), and if you know a kid who's learning to code, show them the source — the whole game is readable in one file.
 ```
 
 ---
 
 ## 5. 发布后清单(中文)
 
-**24 小时内(8/17 周一下午起):**
+**24 小时内(8/24 周一下午起):**
 
 - [ ] 北京周一 14:59 截最终排名/票数/评论区全图,原图存档
 - [ ] 把回复漏掉的评论全部补回(之后 3–5 天每天再看一次,PH 评论有长尾)
@@ -355,7 +355,7 @@ Three free ways: play it and tell us where you got confused (game.boobank.com/ir
 </a>
 ```
 
-给两个仓库 README 的 Markdown 版:
+给仓库 README 的 Markdown 版:
 
 ```markdown
 [![Iron Tide on Product Hunt](https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=POST_ID&theme=light)](https://www.producthunt.com/posts/iron-tide)

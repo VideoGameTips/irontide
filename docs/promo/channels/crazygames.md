@@ -11,7 +11,7 @@
 > 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
 
 > 生成日期:2026-07-24(周五)。所有需要粘贴到平台的文字都在代码块里(英文),直接整块复制即可。
-> 隐私口径:全程用家长账号操作。**名字可以公开**;**不公开**年龄、城市、学校、私人邮箱。署名用 `longmaolab`(家长)和 GitHub handle `VideoGameTips`(孩子)。
+> 隐私口径:全程用家长账号操作。**名字可以公开**;**不公开**年龄、城市、学校、照片/语音、私人邮箱。署名用 `longmaolab`(家长)和 GitHub handle `VideoGameTips`(孩子)。
 
 ---
 
@@ -80,12 +80,12 @@ node tools/verify-portal-build.js
 
 ### 1.3 iframe 本地测试(CrazyGames 就是用 iframe 嵌你的游戏)
 
-存为 `tools/verify-portal-build.js`:
+存为 `promo/builds/iframe-test.html`:
 
 ```html
 <!doctype html><meta charset="utf-8"><title>iframe test</title>
 <style>body{margin:0;background:#111}iframe{width:100vw;height:100vh;border:0}</style>
-<iframe src="crazygames-build/index.html"
+<iframe src=".stage/irontide-crazygames/index.html"
         allow="fullscreen; autoplay; gamepad; pointer-lock"></iframe>
 ```
 
@@ -152,7 +152,7 @@ promo/assets/final/cover-cg-square-800x800.png        # 1:1   追尾视角对轰
 longmaolab
 ```
 
-4. 资料里不填任何孩子的真实信息;如有个人网站字段,可填 `https://longmaolab.github.io`
+4. 资料里不填孩子的年龄、城市、学校、照片/语音和私人邮箱(名字与 GitHub handle 可以公开,见 §3.4);如有个人网站字段,可填 `https://longmaolab.github.io`
 
 ### 2.2 表单字段对照表
 
@@ -232,7 +232,7 @@ Two content notes so the rating is accurate. The game includes historically-name
 ### 3.4 给审核/原创性问题的补充说明(如被问到出处、作者或原创性)
 
 ```
-Iron Tide is an original, open-source game. It was designed and built primarily by a young developer in our family (GitHub handle: VideoGameTips). I am the parent and maintain the polished fork submitted here, covering bug fixes, full English/Chinese localization, onboarding, achievements, and performance work, with AI-assisted code review. All code and assets are our own original work; the only third-party library is three.js (MIT license), bundled in the build. We hold all rights and are happy to verify ownership via our GitHub repositories.
+Iron Tide is an original, open-source game. It was designed and built by a young developer in our family (GitHub handle: VideoGameTips), who wrote the great majority of it solo — the gameplay, the 31-theater campaign, and the ship, plane, tank and infantry systems. I am the parent and handle maintenance — bug fixes, full English/Chinese localization, onboarding, achievements, and performance work, with AI-assisted code review. All code and assets are our own original work; the only third-party library is three.js (MIT license), bundled in the build. We hold all rights and are happy to verify ownership via our GitHub repository: https://github.com/VideoGameTips/irontide
 ```
 
 ---
@@ -258,7 +258,7 @@ Iron Tide is an original, open-source game. It was designed and built primarily 
 | 移动端体验问题 | 修复后重交;短期修不好就**去掉 mobile 勾选**,以 desktop-only 重交,mobile 以后补 |
 | 封面不合规(纯截图/多余文字/带边框) | 按 §1.6 重做,只保留 `IRON TIDE` 字样 |
 | iframe 内黑屏/功能异常 | 用后台预览工具复现,对照 §1.3 逐项排查(十有八九是指针锁定或外部请求) |
-| 与已有游戏相似/名称混淆 | 说明原创性(用 §3.4),附 GitHub 仓库佐证开发历史 |
+| 与已有游戏相似/名称混淆 | 说明原创性(用 §3.4),附 GitHub 仓库 https://github.com/VideoGameTips/irontide 佐证开发历史 |
 | 加载太慢 | 1.4MB 的包几乎不可能中招;若中招先查是否误触发了 cdnjs 兜底 |
 
 ### 重交流程
@@ -306,7 +306,7 @@ longmaolab
 
 - **触发条件**:两周测试 KPI 亮眼,或收到 CrazyGames 主动邀请
 - **Full Launch 要求**:SDK 必接(初始化 + gameplay start/stop 事件 + 广告位事件);内容不超过 PEGI-12(无血腥、无粗口;但**必须如实申报**核打击载具与神风机——见 3.3,隐瞒被审出来比如实申报麻烦得多);初始下载 ≤50MB(1.4MB,符合);快速进入 gameplay(菜单即达,符合)
-- **工作量预估**:单文件架构下接 SDK 大约百行以内的改动,放在 CrazyGames 专用构建里做,不污染主仓库
+- **工作量预估**:单文件架构下接 SDK 大约百行以内的改动,放在 CrazyGames 专用构建里做,只改构建脚本、不影响仓库里的主版本
 - **Full Launch 之后**才有广告分成——但先让数据说话,再决定投不投这份工
 
 ### 心态(写给你们俩)
