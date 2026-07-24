@@ -1,0 +1,15 @@
+{
+  "name": "Iron Tide 钢铁怒潮——战舰指挥官",
+  "short_name": "Iron Tide",
+  "description": "Command a warship, mount your guns, and hold the line. A single-file naval battle game.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a1018",
+  "theme_color": "#0a1018",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
