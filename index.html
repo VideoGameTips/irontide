@@ -4849,9 +4849,10 @@ function damageFoot(dmg,from){
 function playerSunk(){
   if(phase!=='play') return;
   rivalSpeak('gloat');
+  shipsLostThisWar++;   // a hull went down either way — this used to be counted only when the captain happened to be ashore, so going down ON THE BRIDGE (the usual way) still earned the "no ship lost" star
   const survivedAway=(onFoot||drivingTank||piloting)&&!landCampaignMode;
   if(survivedAway){
-    playerShipLost=true; shipsLostThisWar++; driving=false; manning=null;
+    playerShipLost=true; driving=false; manning=null;
     if(player&&player.build&&player.build.group) player.build.group.visible=false;
     flashPrompt('⚓ Your ship was sunk while you were away. Return to your harbor and press P for a replacement.');
     updateMode(); return;
