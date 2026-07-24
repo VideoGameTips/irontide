@@ -104,33 +104,6 @@
   #prompt{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);font-size:15px;color:#eaf4ff;
     background:rgba(10,20,32,.7);padding:8px 16px;border-radius:8px;border:1px solid #2a4660;display:none;}
 
-  /* ---- touch controls (phones & tablets only) ---- */
-  #touch{position:absolute;inset:0;z-index:14;display:none;pointer-events:none;
-    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none;}
-  body.touch #touch{display:block;}
-  #touch .btn{position:absolute;pointer-events:auto;display:flex;align-items:center;justify-content:center;
-    background:rgba(12,24,36,.62);border:1px solid #3d6a90;color:#dceaf7;border-radius:14px;
-    font:600 14px/1 'Segoe UI',system-ui,sans-serif;letter-spacing:1px;backdrop-filter:blur(2px);}
-  #touch .btn:active{background:rgba(30,72,104,.9);border-color:#5fd0ff;}
-  #touch .btn.hide{display:none;}
-  #touch #tFire{right:22px;bottom:26px;width:104px;height:104px;border-radius:50%;font-size:30px;
-    background:rgba(120,30,24,.55);border-color:#c05a44;color:#ffdcd2;}
-  #tAct{right:140px;bottom:104px;width:96px;height:52px;}
-  #tAct2{right:140px;bottom:42px;width:96px;height:52px;}
-  #tShop{left:22px;top:74px;width:82px;height:44px;}      /* left side — the minimap owns the top right */
-  #tMap{left:122px;top:74px;width:82px;height:44px;}   /* ≥18px gap from tShop — fat-finger safe */
-  #tClose{left:22px;top:74px;width:96px;height:44px;background:rgba(90,26,26,.72);border-color:#c05a44;}
-  #tStick{position:absolute;left:30px;bottom:30px;width:132px;height:132px;border-radius:50%;pointer-events:auto;
-    background:rgba(10,20,32,.34);border:1px solid #2a4660;}
-  #tStick i{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;
-    background:rgba(120,180,240,.34);border:1px solid #5fd0ff;transition:none;}
-  /* keyboard hints and the chat log have no place on a touch screen; lift everything else clear of the stick */
-  body.touch #mode,body.touch #chatbox{display:none;}
-  body.touch #shiphpwrap{bottom:180px;width:min(260px,45vw);}
-  body.touch #claude{left:22px;bottom:auto;top:130px;}
-  body.touch #claudeBubble{max-width:min(240px,52vw);}
-  body.touch #prompt{bottom:200px;max-width:min(90vw,520px);text-align:center;}
-  body.touch #tut{top:22%;}
 
   /* ---- first-battle tutorial ---- */
   #tut{position:absolute;left:50%;top:15%;transform:translateX(-50%);display:none;text-align:center;pointer-events:none;z-index:12;max-width:min(92vw,760px);}
@@ -317,15 +290,6 @@
     <div id="score">Sunk: 0</div></div>
   <div id="shiphpwrap"><div class="lab">HULL INTEGRITY</div><div id="shiphp"><i></i></div></div>
   <div id="prompt"></div>
-  <div id="touch">
-    <div id="tStick"><i></i></div>
-    <div id="tFire" class="btn">🔥</div>
-    <div id="tAct" class="btn"></div>
-    <div id="tAct2" class="btn"></div>
-    <div id="tShop" class="btn"></div>
-    <div id="tMap" class="btn"></div>
-    <div id="tClose" class="btn hide"></div>
-  </div>
   <div id="tut"></div>
   <div id="mode"></div>
   <div id="chatbox">
@@ -8739,109 +8703,14 @@ function resumeWar(){
 addEventListener('beforeunload',()=>saveWar());
 document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveWar(); });
 
-// ---------- touch controls (phones & tablets) ----------
-// Self-contained: nothing here runs unless TOUCH is true. The stick writes into the same
-// `keys` map the keyboard uses, and look-drag replaces pointer lock, so no gameplay code
-// needed changing. Add ?touch=1 to force it on for testing, ?touch=0 to force it off.
-// Detect by PRIMARY pointer, not by maxTouchPoints: a Surface / Chromebook driven with a
-// mouse reports ten touch points but wants pointer-lock mouse-look, not a thumbstick.
+// Primary-pointer detection. The touch CONTROLS live in initMobileControls() (#touchControls);
+// this flag only decides whether on-screen prompts name buttons or keyboard keys — see
+// installHint() and isTouch(). Detect by PRIMARY pointer, not maxTouchPoints: a Surface or
+// Chromebook driven with a mouse reports ten touch points but wants key names.
+// ?touch=1 forces it on for testing, ?touch=0 forces it off.
 const TOUCH=(()=>{ try{ const q=new URLSearchParams(location.search).get('touch');
   if(q==='1') return true; if(q==='0') return false;
   return matchMedia('(pointer:coarse)').matches; }catch(e){ return false; } })();
-const STICK_R=46, STICK_DEAD=0.28;
-let _touchWired=false, _lookId=null, _lookX=0, _lookY=0, _stickId=null, _stickCx=0, _stickCy=0;
-function stickKeys(dx,dy){   // stick vector -> the same WASD flags the keyboard sets
-  const n=Math.hypot(dx,dy)/STICK_R, ux=dx/STICK_R, uy=dy/STICK_R;
-  keys['KeyW']=(n>STICK_DEAD&&uy<-STICK_DEAD)?1:0;
-  keys['KeyS']=(n>STICK_DEAD&&uy> STICK_DEAD)?1:0;
-  keys['KeyA']=(n>STICK_DEAD&&ux<-STICK_DEAD)?1:0;
-  keys['KeyD']=(n>STICK_DEAD&&ux> STICK_DEAD)?1:0;
-}
-function stickRelease(){ _stickId=null; ['KeyW','KeyA','KeyS','KeyD'].forEach(k=>keys[k]=0);
-  const t=document.querySelector('#tStick i'); if(t) t.style.transform=''; }
-function touchAction2(){
-  if(piloting) return;                                   // bombs live on the fire-adjacent button below
-  if(drivingTank){ tankLandToggle(); return; }
-  if(playerShipLost&&onFoot){ bailoutOrBoard(); return; }
-  if(!onFoot&&!driving&&selectedWeapon){ tryPlace(); return; }
-  if(driving&&selectedWeapon){ tryPlace(); return; }
-  toggleFoot();
-}
-function touchLabels(){
-  const L=(id,txt,show)=>{ const el=document.getElementById(id); if(!el) return;
-    el.classList.toggle('hide',!show); if(show&&el.textContent!==txt) el.textContent=txt; };
-  const paused=panelOpen();   // a panel covers the thumb controls whether or not it froze the war
-  L('tClose', T('✕ Close','✕ 关闭'), paused);
-  ['tStick','tFire','tAct','tAct2','tShop','tMap'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.style.display=paused?'none':''; });
-  if(paused){
-    if(_stickId!=null) stickRelease(); mouseDownFire=false;
-    // the armory is the one panel with an action to take from inside it
-    return;
-  }
-  L('tShop', T('Shop','商店'), true);
-  L('tMap',  T('Map','地图'), true);
-  const act = driving?T('Leave helm','离开舵位')
-    : drivingTank?T('Exit tank','下坦克')
-    : piloting?T('Land','降落')
-    : manning?T('Leave gun','离开炮位')
-    : onFoot?T('Board','上车/上船')
-    : T('Use  E','操作  E');
-  L('tAct', act, true);
-  let act2='', show2=true;
-  if(piloting) { act2=piloting.plane.def.bomb?T('💣 Bomb','💣 投弹'):''; show2=!!act2; }
-  else if(drivingTank) act2=T('Ashore','上下岸');
-  else if(playerShipLost&&onFoot) act2=T('New ship','换船');
-  else if(selectedWeapon&&!onFoot) act2=T('Install F','装炮 F');
-  else act2=onFoot?T('Re-board','回船'):T('Go ashore','登岸');
-  L('tAct2', act2, show2);
-}
-function touchInit(){
-  if(_touchWired||!TOUCH) return; _touchWired=true;
-  document.body.classList.add('touch');
-  const capture=(el,id)=>{ try{ el.setPointerCapture(id); }catch(e){} };   // capture is a nicety; never let it break the handler
-  const stick=document.getElementById('tStick'), knob=stick.querySelector('i'), cv=document.getElementById('c');
-  stick.addEventListener('pointerdown',e=>{ e.preventDefault(); sfxResume(); if(_stickId!=null) return;
-    const r=stick.getBoundingClientRect(); _stickCx=r.left+r.width/2; _stickCy=r.top+r.height/2;
-    _stickId=e.pointerId; capture(stick,e.pointerId); });
-  stick.addEventListener('pointermove',e=>{ if(e.pointerId!==_stickId) return;
-    let dx=e.clientX-_stickCx, dy=e.clientY-_stickCy;
-    const d=Math.hypot(dx,dy); if(d>STICK_R){ dx=dx/d*STICK_R; dy=dy/d*STICK_R; }
-    knob.style.transform='translate('+dx+'px,'+dy+'px)'; stickKeys(dx,dy); });
-  ['pointerup','pointercancel','pointerleave'].forEach(ev=>stick.addEventListener(ev,e=>{ if(e.pointerId===_stickId) stickRelease(); }));
-
-  // Look-drag gets its own tuned constant (raw client-px deltas are noisier than pointer-lock
-  // movementX) and an edge dead-zone: touches starting within 18px of the physical edge are
-  // ignored so iOS/Android system gestures (home swipe, back swipe) can't hijack the camera.
-  const TOUCH_LOOK=0.0042, EDGE=18;
-  cv.addEventListener('pointerdown',e=>{ if(_lookId!=null||panelOpen()) return;
-    if(e.clientX<EDGE||e.clientY<EDGE||e.clientX>innerWidth-EDGE||e.clientY>innerHeight-EDGE) return;
-    sfxResume();   // any first gesture — stick, button OR drag — must unlock iOS audio
-    _lookId=e.pointerId; _lookX=e.clientX; _lookY=e.clientY; capture(cv,e.pointerId); });
-  cv.addEventListener('pointermove',e=>{ if(e.pointerId!==_lookId||panelOpen()) return;   // a second finger opening a panel must stop the drag
-    camYaw.v -= (e.clientX-_lookX)*TOUCH_LOOK; camPitch.v -= (e.clientY-_lookY)*TOUCH_LOOK;
-    camPitch.v=Math.max(-1.2,Math.min(1.2,camPitch.v));
-    _lookX=e.clientX; _lookY=e.clientY; });
-  ['pointerup','pointercancel'].forEach(ev=>cv.addEventListener(ev,e=>{ if(e.pointerId===_lookId) _lookId=null; }));
-
-  const hold=(id,down,up)=>{ const el=document.getElementById(id);
-    el.addEventListener('pointerdown',e=>{ e.preventDefault(); down(); capture(el,e.pointerId); });
-    ['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,()=>up())); };
-  hold('tFire', ()=>{ sfxResume(); mouseDownFire=true; }, ()=>{ mouseDownFire=false; });
-
-  const tap=(id,fn)=>document.getElementById(id).addEventListener('pointerdown',e=>{ e.preventDefault(); sfxResume(); fn(); });
-  tap('tAct', ()=>toggleMan());   // toggleMan already picks helm / turret / plane / tank by proximity
-  tap('tShop', ()=>toggleShop());
-  tap('tMap', ()=>toggleTacticalMap());
-  tap('tClose', ()=>{ if(shopOpen)toggleShop(); else if(harborOpen)toggleHarbor(); else if(buildOpen)toggleBuild();
-    else if(tacticalOpen)toggleTacticalMap(false); else if(chatOpen)closeChat(); });
-  // secondary button doubles as the bomb release while flying — hold to keep dropping
-  const a2=document.getElementById('tAct2');
-  a2.addEventListener('pointerdown',e=>{ e.preventDefault(); sfxResume(); capture(a2,e.pointerId);
-    if(piloting) keys['Space']=1; else touchAction2(); });
-  ['pointerup','pointercancel','pointerleave'].forEach(ev=>a2.addEventListener(ev,()=>{ keys['Space']=0; }));
-  touchLabels();
-}
 
 // ---------- first-battle tutorial: one big hint at a time, condition-driven, shown once ----------
 const TUT_DONE_KEY='ironTideTutorialDone';
