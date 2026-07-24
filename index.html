@@ -487,9 +487,28 @@ function setDifficulty(d){ if(!DIFFICULTY[d]||d===difficulty)return; difficulty=
   try{localStorage.setItem('ironTideDifficulty',d);}catch(e){} renderDiffRow(); }
 
 // ---------- player settings: volume, simple HUD, parental content filter ----------
+// One localStorage key backs two panels (this row and the K panel's gameSettings), so both
+// read the same blob. Validate on the way in, the way the war save and career do: a corrupt
+// or hand-edited blob must never put a string in volume or an object in a boolean flag —
+// an unreadable field falls back to its default instead of poisoning the game.
+const SETTINGS_VER=1;
+const SETTINGS_SPEC={ volume:'unit', simpleHud:'boolOrNull', contentFilter:'bool' };
+function readSettingsBlob(){
+  try{ const s=JSON.parse(localStorage.getItem('ironTideSettings'));
+    return (s&&typeof s==='object'&&!Array.isArray(s)) ? s : {}; }catch(e){ return {}; }
+}
+function applySettingsBlob(target,blob,spec){
+  for(const k in spec){ if(!Object.prototype.hasOwnProperty.call(blob,k)) continue;
+    const v=blob[k], kind=spec[k];
+    if(kind==='unit'){ const n=+v; if(Number.isFinite(n)) target[k]=Math.max(0,Math.min(1,n)); }
+    else if(kind==='bool'){ if(typeof v==='boolean') target[k]=v; }
+    else if(kind==='boolOrNull'){ if(v===null||typeof v==='boolean') target[k]=v; }
+  }
+  return target;
+}
 const SETTINGS={ volume:1, simpleHud:null, contentFilter:false };   // simpleHud null = auto (on for brand-new players)
-try{ const s=JSON.parse(localStorage.getItem('ironTideSettings')); if(s&&typeof s==='object') Object.assign(SETTINGS,s); }catch(e){}
-function saveSettings(){ try{ const g=(typeof gameSettings!=='undefined')?gameSettings:{}; localStorage.setItem('ironTideSettings',JSON.stringify({...g,...SETTINGS})); }catch(e){} }   // one key, two panels — always persist the union
+applySettingsBlob(SETTINGS, readSettingsBlob(), SETTINGS_SPEC);
+function saveSettings(){ try{ const g=(typeof gameSettings!=='undefined')?gameSettings:{}; localStorage.setItem('ironTideSettings',JSON.stringify({sv:SETTINGS_VER,...g,...SETTINGS})); }catch(e){} }   // one key, two panels — always persist the union
 function simpleHudOn(){ return SETTINGS.simpleHud==null ? (career.wins+career.losses===0) : !!SETTINGS.simpleHud; }
 function contentFilterOn(){ return !!SETTINGS.contentFilter; }
 const FILTERED_PLANES=new Set(['b29','tu95v','lfc5','mhkl235']);    // nuclear payloads + the dedicated kamikaze airframe
@@ -3372,8 +3391,9 @@ let settingsOpen=false;
 // old breathing room can turn it back on in the K panel.
 const gameSettings={combatFeedback:true,damageNumbers:false,cameraShake:true,pauseInArmory:false};
 const damageNumbers=[];
-function loadGameSettings(){try{const s=JSON.parse(localStorage.getItem('ironTideSettings'));if(s&&typeof s==='object')Object.assign(gameSettings,s);}catch(e){}}
-function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
+const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool'};
+function loadGameSettings(){ applySettingsBlob(gameSettings, readSettingsBlob(), GAMESETTINGS_SPEC); }   // same validated read as SETTINGS
+function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({sv:SETTINGS_VER,...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
 function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
 function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;const sp=document.getElementById('settings');sp.style.display=settingsOpen?'block':'none';if(settingsOpen){
   sp.querySelector('h2').textContent=trText('⚙ SETTINGS'); sp.querySelector('p').innerHTML=isZh()?'战斗画面提示都可以自由开关。按 <b>K</b> 关闭。':'Visual combat feedback is optional. Press <b>K</b> to close.';mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
