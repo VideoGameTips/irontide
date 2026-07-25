@@ -38,7 +38,13 @@ const card = (bg, w, h, titleSize, tagSize, badgeSize, tagline, showTag, showBad
 </div>`;
 
 (async () => {
-  const browser = await chromium.launch();
+  // Every promo asset here was being captured in the game's ugliest mode. Plain
+// chromium.launch() runs chromium_headless_shell, which has no GPU and falls back to
+// SwiftShader; the game's adaptive-quality governor then sees 30ms+ frames, disables
+// bloom, drops the pixel ratio to 0.75 and flashes "Performance mode: render detail
+// reduced" — which is burned into the shipped preview.gif. Take the GPU, then hold the
+// quality governor and the toasts off so a screenshot shows the game at its best.
+  const browser = await chromium.launch({ headless: true, channel: 'chromium' });
   const jobs = [
     { out: 'cover-itch-titled-630x500.png', src: '03-broadside.png', w: 630, h: 500, t: 46, g: 15, b: 11,
       tag: 'Command a battleship — then fly the planes,<br>drive the tanks, and storm the beach yourself.', showTag: true },

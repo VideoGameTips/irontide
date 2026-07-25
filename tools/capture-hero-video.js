@@ -2,7 +2,13 @@
 const { chromium } = require('@playwright/test');
 const OUT = require('path').join(__dirname, '..', 'promo', 'assets', 'hero-video');
 (async () => {
-  const browser = await chromium.launch();
+  // Every promo asset here was being captured in the game's ugliest mode. Plain
+// chromium.launch() runs chromium_headless_shell, which has no GPU and falls back to
+// SwiftShader; the game's adaptive-quality governor then sees 30ms+ frames, disables
+// bloom, drops the pixel ratio to 0.75 and flashes "Performance mode: render detail
+// reduced" — which is burned into the shipped preview.gif. Take the GPU, then hold the
+// quality governor and the toasts off so a screenshot shows the game at its best.
+  const browser = await chromium.launch({ headless: true, channel: 'chromium' });
   const ctx = await browser.newContext({
     viewport: { width: 1600, height: 900 },
     recordVideo: { dir: OUT, size: { width: 1600, height: 900 } },
@@ -21,6 +27,13 @@ const OUT = require('path').join(__dirname, '..', 'promo', 'assets', 'hero-video
 
   await page.evaluate(() => {
     startGame('battleship'); skipBanner();
+    // Silence the toasts FIRST: setGfxQuality() announces itself with a "Graphics: Bloom"
+    // prompt that lives 2s, which is long enough to land in a screenshot.
+    window.flashPrompt = () => {};
+    window.updateAdaptiveQuality = () => {};       // or it drops bloom + resolution on us
+    if (typeof setGfxQuality === 'function') setGfxQuality(1);   // clamped 0..1; 1 = bloom on
+    if (typeof renderer !== 'undefined' && renderer) renderer.setPixelRatio(1);
+
     if (typeof skipTutorial === 'function') skipTutorial();
     money = 99999;
     for (const w of ['deckgun','deckgun','twin','bofors','oerlikon','aa']) { selectedWeapon = w; try { tryPlace(); } catch(e){} }

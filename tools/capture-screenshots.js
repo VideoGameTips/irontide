@@ -37,7 +37,13 @@ async function compose(page, { forward, height, side, tod }) {
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
-  const browser = await chromium.launch();
+  // Every promo asset here was being captured in the game's ugliest mode. Plain
+// chromium.launch() runs chromium_headless_shell, which has no GPU and falls back to
+// SwiftShader; the game's adaptive-quality governor then sees 30ms+ frames, disables
+// bloom, drops the pixel ratio to 0.75 and flashes "Performance mode: render detail
+// reduced" — which is burned into the shipped preview.gif. Take the GPU, then hold the
+// quality governor and the toasts off so a screenshot shows the game at its best.
+  const browser = await chromium.launch({ headless: true, channel: 'chromium' });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   page.on('pageerror', e => console.log('PAGEERROR', String(e).slice(0, 160)));
 
@@ -65,6 +71,13 @@ async function compose(page, { forward, height, side, tod }) {
   // spawnEnemy() drops ships near the enemy harbour, which is too far to photograph.
   await page.evaluate(() => {
     skipBanner();
+    // Silence the toasts FIRST: setGfxQuality() announces itself with a "Graphics: Bloom"
+    // prompt that lives 2s, which is long enough to land in a screenshot.
+    window.flashPrompt = () => {};
+    window.updateAdaptiveQuality = () => {};       // or it drops bloom + resolution on us
+    if (typeof setGfxQuality === 'function') setGfxQuality(1);   // clamped 0..1; 1 = bloom on
+    if (typeof renderer !== 'undefined' && renderer) renderer.setPixelRatio(1);
+
     if (typeof skipTutorial === 'function') skipTutorial();
     money = 99999;
     for (const w of ['deckgun', 'deckgun', 'twin', 'bofors', 'oerlikon', 'aa']) {
