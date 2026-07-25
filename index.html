@@ -5886,16 +5886,28 @@ function harborOf(team){ return team===0?friendlyHarbor:enemyHarbor; }
 function nearestLandOf(team,p){ let b=null,bd=1e9; landUnits.forEach(u=>{ if(u.team===team&&!u.dead){ const d=u.pos.distanceTo(p); if(d<bd){bd=d;b=u;} } }); return b; }
 function nearestPlayerTank(p){let b=null,bd=1e9;playerTanks.forEach(tk=>{if(tk.onDeck||tk.hp<=0)return;const wp=tankWP(tk),d=wp.distanceTo(p);if(d<bd){bd=d;b=tk;}});return b;}
 // nearest opposing SURFACE objective (ship → land → harbor) for an attacker on `team`, with its aim point
+// Targets rank by CATEGORY first, distance second: harbour, then ships, then anything on
+// land. Pure nearest-first meant the harbour — which sits at the far end behind the enemy
+// fleet and its own garrison — was never the closest thing to anyone, so nothing ever shot
+// it. Measured: eight minutes of fleet action dealt the enemy harbour exactly 0 damage
+// while it upgraded itself from 2600 to 7100 hp.
+// The range gate still comes first. A ship does not ignore the destroyer alongside it to
+// aim at a harbour three kilometres away that its guns cannot reach; the harbour only wins
+// the pick once it is actually inside maxR.
+const TGT_RANK={harbor:0,ship:1,tank:1,foot:1,swimmer:1,plane:1,land:2};
 function nearestSurfaceTarget(team,p,maxR,includeSoft=false,includeHarbor=true){ const foe=1-team;
-  let best=null,bd=maxR||1e9;
-  const sh=nearestShipOf(foe,p); if(sh){ const d=sh.pos.distanceTo(p); if(d<bd){bd=d;best={kind:'ship',target:sh,pos:shipAim(sh),vel:sh.vel||null,d};} }
-  const u=nearestLandOf(foe,p);  if(u){ const d=u.pos.distanceTo(p);  if(d<bd){bd=d;best={kind:'land',target:u,pos:u.pos.clone().setY(u.kind==='soldier'?1.4:2.5),vel:null,d};} }
+  const R=maxR||1e9; let best=null,bestRank=99,bd=R;
+  const take=(cand,dist)=>{ if(dist>R) return;                       // out of reach: not a candidate at all
+    const rank=TGT_RANK[cand.kind]==null?1:TGT_RANK[cand.kind];
+    if(rank<bestRank || (rank===bestRank && dist<bd)){ bestRank=rank; bd=dist; best=cand; } };
+  const sh=nearestShipOf(foe,p); if(sh){ const d=sh.pos.distanceTo(p); take({kind:'ship',target:sh,pos:shipAim(sh),vel:sh.vel||null,d},d); }
+  const u=nearestLandOf(foe,p);  if(u){ const d=u.pos.distanceTo(p);  take({kind:'land',target:u,pos:u.pos.clone().setY(u.kind==='soldier'?1.4:2.5),vel:null,d},d); }
   if(foe===0){
-    const tk=nearestPlayerTank(p);if(tk){const wp=tankWP(tk),d=wp.distanceTo(p);if(d<bd){bd=d;best={kind:'tank',target:tk,pos:wp.clone().setY(wp.y+1),vel:null,d};}}
+    const tk=nearestPlayerTank(p);if(tk){const wp=tankWP(tk),d=wp.distanceTo(p);take({kind:'tank',target:tk,pos:wp.clone().setY(wp.y+1),vel:null,d},d);}
     const c=activePlayerCombatant();if(c&&c.kind!=='plane'&&(c.hard||includeSoft)){
-      const d=c.pos.distanceTo(p),score=d+(c.hard?0:140);if(score<bd){bd=score;best={kind:c.kind,target:c,pos:c.pos.clone(),vel:c.vel,d};}}
+      const d=c.pos.distanceTo(p);take({kind:c.kind,target:c,pos:c.pos.clone(),vel:c.vel,d}, d+(c.hard?0:140));}  // soft targets still deprioritised by distance
   }
-  const h=harborOf(foe); if(includeHarbor&&h&&h.hp>0){ const d=h.pos.distanceTo(p); if(d<bd){bd=d;best={kind:'harbor',target:h,pos:h.pos.clone().setY(7),vel:null,d};} }
+  const h=harborOf(foe); if(includeHarbor&&h&&h.hp>0){ const d=h.pos.distanceTo(p); take({kind:'harbor',target:h,pos:h.pos.clone().setY(7),vel:null,d},d); }
   return best; }
 // ballistic firing solution: velocity that lands a shell of `speed` on `to` from `from` (low arc); null if out of range
 function arcVelocity(from,to,speed){
@@ -6069,20 +6081,26 @@ function aiShipFire(s){
       const aim=dp<ds?leadAir(from,pl):intercept(from,surf.pos,surf.vel,w.spd);
       spawnShell(w, from.clone(), aim.sub(from).normalize(), team, s); return;
     }
-    // surface (true cannons) — ballistic solution onto the led position of a moving ship, else bombard shore
-    const sh=nearestShipOf(foe, s.pos);
-    let aimPt;
-    if(sh && sh.pos.distanceTo(s.pos)<360*rf){ aimPt=intercept(from, sh.pos.clone().setY((sh.def?sh.def.deckY:2)+1), sh.vel, w.spd*0.82); }
-    else { const surf=nearestSurfaceTarget(team,s.pos,360*rf,true);if(!surf)return;aimPt=intercept(from,surf.pos,surf.vel,w.spd*0.82); }
+    // surface (true cannons) — ballistic solution onto the led position of the target.
+    // This used to test nearestShipOf() first and only fall back to the ranked picker when
+    // no ship was within 360m, which meant the harbour — always screened by the fleet and
+    // its own garrison — could never be chosen. Ask the ranked picker directly instead.
+    const surf=nearestSurfaceTarget(team,s.pos,360*rf,true); if(!surf) return;
+    const aimPt=intercept(from, surf.pos, surf.vel, w.spd*0.82);
     const vel=arcVelocity(from, aimPt, w.spd); if(!vel) return;        // out of range → hold fire (don't lob at max)
     vel.x+=(Math.random()-0.5)*3; vel.z+=(Math.random()-0.5)*3;        // slight dispersion
     spawnShell(w, from.clone(), vel.clone().normalize(), team, s, false, vel);
   });
 }
 function proxyShipFire(s){
-  const tgt=nearestShipOf(1-s.team,s.pos); if(!tgt||tgt.pos.distanceTo(s.pos)>380) return;
   const ko=s.crit?s.crit.guns:0, active=ko>0?s.loadout.slice(0,Math.max(1,s.loadout.length-ko)):s.loadout;
   const dmg=Math.max(5,active.reduce((n,w)=>n+w.dmg*(w.burst||1),0)*0.35);
+  // The harbour is the objective and it lives far from the player, so the ships in a
+  // position to shell it are exactly the ones abstracted to this resolver. It only spoke
+  // ship-vs-ship, so a fleet sitting on the enemy harbour left it untouched.
+  const h=harborOf(1-s.team);
+  if(h && h.hp>0 && h.pos.distanceTo(s.pos)<380){ damageHarbor(h,dmg); return; }
+  const tgt=nearestShipOf(1-s.team,s.pos); if(!tgt||tgt.pos.distanceTo(s.pos)>380) return;
   if(tgt===player){ damageTarget(player,dmg,s); return; }
   if(tgt.team===1){ damageTarget(tgt,dmg,s); return; }
   damageAlly(tgt,dmg);
