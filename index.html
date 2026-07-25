@@ -607,7 +607,7 @@ const WEAPONS = {
   sixteen: { name:'16" Mk 7 Battery',cost:1900,dmg:135,cd:3.4,  spd:92,  kind:'cannon', col:0xccd0d6, size:2.0, barrels:3, splash:13, lob:13 }, // capital main battery
   quadtorp:{ name:'Quint Torpedo',   cost:1300,dmg:105,cd:3.0,  spd:58,  kind:'torpedo', col:0x9aa2aa, size:1.3, splash:8 },
   // ---- modern mounts ----
-  m2:      { name:'M2 Browning',     cost:200, dmg:5,  cd:0.06, spd:185, kind:'gun', col:0x8f969e, size:0.5, spread:0.04, aa:true },     // light dual-purpose HMG
+  m2:      { name:'M2 Browning',     cost:200, dmg:5,  cd:0.14, spd:185, kind:'gun', col:0x8f969e, size:0.5, spread:0.04, aa:true },     // light dual-purpose HMG
   m777:    { name:'M777 Howitzer',   cost:1800,dmg:92, cd:2.8,  spd:92,  kind:'cannon', col:0xc4c8d0, size:1.5, splash:12, lob:16 },      // long-range artillery
   patriot: { name:'Patriot SAM',     cost:2200,dmg:50, cd:1.3,  spd:195, kind:'missile', col:0xd8dce2, size:1.1, splash:6, homing:true, aa:true, turn:4.5, range:520 }, // long-range air defense
   tomahawk:{ name:'Tomahawk Launcher',cost:2700,dmg:120,cd:3.6, spd:88,  kind:'missile', col:0xc0c6cc, size:1.2, splash:13, homing:true, turn:2.0, range:720 }, // cruise missile
@@ -3786,7 +3786,7 @@ const STRUCTS = {
   torpbat:   {name:'Torpedo Bunker',cost:950,footprint:20,scale:1.7,desc:'Launches torpedoes through nearby channels'},
   aa:        {name:'Anti-Air Emplacement',cost:750,footprint:18,scale:1.65,desc:'Rapid flak battery against low aircraft'},
   silo:      {name:'SAM Site',cost:1250,footprint:24,scale:1.75,power:true,desc:'Long-range missiles; needs power and ammunition'},
-  nukesilo:  {name:'R-36M “Satan” Nuclear Silo',cost:14000,footprint:60,scale:1.7,power:true,
+  nukesilo:  {name:'R-36M “Satan” Nuclear Silo',cost:30000,footprint:60,scale:1.7,power:true,
     desc:'One per side · tactical-map launch · 200s reload · interceptable 9,999-damage warhead'},
   radar:     {name:'Radar Station',cost:800,footprint:22,scale:1.8,power:true,desc:'Extends detection and spots for distant artillery'},
   sonar:     {name:'Sonar Station',cost:850,footprint:22,scale:1.7,power:true,desc:'Reveals nearby submarines and naval mines'},
