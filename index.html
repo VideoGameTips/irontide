@@ -4271,7 +4271,9 @@ function refreshTouchControls(){
   document.querySelectorAll('#touchControls .tbtn').forEach(b=>{
     const act=b.dataset.act;b.textContent=touchButtonLabel(act);
     b.classList.toggle('on',(act==='view'&&fpv)||(act==='shop'&&shopOpen)||(act==='harbor'&&harborOpen)||(act==='build'&&buildOpen)||(act==='map'&&tacticalOpen));
-    b.style.visibility=(act==='special'&&piloting&&(!piloting.plane.def.bomb))?'hidden':'visible';
+    const deadHere=(act==='special'&&piloting&&(!piloting.plane.def.bomb))
+      || (act==='map'&&(contentFilterOn()||nukesBannedHere()));   // MAP is the R-36M targeting screen; it cannot open here
+    b.style.visibility=deadHere?'hidden':'visible';
   });
   const hint=document.getElementById('touchHint');
   if(hint)hint.textContent=drivingTank?T('left stick controls tracks · right pad aims','左摇杆控制履带 · 右侧区域瞄准'):piloting?T('left stick throttle/turn · right pad pitch/look','左摇杆油门/转向 · 右侧区域俯仰视角'):T('left stick moves · right pad aims','左摇杆移动 · 右侧区域瞄准');
@@ -4279,7 +4281,9 @@ function refreshTouchControls(){
 function touchActionDown(act){
   touchMark();sfxResume();
   if(panelOpen())return;                       // a panel owns the screen — mouse and gamepad are held off too
-  if(act==='fire'){mouseDownFire=true;return;}
+  if(act==='fire'){ mouseDownFire=true;
+    if(driving&&!manning) flashPrompt(T('The crew works the deck guns. Tap Exit, walk to a gun, then tap Use to aim it yourself.','甲板炮由船员开火。点「离开」下舵位，走到炮位再点「使用」就能自己瞄。'));
+    return; }
   if(act==='special'){
     if(piloting){pulseKey('Space',160);return;}
     if(drivingTank){setKey('KeyR',1);return;}
@@ -5103,7 +5107,7 @@ function playerSunk(){
   if(survivedAway){
     playerShipLost=true; driving=false; manning=null;
     if(player&&player.build&&player.build.group) player.build.group.visible=false;
-    flashPrompt('⚓ Your ship was sunk while you were away. Return to your harbor and press P for a replacement.');
+    flashPrompt(keyPrompt('⚓ Your ship was sunk while you were away. Return to your harbor and press P for a replacement.','⚓ Your ship was sunk while you were away. Return to your harbor and tap Ship for a replacement.','⚓ 你的船在你离开时被击沉了。回到海港，点「换船」领一条新船。'));
     updateMode(); return;
   }
   showRespawnMenu('You were lost with your ship — pick a replacement. It redeploys from your harbor. (The war isn’t over until a harbor falls.)');
@@ -5361,7 +5365,7 @@ function tankLandToggle(){
   const tk=drivingTank; if(!tk) return;
   if(tk.onDeck){
     let best=null,bd=1e9; landSpots().forEach(o=>{ if(!o.island) return; const d=islandEdgeDistance(player.pos,o); if(d<bd){bd=d;best=o;} });
-    if(!best||bd>80){ flashPrompt('Bring the ship alongside an island, then G to put the tank ashore'); return; }
+    if(!best||bd>80){ flashPrompt(keyPrompt('Bring the ship alongside an island, then G to put the tank ashore','Bring the ship alongside an island, then tap Land to put the tank ashore','把船靠到岛边，再点「登陆」把坦克送上岸')); return; }
     const wp=tk.group.getWorldPosition(new THREE.Vector3()); scene.attach(tk.group);   // ship-deck → world, keep transform
     const isl=best.island; tk.onDeck=false; tk.island=isl;
     tk.pos=new THREE.Vector3(wp.x,2.1,wp.z); clampToIsland(tk.pos,isl,0.92); tk.pos.y=2.1;
@@ -6309,7 +6313,7 @@ function closeBuild(){ buildOpen=false; document.getElementById('build').style.d
 function toggleBuild(){
   if(phase!=='play') return;
   if(buildOpen){ closeBuild(); return; }   // an open panel always closes, whatever the captain is standing on
-  if(!onFoot){ flashPrompt('Go ashore on an island (G) to build defenses'); return; }
+  if(!onFoot){ flashPrompt(keyPrompt('Go ashore on an island (G) to build defenses','Go ashore first — pull alongside an island and tap Ashore','先上岛才能建造——把船靠到岛边点「登岸」')); return; }
   if(!footLand){ flashPrompt('Swim to dry land before building defenses'); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('Capture this position before building defenses'); return; }
   if(shopOpen) toggleShop(); if(harborOpen) toggleHarbor();
@@ -6321,7 +6325,7 @@ function toggleBuild(){
 function buildStructure(k){
   if(contentFilterOn()&&k==='nukesilo') return;   // kid-safe mode
   if(nukesBannedHere()&&isNuclear(STRUCTS[k])){ flashPrompt(T('No strategic weapons on this theater','本战区禁用战略武器')); return; }   // small / land theatres
-  if(!onFoot){ flashPrompt('Go ashore on an island (G) to emplace '+STRUCTS[k].name); return; }
+  if(!onFoot){ flashPrompt(keyPrompt('Go ashore on an island (G) to emplace '+STRUCTS[k].name,'Go ashore first — tap Ashore alongside an island to emplace '+STRUCTS[k].name,'先靠岛点「登岸」上岛，才能架设'+trName(STRUCTS[k].name))); return; }
   if(!footLand){ flashPrompt('Swim to dry land before building '+STRUCTS[k].name); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('This position is not under friendly control'); return; }
   const s=STRUCTS[k], cost=priceOf(s.cost);
@@ -6433,7 +6437,7 @@ function tryPlace(){
   const fromShop=shopOpen;
   if(fromShop&&!selectedWeapon){ shopMsg(T('Click a weapon first, then '+installHint()+' to install it','先点选一门武器，再'+installHint()+'安装它'),'bad'); return; }
   if(!fromShop&&panelOpen()) return;   // F outside the armory: any open panel owns the keystroke
-  if(!selectedWeapon){ flashPrompt('Pick a weapon in the Armory (Tab)'); return; }
+  if(!selectedWeapon){ flashPrompt(keyPrompt('Pick a weapon in the Armory (Tab)','Pick a weapon in the Armory (tap Shop)','先在军械库（点「商店」）里选一件武器')); return; }
   const w=WEAPONS[selectedWeapon]; const cost=priceOf(w.cost);
   if(marketBlocked('weapon',selectedWeapon,w))return;
   if(placed.length>=player.def.mounts){ flashPrompt('Gun limit reached — this hull mounts only '+player.def.mounts+' guns','bad'); return; }
@@ -6442,7 +6446,7 @@ function tryPlace(){
   let px,pz,mountPos=null;
   if(driving){                          // at the helm: F drops the new gun onto the next free hull mount
     mountPos=freeMountLocal(w);
-    if(!mountPos){ flashPrompt('All mounts are full — press E to step onto the deck, then F places it anywhere'); return; }
+    if(!mountPos){ flashPrompt(keyPrompt('All mounts are full — press E to step onto the deck, then F places it anywhere','All mounts are full — tap Exit to step onto the deck, then Install places it anywhere','炮位都满了——点「离开」下到甲板，再点「安装」就能装在任意位置')); return; }
     px=mountPos.x; pz=mountPos.z;
   } else {
     // install a couple feet ahead of where you stand, on the deck (free placement anywhere)
@@ -6521,7 +6525,7 @@ function captureEnemyShip(e){
 }
 function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot up in it
   if(phase!=='play'||onFoot||driving||manning||piloting||drivingTank||shopOpen||harborOpen||buildOpen) return;
-  const pa=nearestPlane(); if(pa&&pa.def.uav){flashPrompt('UAVs need your remote pilot — press E to launch.');return;} if(pa) dispatchPlane(pa);
+  const pa=nearestPlane(); if(pa&&pa.def.uav){flashPrompt(keyPrompt('UAVs need your remote pilot — press E to launch.','UAVs need your remote pilot — tap Use to launch.','无人机要你亲自遥控——点「使用」起飞。'));return;} if(pa) dispatchPlane(pa);
 }
 function toggleMan(){
   if(phase!=='play'||panelOpen()) return;   // no state changes while a panel has the screen
@@ -6799,7 +6803,7 @@ function updatePilot(dt){
     P.hp-=P.fire*(P.maxhp||120)*0.04*dt; burnFx(P.pos,1.2,dt,P.fire+0.5);
     P._fireT=(P._fireT||0)+dt; if(P._fireT>5){ P._fireT=0; P.fire--; }
     if(P.hp<=0){ crashPlane('Burning aircraft went down!'); return; }
-    if(Math.random()<dt*1.1) flashPrompt('🔥 YOUR AIRCRAFT IS ON FIRE — press P to bail out!'); }
+    if(Math.random()<dt*1.1) flashPrompt(keyPrompt('🔥 YOUR AIRCRAFT IS ON FIRE — press P to bail out!','🔥 YOUR AIRCRAFT IS ON FIRE — tap Bail to jump!','🔥 你的飞机着火了——快点「跳伞」！')); }
   // ---------- TAKEOFF ----------
   if(P.phase==='takeoff'){
     if(def.heli){ // helicopters lift straight up
@@ -7518,20 +7522,20 @@ function bailoutOrBoard(){
     showRespawnMenu('Back at harbor — choose your replacement ship. Your last ship is gone for good.');
     return;
   }
-  if(playerShipLost) flashPrompt('Return to your friendly harbor, then press P to request a replacement ship.');
+  if(playerShipLost) flashPrompt(keyPrompt('Return to your friendly harbor, then press P to request a replacement ship.','Return to your friendly harbor, then tap Ship for a replacement.','回到我方海港，再点「换船」领一条新船。'));
   else flashPrompt('P = parachute from aircraft, or request a replacement ship at harbor after yours is sunk.');
 }
 function toggleFoot(){
   if(phase!=='play'||panelOpen()||manning||piloting) return;
   if(landCampaignMode){ flashPrompt('No ship on this theater — this is an airborne ground assault. Capture the command posts.'); return; }
-  if(playerShipLost){ flashPrompt('Your ship is gone — return to friendly harbor and press P for a replacement.'); return; }
+  if(playerShipLost){ flashPrompt(keyPrompt('Your ship is gone — return to friendly harbor and press P for a replacement.','Your ship is gone — return to friendly harbor and tap Ship for a replacement.','船没了——回到我方海港，点「换船」领一条新船。')); return; }
   if(onFoot){ // re-board if standing near the ship
     if(Math.hypot(footPos.x-player.pos.x, footPos.z-player.pos.z) < boardRange()){
       onFoot=false; walkPos.set(0,deckEyeY(), player.build.halfLen*0.55); flashPrompt('Back aboard.','ok'); updateMode();
     } else flashPrompt('Walk back to your ship to climb aboard.','bad');
     return;
   }
-  if(player.submerged){ flashPrompt('Surface first (C), then press G to go ashore.','bad'); return; }
+  if(player.submerged){ flashPrompt(keyPrompt('Surface first (C), then press G to go ashore.','Surface first (tap Surface), then tap Ashore.','先点「上浮」，再点「登岸」。'),'bad'); return; }
   // disembark onto the nearest land the ship is alongside
   let best=null,bd=1e9;
   landSpots().forEach(o=>{ const d=islandEdgeDistance(player.pos,o); if(d<bd){bd=d;best=o;} });
@@ -7540,7 +7544,7 @@ function toggleFoot(){
     onFoot=true; resetFootHealth(); footLand=best.island||best.harbor||best; warRecord('marched');
     footPos.copy(player.pos); clampToIsland(footPos,footLand,0.82); footPos.y=groundHeightAt(footPos,footLand)+EYE;
     flashPrompt('Ashore'+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.','ok'); updateMode();
-  } else flashPrompt('Sail right up alongside an island or harbor, then press G to go ashore.','bad');
+  } else flashPrompt(keyPrompt('Sail right up alongside an island or harbor, then press G to go ashore.','Sail right up alongside an island or harbor, then tap Ashore.','把船紧靠到岛屿或海港边，再点「登岸」。'),'bad');
 }
 const WALKABLE_STRUCTURE_KINDS=new Set(['airstrip','helipad','dock']);
 function harborWalkBlocked(x,z,h){
@@ -8521,6 +8525,10 @@ function shopBalance(){
     else fp.textContent=T('🔫 Fleet power ','🔫 全舰火力 ')+cur; }
 }
 // there is no F key on a phone, so every hint points at the panel's own Install button
+// A prompt that names a key is useless on a phone. Hand the touch player the button they
+// can actually see — the words come from touchButtonLabel(), which is what prints them —
+// and on desktop return the original English untouched so its dictionary entry still hits.
+function keyPrompt(deskEn,touchEn,touchZh){ return (typeof TOUCH!=='undefined'&&TOUCH)?T(touchEn,touchZh):deskEn; }
 function installHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
   ? T('tap Install below','点下方的安装按钮')
   : T('press F (or click Install below)','按 F（或点下方的安装按钮）'); }
