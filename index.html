@@ -6297,6 +6297,10 @@ function aiIslandBuild(dt){
   const isl=enemyIsles[Math.floor(Math.random()*enemyIsles.length)];
   let kinds=['barracks','tankdepot','hospital','ammo','workshop','coastal','torpbat','aa','silo','radar','sonar','searchlight','bunker','airstrip','helipad','dock','fuel','bridge','artillery','rocket','fortress','supergun','nukesilo','tesla','wall'];
   if(contentFilterOn()||nukesBannedHere()||landUnits.some(u=>!u.dead&&u.team===1&&u.nukesilo))kinds=kinds.filter(k=>k!=='nukesilo');
+  // The super-gun is the only enemy weapon that lobs a map-wide 'SUPER-HEAVY ARTILLERY INBOUND'
+  // strike with a red warning — as unfair on a warm-up theatre as the nuke above, and the player
+  // can't field one there either. Hold the enemy to the same warm-up ban.
+  if(nukesBannedHere())kinds=kinds.filter(k=>k!=='supergun');
   const k=!islandStructures(isl,1,'command').length?'command':!islandStructures(isl,1,'power').length?'power':kinds[Math.floor(Math.random()*kinds.length)];
   if(k==='command'&&islandStructures(isl,1,'command').length)return;
   const p=findIslandBuildPoint(isl,k);if(p)buildAndPushLand(k,1,p,2,isl);
