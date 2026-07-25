@@ -259,6 +259,33 @@
   #touchUtility .tbtn{height:36px;min-width:58px;padding:0 8px;border-radius:18px;background:rgba(8,18,28,.55);font-size:9px;}
   #touchHint{position:absolute;left:50%;bottom:58px;transform:translateX(-50%);padding:5px 9px;border-radius:999px;background:rgba(6,14,22,.55);border:1px solid rgba(120,180,220,.25);font-size:10px;color:rgba(230,245,255,.74);letter-spacing:.7px;white-space:nowrap;}
   @media (pointer:fine) and (min-width:900px){ body:not(.touch-forced) #touchControls{display:none!important;} }
+  /* A landscape phone is WIDE but SHORT — 844x390 on an iPhone — so the max-width block
+     below never matches and it gets the untuned desktop layout. Measured there: the top row
+     of action buttons sits at top:-6px, half off-screen and over the objective readout, and
+     the keyboard hint card ("W/S throttle · Mouse look") shows on a device with neither.
+     itch.io embeds this game in landscape, so that is how most phone players arrive. */
+  @media (pointer:coarse) and (max-height:560px){
+    #mode{display:none;}
+    #killfeed{display:none;}
+    #objective{font-size:10px!important;}#objective div:last-child{font-size:9px!important;}
+    #score{font-size:10px;max-width:34vw;text-align:right;}#money{font-size:15px;}
+    #minimap{width:104px;height:104px;top:48px;right:12px;}
+    #prompt{bottom:60px;max-width:60vw;font-size:11px;text-align:center;}
+    #shiphpwrap{left:14px;bottom:14px;width:140px;}
+    .touch-stick{width:104px;height:104px;left:14px;bottom:56px;}
+    .touch-stick .knob{width:42px;height:42px;margin:-21px 0 0 -21px;}
+    .touch-look{width:118px;height:118px;right:12px;bottom:56px;}
+    /* a single row clears both the objective above and the two pads below */
+    #touchButtons{grid-template-columns:repeat(6,44px);gap:6px;right:12px;bottom:12px;}
+    .tbtn{height:36px;font-size:8px}.tbtn.primary{height:36px}
+    /* keep the utility row on ONE line so the radio log below it stays readable */
+    #touchUtility{top:44px;left:14px;width:min(370px,54vw);gap:5px;flex-wrap:nowrap;}
+    #touchUtility .tbtn{height:28px;min-width:44px;padding:0 6px;font-size:8px;}
+    #touchHint{display:none;}   /* the prompt above now carries the touch wording */
+    body.touch-ready #comms{top:78px!important;width:min(215px,32vw)!important;}
+    body.touch-ready #claude{bottom:auto;top:180px;}
+    body.touch-ready #claudeBubble{max-width:34vw;}
+  }
   @media (max-width:760px){
     #minimap{width:132px;height:132px;top:56px;right:12px;}
     #killfeed{display:none;}#score{font-size:10px;max-width:36vw;text-align:right;}#money{font-size:16px;}
@@ -8463,6 +8490,14 @@ function shopBalance(){
 function installHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
   ? T('tap Install below','点下方的安装按钮')
   : T('press F (or click Install below)','按 F（或点下方的安装按钮）'); }
+// Same idea for the steady-state helm hint: on a phone the keys named here do not exist,
+// and this is the line a player stares at for most of the battle.
+function steerHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
+  ? T('Steering — left stick steers · right pad aims','掌舵中 — 左摇杆操舵 · 右侧触控板瞄准')
+  : T('Steering — W/S throttle · A/D rudder','掌舵中 — W/S 油门 · A/D 转舵'); }
+function helmExitHint(){ return (typeof TOUCH!=='undefined'&&TOUCH)
+  ? T('   ·   tap View   ·   tap Exit to step away','   ·   点 View 换视角   ·   点 Exit 离开舵位')
+  : T('   ·   T view   ·   E to step away','   ·   T 视角   ·   E 离开舵位'); }
 // Only deliberate feedback (kind 'ok'/'bad' — bought it, cannot afford it, no free mount)
 // mirrors into the armory. Kindless prompts are ambient combat chatter — fires, turret hits,
 // bounties, weather — and now that the war runs behind the panel they arrive constantly.
@@ -8528,7 +8563,7 @@ function updatePrompt(){
     if(prize) msg=T('⚓ CRIPPLED '+prize.def.name.toUpperCase()+' — PRESS E TO BOARD','⚓ 瘫痪的'+trName(prize.def.name)+'——按 E 强行登舰')+hp+T(' · Claim it before it sinks.',' · 趁它没沉赶紧拿下。');
     else if(playerShipLost) msg=(nearFriendlyHarborForReplacement()?T('Harbor reached — press P for a replacement ship','已到海港——按 P 领取新船'):T('Ship lost — swim/walk back to your harbor','船沉了——游泳/走路回到我方海港'))+hp+' · WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm;
     else msg=(ftk?T('Press E to crew '+(ftk.name||'tank')+' · ','按 E 进入'+trName(ftk.name||'坦克')+' · '):'')+(landCampaignMode?T('Airborne assault','空降突击'):(footLand?T('Ashore','登岸'):T('Swimming','游泳中')))+hp+' — WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm+T(' · Q switch',' · Q 换枪')+(footLand?T(' · B build',' · B 建造'):'') + shipWayback(near) + (capIsl?'   ·   '+capMsg():''); }
-  else if(driving){ msg=T('Steering — W/S throttle · A/D rudder','掌舵中 — W/S 油门 · A/D 转舵') + (player.def.kind==='sub'?T('   ·   C dive/surface','   ·   C 下潜/上浮'):'') + (selectedWeapon?T('   ·   F install '+WEAPONS[selectedWeapon].name,'   ·   F 安装'+trName(WEAPONS[selectedWeapon].name)):'') + T('   ·   T view   ·   E to step away','   ·   T 视角   ·   E 离开舵位'); }
+  else if(driving){ msg=steerHint() + (player.def.kind==='sub'?T('   ·   C dive/surface','   ·   C 下潜/上浮'):'') + (selectedWeapon?T('   ·   '+installHint()+' '+WEAPONS[selectedWeapon].name,'   ·   '+installHint()+trName(WEAPONS[selectedWeapon].name)):'') + helmExitHint(); }
   else if(piloting){
     if(piloting.phase==='takeoff') msg=T('Taking off…','正在起飞…');
     else if(piloting.phase==='landing') msg=T('Landing — line up OVER the ship and descend · E to abort','降落——对准舰船正上方缓慢下降 · E 取消');
