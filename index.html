@@ -3945,6 +3945,31 @@ const CLAUDE_TIPS=[
   'Submarines dive with C — invisible to guns, but torpedoes only.',
   'Sinking the enemy harbor wins the war — but islands feed your economy first.',
 ];
+// A tip that names a key is useless on a phone, where the key does not exist. These are
+// the touch rewrites, keyed by the English tip above (not by index, so reordering the list
+// cannot silently misalign them). The button words here must match touchButtonLabel() —
+// that function is what actually prints them on the buttons the player is looking at.
+// Tips with no key reference need no entry. Note: sending up an AI pilot (Y) has no touch
+// control at all, so that half of the Hangar tip is dropped rather than pointing at a
+// button that isn't there.
+const CLAUDE_TIPS_TOUCH={
+  'Take the helm with E — W/S throttle, A/D rudder.':
+    ['Walk to the helm and tap USE — then the left stick steers.','走到舵位点「使用」——之后左摇杆就能操舵。'],
+  'Press Tab for the Armory, then F to mount a gun right where you stand.':
+    ['Tap SHOP for the Armory, then INSTALL to mount a gun where you stand.','点「商店」打开军械库，再点「安装」就能在你站的位置装上一门炮。'],
+  'Press H for harbor upgrades — the Repair Dock is a lifesaver.':
+    ['Tap HARBOR for upgrades — the Repair Dock is a lifesaver.','点「海港」打开升级——维修船坞能救你的命。'],
+  'Sail beside an island and press G to go ashore. B builds defenses there.':
+    ['Sail beside an island and tap ASHORE to land. BUILD puts defenses there.','把船开到岛边，点「登岸」上岛。点「建造」就能在岛上修防御。'],
+  'Buy planes in the Hangar: E to fly one yourself, Y to send up an AI pilot.':
+    ['Buy planes in the Hangar, then walk up to one and tap USE to fly it yourself.','在机库买飞机，走到飞机旁点「使用」就能自己开。'],
+  'Tanks ride your deck — E to crew one, G to land it on an island.':
+    ['Tanks ride your deck — tap USE to crew one, then LAND to put it ashore.','坦克就停在甲板上——点「使用」上坦克，再点「登陆」把它送上岛。'],
+  'Press T for first-person view in tanks, planes, turrets and at the helm.':
+    ['Tap VIEW for first-person in tanks, planes, turrets and at the helm.','在坦克、飞机、炮塔和舵位上点「视角」切换第一人称。'],
+  'Submarines dive with C — invisible to guns, but torpedoes only.':
+    ['Submarines dive with the DIVE button — invisible to guns, but torpedoes only.','潜艇点「下潜」——火炮打不到你，但你也只能用鱼雷。'],
+};
 function claudeSay(msg){ const b=document.getElementById('claudeTxt'); if(!b||msg===claudeLastMsg) return; claudeLastMsg=msg; b.textContent=trText(msg); }
 function initClaude(){
   if(document.getElementById('claude')) return;
@@ -3971,13 +3996,22 @@ function nextClaudeTip(){
     if(c&&c.fire>0) return '🔥 We’re on fire! It burns down in time — faster near the Repair Dock.';
     if(c&&c.flood>0) return '💧 Taking on water! Stop taking hits and the crew will plug the leak.';
   }
-  if(piloting&&piloting.fuelMax&&piloting.fuel<piloting.fuelMax*0.25) return '⛽ Fuel’s low — fly home and press E over the deck to land.';
+  if(piloting&&piloting.fuelMax&&piloting.fuel<piloting.fuelMax*0.25) return (typeof TOUCH!=='undefined'&&TOUCH)
+    ? T('⛽ Fuel’s low — fly home and tap LAND over the deck.','⛽ 燃油不多了——飞回来，在甲板上方点「降落」。')
+    : '⛽ Fuel’s low — fly home and press E over the deck to land.';
   if(friendlyHarbor&&friendlyHarbor.hp>0&&friendlyHarbor.hp<friendlyHarbor.maxhp*0.5) return '🚨 Our harbor is being pounded — get back and defend it!';
-  if(placed.length===0&&money>=300&&!piloting&&!drivingTank&&!onFoot) return 'No guns mounted yet! Tab → pick a weapon → F on deck to install it.';
+  if(placed.length===0&&money>=300&&!piloting&&!drivingTank&&!onFoot) return (typeof TOUCH!=='undefined'&&TOUCH)
+    ? T('No guns mounted yet! SHOP → pick a weapon → INSTALL on deck.','还没装炮呢！点「商店」→ 选一门 → 在甲板上点「安装」。')
+    : 'No guns mounted yet! Tab → pick a weapon → F on deck to install it.';
   if(typeof sideOb!=='undefined'&&sideOb) return '★ Objective: '+sideOb.label.replace('BONUS: ','')+' — pays $'+sideOb.pay+'.';
-  if(money>2600&&Math.random()<0.5) return '$'+money+' in the bunkers — Tab for guns, H for harbor upgrades.';
+  if(money>2600&&Math.random()<0.5) return (typeof TOUCH!=='undefined'&&TOUCH)
+    ? T('$'+money+' in the bunkers — SHOP for guns, HARBOR for upgrades.','仓库里存着 $'+money+'——点「商店」买炮，点「海港」升级。')
+    : '$'+money+' in the bunkers — Tab for guns, H for harbor upgrades.';
   claudeIdx=(claudeIdx+1)%CLAUDE_TIPS.length;
-  return (isZh()&&typeof CLAUDE_TIPS_ZH!=='undefined'&&CLAUDE_TIPS_ZH[claudeIdx])||CLAUDE_TIPS[claudeIdx];
+  const _tip=CLAUDE_TIPS[claudeIdx];
+  const _touch=(typeof TOUCH!=='undefined'&&TOUCH)&&typeof CLAUDE_TIPS_TOUCH!=='undefined'&&CLAUDE_TIPS_TOUCH[_tip];
+  if(_touch) return isZh()?_touch[1]:_touch[0];
+  return (isZh()&&typeof CLAUDE_TIPS_ZH!=='undefined'&&CLAUDE_TIPS_ZH[claudeIdx])||_tip;
 }
 function updateClaude(dt){
   if(phase!=='play') return;
