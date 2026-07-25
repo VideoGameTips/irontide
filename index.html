@@ -5437,6 +5437,12 @@ function hurtPlayerTank(tk,dmg,fromPos,top){
 }
 function destroyPlayerTank(tk,msg){
   if(!tk||tk.destroyed)return;tk.destroyed=true;
+  // Zero the hp as well as the flag. Everything else in the file tests `tk.hp<=0` to mean
+  // "this tank is gone", so a wreck left with positive hp sails straight through those
+  // guards holding a null group. That is the reported crash: tankFireTick() cooks off a
+  // burning tank mid-loop in updatePlayerTankAI, this runs, and the very next line —
+  // `if(tk.hp<=0)return` — waves the wreck through to `tk.group.position`.
+  tk.hp=0;
   const wp=tankWP(tk); blastAll(wp.clone().setY(wp.y+1),60,10);
   const wasDriving=drivingTank===tk;
   destroyObject3D(tk.group); tk.group=null;
@@ -5539,8 +5545,8 @@ function nearestEnemyForPlayerTank(pos,range){
 }
 function updatePlayerTankAI(dt){
   playerTanks.forEach(tk=>{
-    if(tk===drivingTank||tk.hp<=0)return;
-    tankFireTick(tk,dt); if(tk.hp<=0)return;
+    if(tk===drivingTank||tk.hp<=0||tk.destroyed||!tk.group)return;
+    tankFireTick(tk,dt); if(tk.hp<=0||tk.destroyed||!tk.group)return;   // may have cooked off just now
     const wp=tankWP(tk), tgt=nearestEnemyForPlayerTank(wp,tk.onDeck?330:240);
     if(!tgt)return;
     const to=tgt.pos.clone().sub(wp), yaw=Math.atan2(to.x,to.z);
@@ -8442,7 +8448,13 @@ function aiHarborTick(dt){
   if(enemyHarbor.aiUpT>0) return;
   enemyHarbor.aiUpT=20+Math.random()*16;
   const pool=['coastal','aa','missiles','walls','hangar','radar','fastBuild','slots'];
-  const opts=pool.filter(k=>enemyHarbor.up[k]<HARBOR_UP[k].max);
+  // These are free, every 20-36s, forever, while the player buys each one. Walls is the
+  // entry that compounds — +1500 max hp AND -12% damage taken per level — so unbounded
+  // free walls put the win condition out of reach: measured 2600 -> 8600 hp in eight
+  // minutes, which outruns what a player can deal. Cap the free ones at half the table
+  // maximum. A player who pays for walls still gets all four levels.
+  const AI_FREE_CAP={walls:2};
+  const opts=pool.filter(k=>enemyHarbor.up[k] < Math.min(HARBOR_UP[k].max, AI_FREE_CAP[k]||99));
   if(!opts.length) return;
   const k=opts[Math.floor(Math.random()*opts.length)];
   enemyHarbor.up[k]++; applyUpgrade(k, enemyHarbor);
