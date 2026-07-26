@@ -5821,6 +5821,8 @@ function sonarPing(){
   sfxSonar(p); warRecord('sonars');
   flashPrompt('◉ SONAR PING — contacts revealed for 4 seconds');
 }
+// Beyond this the model is a couple of pixels, so its marker would float over empty ground.
+const MARKER_FAR=620;
 function updateFogOfWar(dt){
   sonarCooldown=Math.max(0,sonarCooldown-dt);sonarPulse=Math.max(0,sonarPulse-dt);
   enemies.forEach(e=>{if(e.build)e.build.group.visible=enemyDetected(e);});
@@ -5832,7 +5834,11 @@ function updateFogOfWar(dt){
     const close=groundTheater&&dist<1700,threatening=dist<Math.max(170,Math.min(1800,(u.range||0)+100));
     const seen=u.revealT>0||threatening||sameIsland||close||enemyDetectedAt(u.pos,groundTheater?1.8:1);
     u.group.visible=seen;
-    if(u.marker){const pulse=u.revealT>0?1.2+Math.abs(Math.sin(t2*9))*.35:1,sc=(u.markerScale||5)*pulse;u.marker.scale.set(sc,sc,1);}
+    if(u.marker){const pulse=u.revealT>0?1.2+Math.abs(Math.sin(t2*9))*.35:1,sc=(u.markerScale||5)*pulse;u.marker.scale.set(sc,sc,1);
+      // A land theatre reveals everything within 1700m, but a tank at that range is a couple of
+      // pixels — leaving a row of red triangles hovering over apparently empty ground (it reads
+      // as "invisible boats"). Past MARKER_FAR the marker goes with the model it belongs to.
+      u.marker.visible = seen && (dist<MARKER_FAR || u.revealT>0);}
   }});
   aiPlanes.forEach(p=>{if(p.team!==1)return;const seen=enemyDetectedAt(p.pos,1.15);p.group.visible=seen;if(p.marker)p.marker.visible=seen;});
 }
