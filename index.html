@@ -5322,7 +5322,8 @@ function garrisonHarbor(c, team){
   for(let i=0;i<nS;i++){ const a=i/nS*6.28; buildAndPushLand('soldier',team, c.clone().add(new THREE.Vector3(Math.cos(a)*72,1.4,Math.sin(a)*72))); }
 }
 const STRUCT_KINDS=Object.keys(STRUCTS);
-function buildAndPushLand(kind,team,pos,yOverride,islOverride,typeOverride){
+const MAX_LAND_UNITS=90;   // per side; structures excluded
+function buildAndPushLand(kind,team,pos,yOverride,islOverride,typeOverride,force){
   const isl=islOverride||islandOfPos(pos);
   const groundY=isl?islandSurfaceY(pos,isl):null;
   // Coastal guns used to be pinned to y=0 (sea level). On an island whose surface sits 1.3-2.1
@@ -5332,6 +5333,14 @@ function buildAndPushLand(kind,team,pos,yOverride,islOverride,typeOverride){
   pos.y = yOverride!=null ? yOverride : (kind==='coastal' ? (groundY!=null?groundY:0) : groundY!=null?groundY : STRUCT_KINDS.includes(kind)?2.0:1.4);
   let type=typeOverride;
   if(kind==='tank'&&!type){ const keys=Object.keys(TANKS); type=keys[Math.floor(Math.random()*keys.length)]; }
+  // Global backstop: whatever the caller's own cap logic says, the battlefield never carries
+  // more than MAX_LAND_UNITS mobile troops per side. Structures are exempt — they are placed
+  // deliberately and are finite by footprint. Without this a single broken cap anywhere turns
+  // into hundreds of units, tanking the framerate and (via kill bounties) the economy.
+  if(!force && !STRUCT_KINDS.includes(kind)){
+    let live=0; for(const x of landUnits){ if(!x.dead&&x.team===team&&!STRUCT_KINDS.includes(x.kind)) live++; }
+    if(live>=MAX_LAND_UNITS) return null;
+  }
   const u=buildLand(kind,team,pos,type);u.island=isl;
   u.homeIsl=isl;   // where it was RAISED. u.island tracks where it currently stands, so a squad that
                    // marches off stops matching its own island — which used to make production caps
@@ -9049,14 +9058,18 @@ function resumeWar(){
   sfxResume(); phase='play';
   const M=applyMap();
   if(s.weather){ weather.type=s.weather.type||M.weather; if(s.weather.tod!=null)weather.tod=s.weather.tod; weather.t=s.weather.t||40; weather.sea=s.weather.sea||1; }
-  // world state comes from the snapshot, not the generator — no garrison/theater rolls here
+  // world state comes from the snapshot, not the generator — no garrison/theater rolls here.
+  // Clear first: resuming is normally reached from the menu with an empty field, but resuming
+  // while a battle is already up used to ADD the snapshot on top of it, doubling every unit.
+  for(const u of landUnits){ if(u.group) destroyObject3D(u.group); }
+  landUnits.length=0; _radar[0]=0; _radar[1]=0;
   friendlyHarbor=buildHarbor(0,new THREE.Vector3(s.fh.x,0,s.fh.z));
   enemyHarbor  =buildHarbor(1,new THREE.Vector3(s.eh.x,0,s.eh.z));
   Object.assign(friendlyHarbor.up,s.fh.up||{}); friendlyHarbor.hp=s.fh.hp; friendlyHarbor.maxhp=s.fh.maxhp;
   Object.assign(enemyHarbor.up,s.eh.up||{});   enemyHarbor.hp=s.eh.hp;   enemyHarbor.maxhp=s.eh.maxhp;
   (s.islands||[]).forEach(si=>{ const isl=buildIsland(new THREE.Vector3(si.x,0,si.z),si.r,si.name,{rx:si.rx,rz:si.rz,angle:si.angle,seed:si.seed}); isl.capturable=si.cap!==false; });
-  (s.units||[]).forEach(su=>{ const u=buildAndPushLand(su.k,su.t,new THREE.Vector3(su.x,su.y,su.z),su.y,(su.isl>=0?islands[su.isl]:null)||undefined,su.tt||undefined);
-    if(su.hp!=null)u.hp=su.hp; if(su.am!=null)u.ammoLeft=su.am; });
+  (s.units||[]).forEach(su=>{ const u=buildAndPushLand(su.k,su.t,new THREE.Vector3(su.x,su.y,su.z),su.y,(su.isl>=0?islands[su.isl]:null)||undefined,su.tt||undefined,true);   // force: a save must restore exactly what it stored
+    if(!u) return; if(su.hp!=null)u.hp=su.hp; if(su.am!=null)u.ammoLeft=su.am; });
   (s.islands||[]).forEach((si,i)=>{ if(si.owner!=null&&islands[i]) setIslandOwner(islands[i],si.owner,true); });
   buildTreeField();
   money=s.money|0; sunk=s.sunk|0;
