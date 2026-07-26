@@ -33,3 +33,22 @@ test('distant land units do not leave floating markers over empty ground', async
   expect(r.farVisible).toBeLessThan(r.farTotal * 0.2);
   expect(r.markerFar).toBeLessThan(1700);
 });
+
+test('coastal guns sit on the terrain, not buried under it', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof islandSurfaceY === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    currentSandboxIdx = SANDBOX_MAPS.findIndex(m=>m.ground);
+    startGame('battleship'); skipBanner();
+    for(let i=0;i<40;i++){ t2+=0.05; update(0.05,t2); }
+    const coastal = landUnits.filter(u=>!u.dead && u.kind==='coastal' && u.island);
+    // buried = model sits measurably below the island surface it stands on
+    const buried = coastal.filter(u => u.group.position.y < islandSurfaceY(u.pos,u.island) - 0.3);
+    return { total: coastal.length, buried: buried.length };
+  });
+  expect(r.total).toBeGreaterThan(10);   // the map really does field coastal guns
+  expect(r.buried).toBe(0);              // none of them are underground
+});
+
