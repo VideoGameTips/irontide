@@ -3768,6 +3768,7 @@ const landUnits=[];        // enemy coastal guns / tanks / soldiers {kind, pos, 
 let friendlyBossUsed=false,enemyBossUsed=false; // bosses are one-life assets and never enter reinforcement rolls
 let enemyHarbor=null, friendlyHarbor=null;  // {team, pos, hp, maxhp, group, r}
 let planeSpots=[];
+let deckPlan=null;   // runway / apron / helipad geometry for the player's current hull
 let tankSpots=[];          // free deck slots for bought tanks {pos, taken}
 let shopOpen=false;
 let harborOpen=false;
@@ -4937,8 +4938,34 @@ function makePlayerShip(shipId){
   compass.position.copy(helmLocal).add(new THREE.Vector3(-.78,.53,.02));build.group.add(compass);
   const hmark=new THREE.Mesh(new THREE.TorusGeometry(0.85,0.09,8,20), new THREE.MeshStandardMaterial({color:0xffd060,emissive:0xc09020,emissiveIntensity:0.8,transparent:true,opacity:0.8}));
   hmark.rotation.x=-Math.PI/2; hmark.position.copy(helmLocal); build.group.add(hmark); player.helmMark=hmark;
-  const ns = def.kind==='carrier'?4:2, dy=def.deckY+(def.kind==='carrier'?0.55:0.3);
-  for(let i=0;i<ns;i++) planeSpots.push({ pos:new THREE.Vector3((i%2?1:-1)*build.halfBeam*0.45, dy, -build.halfLen*0.35 - Math.floor(i/2)*6), taken:false });
+  // ---- FLIGHT DECK LAYOUT: runway + parking apron + helipad ----------------------------
+  // Every surface ship gets a marked runway down the port side, a parking apron aft where the
+  // aircraft sit, and a helipad. You taxi from your parking spot to the runway, then take off.
+  // Dimensions scale with the hull, so a destroyer's strip is genuinely short and unforgiving.
+  const dy=def.deckY+(def.kind==='carrier'?0.55:0.3);
+  const carrier=def.kind==='carrier';
+  // Layout follows a real flat-top: the runway is the full-length axial strip, aircraft park
+  // SIDEWAYS along the port edge with their noses inboard (wings folded, as on a real deck),
+  // and the helipad sits in the aft-starboard corner clear of both.
+  deckPlan={
+    y: dy,
+    runX: build.halfBeam*0.12,                     // axial strip, nudged to starboard of the parked row
+    runHalfW: Math.max(1.8, build.halfBeam*0.36),
+    runZ0: -build.halfLen*0.72,                    // aft threshold — where the roll starts
+    runZ1: build.halfLen*0.94,                     // bow end — past this you are off the deck
+    padPos: new THREE.Vector3(build.halfBeam*0.60, dy, -build.halfLen*0.74),   // aft-starboard corner
+    padR: Math.max(2.0, build.halfBeam*0.28),
+  };
+  const runLen=deckPlan.runZ1-deckPlan.runZ0;
+  const ns = carrier?8:2;
+  // Far enough inboard that a sideways-parked aircraft has room to swing its nose onto the
+  // runway — parked hard against the edge, the first metre of taxi puts it in the water.
+  const parkX = -build.halfBeam*0.52;
+  const z0 = -build.halfLen*0.52, z1 = build.halfLen*0.62;
+  for(let i=0;i<ns;i++){
+    const z = ns>1 ? z0 + (z1-z0)*(i/(ns-1)) : 0;
+    planeSpots.push({ pos:new THREE.Vector3(parkX, dy, z), taken:false, park:true });
+  }
   for(let i=0;i<6;i++){ const s=buildSailor('crew'); const lx=(Math.random()-0.5)*build.halfBeam*1.2, lz=(Math.random()-0.5)*build.halfLen*1.4;
     s.position.set(lx, def.deckY+(def.kind==='carrier'?0.5:0), lz); build.group.add(s);
     crew.push({mesh:s, base:new THREE.Vector3(lx,s.position.y,lz), phase:Math.random()*6.28, dir:Math.random()*6.28, t:Math.random()*6}); }
@@ -6602,7 +6629,7 @@ function buyPlane(id){
   const spot=planeSpots.find(s=>!s.taken);
   if(!spot){ flashPrompt('No free flight spot on deck'); return; }
   money-=cost;
-  const g=buildPlane(p); g.position.copy(spot.pos); g.rotation.y=0; player.build.group.add(g);
+  const g=buildPlane(p); g.position.copy(spot.pos); g.rotation.y=parkYaw(spot); player.build.group.add(g);
   planes.push({def:p,group:g,spot,parked:true,bombsLeft:p.bombs||0,gunAmmo:p.gunAmmo==null?null:p.gunAmmo});
   spot.taken=true; refreshShop(); updateHUD(); sfxClick(); flashPrompt(p.name+' ready on deck — press E aboard it to fly','ok');
 }
@@ -6638,14 +6665,97 @@ function spinProp(pa,dt){
   if(pa.group.userData.burner) pa.group.userData.burner.scale.setScalar(dead?0:0.7+Math.random()*0.6);
 }
 function deckTopWorldY(){ return player.build.group.position.y + player.def.deckY + (player.def.kind==='carrier'?0.5:0); }
+// Anything on deck that is not flat is a hazard while taxiing: mounted turrets, other parked
+// aircraft, deck tanks, and the superstructure/island. Returns a label for the crash message.
+// Parked aircraft sit ACROSS the deck edge with their noses inboard, the way a real flat-top
+// ranges its air wing along the port side. spot.park marks the sideways rows.
+function parkYaw(spot){ return spot&&spot.park ? Math.PI/2 : 0; }
+// The aircraft stopped safely on deck. It stays exactly where it stopped — no teleport back to
+// a numbered slot — and its spot becomes that position, so next time you board it there and
+// taxi from there. This is what replaced the old auto-recover.
+function parkWhereItStopped(P, pa){
+  const g=player.build.group;
+  const lp=P.deckLocal.clone();
+  pa.spot = { pos: lp.clone(), taken: true, park: false, adhoc: true };
+  g.attach(pa.group);
+  pa.group.position.copy(lp);
+  pa.group.rotation.set(0, P.taxiYaw||0, 0);
+  pa.parked = true;
+  setPlaneGearVisual(pa, true);
+  flashPrompt(T('✈️ Down safely — she waits here for you','✈️ 安全着舰——飞机就停在这里等你'),'ok');
+  piloting=null; fpv=false; mouseDownFire=false; camPitch.v=0.04;
+  updateMode();
+}
+// Went into the water short of the deck. The airframe is lost and the pilot is in the sea —
+// you swim back, exactly like bailing out.
+function ditchInOcean(P){
+  const pa=P.plane, where=P.pos.clone().setY(0.5);
+  splashAt(where, 3.0); boom(where, 0.8);
+  const i=planes.indexOf(pa); if(i>=0) planes.splice(i,1);
+  if(pa.spot) pa.spot.taken=false;
+  destroyObject3D(pa.group);
+  piloting=null; fpv=false; mouseDownFire=false;
+  // put the captain in the water at the ditch point and let them swim home
+  onFoot=true; driving=false; manning=null; drivingTank=null;
+  footLand=null; footPos.copy(where).setY(EYE*0.6);
+  resetFootHealth(); camPitch.v=0.02;
+  flashPrompt(T('🌊 Ditched — you are in the water. Swim back to the ship.','🌊 迫降入海——你落水了，游回舰上去。'),'bad');
+  updateMode();
+}
+function deckObstacleAt(lp, self){
+  const R=2.4;
+  for(const pl of placed){ if(!pl.group) continue;
+    const q=pl.group.position; if(Math.hypot(lp.x-q.x, lp.z-q.z) < R) return 'turret'; }
+  for(const other of planes){ if(other===self||!other.parked||!other.spot) continue;
+    const q=other.spot.pos; if(Math.hypot(lp.x-q.x, lp.z-q.z) < R+0.6) return 'plane'; }
+  for(const tk of playerTanks){ if(!tk.onDeck||!tk.group) continue;
+    const q=tk.group.position; if(Math.hypot(lp.x-q.x, lp.z-q.z) < R+0.4) return 'tank'; }
+  // the island / superstructure: a block amidships-to-aft on the starboard side
+  // The island/superstructure sits clear of the runway — outboard of its starboard edge, the way
+  // a real flat-top keeps the strip unobstructed. Derive it from deckPlan so the two can never
+  // overlap again if the layout is retuned.
+  const dpl=deckPlan;
+  if(dpl){
+    const outboard = dpl.runX + dpl.runHalfW + 0.8;
+    if(player.def.kind==='carrier'){
+      if(lp.x > outboard && Math.abs(lp.z - player.build.halfLen*0.10) < player.build.halfLen*0.22) return 'island';
+    } else if(lp.x > outboard && Math.abs(lp.z - player.build.halfLen*0.06) < player.build.halfLen*0.20){
+      return 'superstructure';
+    }
+  }
+  return null;
+}
+// A taxiing accident. Hitting solid gear detonates the aircraft; going over the side flips it
+// into the water. Either way the airframe is lost and the captain is back on deck.
+function crashOnDeck(P, pa, what){
+  const wreck=P.pos.clone();
+  const flipped = what==='edge';
+  if(flipped){ flashPrompt(T('✈️ Rolled off the deck — the aircraft flipped into the sea','✈️ 冲出甲板——飞机翻进海里'),'bad'); splashAt(wreck.setY(0.4), 2.2); }
+  else {
+    const label={turret:T('a turret','炮塔'),plane:T('a parked aircraft','停放的飞机'),tank:T('a deck tank','甲板坦克'),
+                 island:T('the island','舰岛'),superstructure:T('the superstructure','上层建筑')}[what]||T('deck gear','甲板设备');
+    flashPrompt(T('💥 Taxi crash — you hit '+label,'💥 滑行事故——撞上了'+label),'bad');
+    boom(wreck, 1.1); explodeAt(wreck, 0, 30, 8, null);
+  }
+  if(typeof addCameraShake==='function') addCameraShake(wreck, flipped?0.5:0.9);
+  const i=planes.indexOf(pa); if(i>=0) planes.splice(i,1);
+  if(pa.spot) pa.spot.taken=false;
+  destroyObject3D(pa.group);
+  piloting=null; fpv=false; mouseDownFire=false; camPitch.v=0.04;
+  updateMode();
+}
 function flyPlane(pa){
   if(player.crit && player.crit.deck){ flashPrompt('✈️ Flight deck wrecked — can’t launch until it’s repaired'); return; }
   const wp=pa.group.getWorldPosition(new THREE.Vector3());
   scene.attach(pa.group);                          // detach to world, keep transform
   const fuel=pa.def.fuel||200;
-  piloting={ plane:pa, pos:wp.clone(), speed:pa.def.speed*0.35, gunCd:0, bombCd:0, roll:0, lastYaw:player.heading||0, phase:'takeoff', taxiT:0, hp:pa.def.hp, maxhp:pa.def.hp,
+  piloting={ plane:pa, pos:wp.clone(), speed:0, gunCd:0, bombCd:0, roll:0, lastYaw:player.heading||0, phase:(pa.def.heli?'takeoff':'taxi'), taxiT:0, hp:pa.def.hp, maxhp:pa.def.hp,
     fuel,fuelMax:fuel,engineOn:true,gLoad:0,stallT:0,parts:initPlaneParts(pa.def) };
-  pa.parked=false; camYaw.v=player.heading||0; camPitch.v=0.05; warRecord('flew');
+  // You take the aircraft exactly as it sits: the taxi heading starts at its parked yaw, so
+  // a sideways-ranged fighter must actually be turned onto the runway before it can fly.
+  pa.parked=false; const parkedYaw=parkYaw(pa.spot);
+  piloting.taxiYaw=parkedYaw; piloting.deckLocal=player.build.group.worldToLocal(piloting.pos.clone());
+  camYaw.v=(player.heading||0)+parkedYaw; camPitch.v=0.05; warRecord('flew');
   if(pa.def.uav) fpv=true;
   const cv=document.getElementById('c'); if(document.pointerLockElement!==cv) try{const _pl=cv.requestPointerLock(); if(_pl&&_pl.catch)_pl.catch(()=>{});}catch(e){}
   flashPrompt('Takeoff roll…'); updateMode();
@@ -6658,13 +6768,13 @@ function applyPlaneDamageVisual(P){
   if(g.userData.gearVisuals)g.userData.gearVisuals.forEach((q,i)=>{q.rotation.z=pr.gear>=2?(i%2?-.3:.3):0;q.scale.y=pr.gear>=3?.35:1;});
   if(g.userData.burners&&pr.engL!==undefined){g.userData.burners.forEach((b,i)=>{const d=i<g.userData.burners.length/2?pr.engL:pr.engR;b.material.opacity=d>=3?0:d>=2?.3:.72;});}
 }
-function startLanding(){ if(piloting && piloting.phase==='fly'){ piloting.phase='landing';setPlaneGearVisual(piloting.plane,true);flashPrompt('Landing — bring it down OVER the ship, or you ditch.'); updateMode(); } }
+function startLanding(){ if(piloting && piloting.phase==='fly'){ piloting.phase='landing';setPlaneGearVisual(piloting.plane,true);flashPrompt(T('Gear down — fly it onto the deck yourself','起落架放下——自己飞回甲板上'),'ok'); updateMode(); } }
 function recoverPlane(){ // safe landing on the ship
   const pr=piloting.parts;
   if(pr && pr.gear>=2 && Math.random()<0.4+0.3*(pr.gear-2)){ crashPlane('Landing gear collapsed on touchdown!'); return; }
   const pa=piloting.plane;
   player.build.group.attach(pa.group);
-  pa.group.position.copy(pa.spot.pos); pa.group.rotation.set(0,0,0);pa.parked=true;setPlaneGearVisual(pa,true);
+  pa.group.position.copy(pa.spot.pos); pa.group.rotation.set(0,parkYaw(pa.spot),0);pa.parked=true;setPlaneGearVisual(pa,true);
   const exit=pa.spot.pos.clone();
   const side=exit.x>=0?-1:1;
   exit.x+=side*4.5; exit.z+=3.5;
@@ -6829,7 +6939,7 @@ function returnFromUAV(destroyed,msg){
 }
 function dockUAV(){
   const P=piloting,pa=P&&P.plane;if(!pa)return;
-  player.build.group.attach(pa.group);pa.group.position.copy(pa.spot.pos);pa.group.rotation.set(0,0,0);pa.parked=true;setPlaneGearVisual(pa,true);
+  player.build.group.attach(pa.group);pa.group.position.copy(pa.spot.pos);pa.group.rotation.set(0,parkYaw(pa.spot),0);pa.parked=true;setPlaneGearVisual(pa,true);
   piloting=null;fpv=false;mouseDownFire=false;camPitch.v=.04;flashPrompt('UAV recovered — captain safely back aboard.');updateMode();
 }
 function startDrive(){
@@ -6851,6 +6961,50 @@ function updatePilot(dt){
     if(P.hp<=0){ crashPlane('Burning aircraft went down!'); return; }
     if(Math.random()<dt*1.1) flashPrompt(keyPrompt('🔥 YOUR AIRCRAFT IS ON FIRE — press P to bail out!','🔥 YOUR AIRCRAFT IS ON FIRE — tap Bail to jump!','🔥 你的飞机着火了——快点「跳伞」！')); }
   // ---------- TAKEOFF ----------
+  // ---- TAXI: you drive the aircraft on deck before you fly it ---------------------------
+  // W/S throttle, A/D steer. Q rotates once you have speed AND are lined up on the runway.
+  // Anything on deck that is not flat — turrets, parked aircraft, deck tanks, the island —
+  // wrecks you, and rolling off the side flips you into the sea.
+  if(P.phase==='taxi'){
+    const dp=deckPlan;
+    const g=player.build.group;
+    const steer=(keys['KeyD']?1:0)-(keys['KeyA']?1:0);   // A=port, D=starboard, matching the helm
+    const rollFrac=Math.min(1,P.speed/8);                // nosewheel only bites once you are moving
+    P.taxiYaw=(P.taxiYaw==null?0:P.taxiYaw)+steer*dt*2.6*rollFrac;   // deck turns are tight; you must be able to swing 90° in the width of the deck
+    const thr=(keys['KeyW']?1:0)-(keys['KeyS']?1:0);
+    P.speed=Math.max(0, Math.min(def.maxSpeed*0.55, P.speed + thr*14*dt - (thr<=0?16*dt:0)));   // gentler spool-up: a deck is a short place to change your mind
+    // move in DECK-LOCAL space so the ship can steer under you
+    const lp = P.deckLocal || (P.deckLocal = g.worldToLocal(P.pos.clone()));
+    lp.x += Math.sin(P.taxiYaw)*P.speed*dt;
+    lp.z += Math.cos(P.taxiYaw)*P.speed*dt;
+    lp.y = dp ? dp.y+1.0 : lp.y;
+    P.pos.copy(g.localToWorld(lp.clone()));
+    const yawW=(player.heading||0)+P.taxiYaw;
+    pa.group.position.copy(P.pos);
+    pa.group.quaternion.setFromEuler(new THREE.Euler(0, yawW, 0,'YXZ'));
+    camYaw.v=yawW; camPitch.v=0.03; spinProp(pa,dt);
+    // --- hit something solid? ---
+    const hit=deckObstacleAt(lp, pa);
+    if(hit){ crashOnDeck(P, pa, hit); return; }
+    // --- rolled off the edge? ---
+    if(dp && (Math.abs(lp.x)>player.build.halfBeam*1.02 || lp.z<-player.build.halfLen*1.02 || lp.z>player.build.halfLen*1.02)){
+      crashOnDeck(P, pa, 'edge'); return;
+    }
+    // --- Q to rotate ---
+    const onRunway = dp && Math.abs(lp.x-dp.runX) < dp.runHalfW+0.6;
+    const runwayLeft = dp ? (dp.runZ1 - lp.z) : 999;
+    if(keys['KeyQ'] && !P._qHeld){
+      P._qHeld=true;
+      const vmin=def.maxSpeed*0.26;
+      if(!onRunway) flashPrompt(T('Line up on the runway first','先把飞机开到跑道上'),'bad');
+      else if(P.speed<vmin) flashPrompt(T('Too slow to rotate — more throttle','速度不够——加大油门'),'bad');
+      else { P.phase='takeoff'; P.taxiT=0; P.rotateYaw=yawW; flashPrompt(T('Rotate!','拉起！'),'ok'); }
+    }
+    if(!keys['KeyQ']) P._qHeld=false;
+    // running out of deck at speed with no rotation = over the bow
+    if(dp && lp.z>dp.runZ1 && P.speed>2){ crashOnDeck(P, pa, 'edge'); return; }
+    return;
+  }
   if(P.phase==='takeoff'){
     if(def.heli){ // helicopters lift straight up
       camYaw.v=player.heading||0; camPitch.v=0; P.pos.y+=20*dt;
@@ -6882,19 +7036,61 @@ function updatePilot(dt){
     if(dist<3){dockUAV();return;} return;
   }
   // ---------- LANDING: descend; safe only OVER the ship, else ditch ----------
+  // ---------- LANDING: a real deck recovery, no auto-return ------------------------------
+  // You fly it down yourself. Touch the deck and it becomes a rollout: the aircraft glides on
+  // for a distance set by the speed you brought in, and anything solid in that path wrecks it.
+  // Stop safely and it STAYS where it stopped — that is where you'll board it next time.
   if(P.phase==='landing'){
     if(keys['KeyA']) camYaw.v+=def.turn*0.7*dt; if(keys['KeyD']) camYaw.v-=def.turn*0.7*dt;
     const yaw=camYaw.v;
-    P.speed=Math.max(def.speed*0.4, P.speed-14*dt);
+    // gear and flaps down: she flies a slow, steep approach, and S bleeds even more
+    const vApp=def.speed*0.55;
+    if(keys['KeyW']) P.speed=Math.min(def.maxSpeed*0.6, P.speed+18*dt);
+    else if(keys['KeyS']) P.speed=Math.max(def.speed*0.28, P.speed-26*dt);
+    else P.speed += (vApp-P.speed)*Math.min(1,dt*1.2);
     P.pos.add(new THREE.Vector3(Math.sin(yaw),0,Math.cos(yaw)).multiplyScalar(P.speed*dt));
-    P.pos.y-=15*dt;
+    P.pos.y-=26*dt;
     P.roll=THREE.MathUtils.lerp(P.roll,0,0.1);
     pa.group.position.copy(P.pos); pa.group.quaternion.setFromEuler(new THREE.Euler(0.1,yaw,P.roll,'YXZ'));setAircraftControlSurfaces(pa.group,P.roll,-.1);spinProp(pa,dt);
     const local=player.build.group.worldToLocal(P.pos.clone());
     const overShip = Math.abs(local.x)<player.build.halfBeam && Math.abs(local.z)<player.build.halfLen;
-    if(P.pos.y<=deckY+1.3 && overShip){ recoverPlane(); return; }
+    if(P.pos.y<=deckY+1.3 && overShip){
+      // touchdown → roll out under your own momentum, in deck-local space
+      P.phase='rollout'; P.deckLocal=local.clone(); P.deckLocal.y=(deckPlan?deckPlan.y:0)+1.0;
+      P.taxiYaw=yaw-(player.heading||0);
+      setPlaneGearVisual(pa,true);
+      // Arrestor wires: catching one is what makes a deck landing survivable at all. Touch down
+      // in the wire zone (the aft third of the runway) and the hook takes most of your speed;
+      // land long, past the wires, and you are relying on brakes alone — usually not enough.
+      const dp=deckPlan;
+      const inWires = dp && local.z < dp.runZ0 + (dp.runZ1-dp.runZ0)*0.42;
+      if(inWires){ P.speed*=0.18; flashPrompt(T('🪝 Wire caught — brake with S','🪝 挂上拦阻索——按 S 刹车'),'ok'); }
+      else { P.speed*=0.72; flashPrompt(T('Landed long — no wire! Brake!','着陆过远——没挂上索！快刹车！'),'bad'); }
+      return;
+    }
     if(planeTerrainCollision(P)) return;
-    if(P.pos.y<=0.8){ crashPlane('Ditched in the ocean — aircraft destroyed!'); return; }
+    if(P.pos.y<=0.8){ ditchInOcean(P); return; }
+    return;
+  }
+  // ---------- ROLLOUT: the landing is not over until you stop ----------------------------
+  if(P.phase==='rollout'){
+    const g=player.build.group, dp=deckPlan;
+    const steer=(keys['KeyD']?1:0)-(keys['KeyA']?1:0);
+    const rollFrac=Math.min(1,P.speed/8);
+    P.taxiYaw=(P.taxiYaw||0)+steer*dt*1.1*rollFrac;
+    const brake=keys['KeyS']?34:14;                     // S brakes hard; otherwise friction alone
+    P.speed=Math.max(0, P.speed - brake*dt);
+    const lp=P.deckLocal;
+    lp.x+=Math.sin(P.taxiYaw)*P.speed*dt; lp.z+=Math.cos(P.taxiYaw)*P.speed*dt;
+    if(dp) lp.y=dp.y+1.0;
+    P.pos.copy(g.localToWorld(lp.clone()));
+    const yawW=(player.heading||0)+P.taxiYaw;
+    pa.group.position.copy(P.pos); pa.group.quaternion.setFromEuler(new THREE.Euler(0,yawW,0,'YXZ'));
+    camYaw.v=yawW; camPitch.v=0.03; spinProp(pa,dt);
+    const hit=deckObstacleAt(lp,pa);
+    if(hit){ crashOnDeck(P,pa,hit); return; }
+    if(Math.abs(lp.x)>player.build.halfBeam*1.02 || Math.abs(lp.z)>player.build.halfLen*1.02){ crashOnDeck(P,pa,'edge'); return; }
+    if(P.speed<=0.4){ parkWhereItStopped(P,pa); return; }   // stopped safely — it stays here
     return;
   }
   // ---------- HELI FLY: hover — throttle = forward, mouse pitch = climb/descend ----------
@@ -8679,7 +8875,8 @@ function updatePrompt(){
     else msg=(ftk?T('Press E to crew '+(ftk.name||'tank')+' · ','按 E 进入'+trName(ftk.name||'坦克')+' · '):'')+(landCampaignMode?T('Airborne assault','空降突击'):(footLand?T('Ashore','登岸'):T('Swimming','游泳中')))+hp+' — WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm+T(' · Q switch',' · Q 换枪')+(footLand?T(' · B build',' · B 建造'):'') + shipWayback(near) + (capIsl?'   ·   '+capMsg():''); }
   else if(driving){ msg=steerHint() + (player.def.kind==='sub'?T('   ·   C dive/surface','   ·   C 下潜/上浮'):'') + (selectedWeapon?T('   ·   '+installHint()+' '+WEAPONS[selectedWeapon].name,'   ·   '+installHint()+trName(WEAPONS[selectedWeapon].name)):'') + helmExitHint(); }
   else if(piloting){
-    if(piloting.phase==='takeoff') msg=T('Taking off…','正在起飞…');
+    if(piloting.phase==='taxi') msg=T('Taxi to the runway — Q to rotate','滑到跑道上——按 Q 拉起');
+    else if(piloting.phase==='takeoff') msg=T('Taking off…','正在起飞…');
     else if(piloting.phase==='landing') msg=T('Landing — line up OVER the ship and descend · E to abort','降落——对准舰船正上方缓慢下降 · E 取消');
     else { const heli=piloting.plane.def.heli; const b=piloting.plane.def.bomb?T(`   ·   Space drop (${piloting.plane.bombsLeft})`,`   ·   空格投弹 (${piloting.plane.bombsLeft})`):'';
       const ga=piloting.plane.gunAmmo==null?'':T(`   ·   Gun ammo ${piloting.plane.gunAmmo}`,`   ·   弹药 ${piloting.plane.gunAmmo}`);
@@ -8853,7 +9050,8 @@ function updateMode(){
         : landCampaignMode?T('<b>AIRBORNE ASSAULT</b><br>WASD walk/swim · Click = rifle · B build<br>E board tank · Capture command posts','<b>空降突击</b><br>WASD 行走/游泳 · 点击开枪 · B 建造<br>E 上坦克 · 占领指挥所')
         : footLand?T('<b>ASHORE</b><br>WASD walk · Click = rifle · B build<br>E board tank · G re-board ship','<b>登岸</b><br>WASD 行走 · 点击开枪 · B 建造<br>E 上坦克 · G 回船'):T('<b>SWIMMING</b><br>WASD swim to land or ship<br>Click = rifle','<b>游泳中</b><br>WASD 游向陆地或船只<br>点击开枪'))
     : driving ? (T('<b>AT THE HELM</b><br>W/S throttle · A/D rudder','<b>掌舵中</b><br>W/S 油门 · A/D 舵')+(player.def.kind==='sub'?T(' · C dive',' · C 下潜'):'')+T('<br>Mouse look · E to step away','<br>鼠标看四周 · E 离开舵位'))
-    : piloting ? (piloting.phase==='takeoff' ? T('<b>TAKEOFF</b><br>Climbing out…','<b>起飞</b><br>正在爬升…')
+    : piloting ? (piloting.phase==='taxi' ? T('<b>TAXI</b><br>W/S throttle · A/D steer<br>Q to rotate on the runway','<b>滑行</b><br>W/S 油门 · A/D 转向<br>开上跑道后按 Q 拉起')
+        : piloting.phase==='takeoff' ? T('<b>TAKEOFF</b><br>Climbing out…','<b>起飞</b><br>正在爬升…')
         : piloting.phase==='landing' ? T('<b>LANDING</b><br>Descend over the ship<br>E to abort','<b>降落</b><br>对准舰船上方下降<br>E 取消')
         : T('<b>IN FLIGHT</b><br>Mouse + A/D steer · W/S throttle<br>Click guns · Space bombs · P parachute · E land','<b>飞行中</b><br>鼠标 + A/D 操纵 · W/S 油门<br>点击开炮 · 空格投弹 · P 跳伞 · E 降落'))
     : manning ? T('<b>GUNNERY</b><br>Mouse aim · Click fire · E exit','<b>炮手位</b><br>鼠标瞄准 · 点击开火 · E 离开')
