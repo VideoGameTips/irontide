@@ -5912,39 +5912,38 @@ function syncNPCDeck(s){
     t.position.copy(b.mounts[i]); b.group.add(t); b.npcTurrets.push(t);
   }
   // ...and a small ranged air wing on the flight deck, slanted the way the player's is
-  if(!b.deckPlanes.length && b.ext){
-    const cx=(b.ext.x0+b.ext.x1)/2, z0=-b.halfLen*0.50, z1=-b.halfLen*0.36;
+  if(!b.deckSpots && b.ext){
+    const cx=(b.ext.x0+b.ext.x1)/2, z0=-b.halfLen*0.50, z1=-b.halfLen*0.34;
     const n = (s.def.len0||s.def.len)>150 ? 3 : 2;
-    for(let i=0;i<n;i++){
-      const d=PLANES[NPC_PLANE_MODELS[i%NPC_PLANE_MODELS.length]];
-      const g=buildPlane({...d, col: s.team===1?0x8a6a6a:0x6a78a0});
-      g.position.set(cx, s.def.deckY+0.3, n>1 ? z0+(z1-z0)*(i/(n-1)) : z0);
-      g.rotation.y=Math.PI*0.17;                 // same slant as the player's ranged row
-      setPlaneGearVisual({group:g}, true);
-      b.group.add(g); b.deckPlanes.push(g);
-    }
+    b.deckSpots=[];
+    for(let i=0;i<n;i++) b.deckSpots.push(new THREE.Vector3(cx, s.def.deckY+0.3, n>1 ? z0+(z1-z0)*(i/(n-1)) : z0));
+    for(let i=0;i<n;i++) addNPCDeckPlane(s, PLANES[NPC_PLANE_MODELS[i%NPC_PLANE_MODELS.length]]);
   }
+}
+// Range one aircraft on the first free deck spot. Used at spawn, and again every time one of
+// this ship's aircraft comes home and parks — the deck is a real inventory now, not scenery.
+function addNPCDeckPlane(s, def){
+  const b=s.build; if(!b||!b.deckSpots) return null;
+  const used=new Set((b.deckPlanes||[]).map(g=>g.userData.deckSlot));
+  const slot=b.deckSpots.findIndex((_,i)=>!used.has(i));
+  if(slot<0) return null;
+  const d=def||PLANES[NPC_PLANE_MODELS[slot%NPC_PLANE_MODELS.length]];
+  const g=buildPlane({...d, col: s.team===1?0x8a6a6a:0x6a78a0});
+  g.position.copy(b.deckSpots[slot]);
+  g.rotation.y=Math.PI*0.14;                   // same slant as the player's ranged row
+  g.userData.planeDef=d; g.userData.deckSlot=slot;
+  setPlaneGearVisual({group:g}, true);
+  b.group.add(g); b.deckPlanes.push(g);
+  return g;
+}
+function npcDeckRoom(s){
+  const b=s&&s.build; if(!b||!b.deckSpots) return 0;
+  return b.deckSpots.length - (b.deckPlanes?b.deckPlanes.length:0) - (s.deckInbound||0);
 }
 // One aircraft leaves the ranged row when the ship launches, and is back after a turnaround —
 // so the deck reflects what the ship is actually doing rather than being a static prop.
-function npcDeckLaunch(s){
-  const dp=s.build&&s.build.deckPlanes; if(!dp||!dp.length) return;
-  const g=dp.find(x=>x.visible); if(!g) return;
-  g.visible=false;
-  // One turnaround per AIRCRAFT, not one per ship. A single shared timer that each launch reset
-  // only ever handed one aircraft back, so a ship launching every ~10s emptied its own deck for
-  // the rest of the battle and never re-ranged.
-  (s.deckReturn || (s.deckReturn=[])).push(42);
-}
-function npcDeckRearm(s,dt){
-  const q=s.deckReturn; if(!q||!q.length) return;
-  for(let i=q.length-1;i>=0;i--){
-    if((q[i]-=dt)>0) continue;
-    q.splice(i,1);
-    const dp=s.build&&s.build.deckPlanes, g=dp&&dp.find(x=>!x.visible);
-    if(g) g.visible=true;
-  }
-}
+// Aircraft no longer reappear on a timer — they fly home, land, and taxi to a spot, which is
+// what npcRecoverToDeck below does. Nothing to tick here any more.
 function chooseNPCShipDef(team){
   const fleet=team===1?enemies:allies;
   if(!fleet.some(s=>s.def.support&&s.sinkT===0))return {...FLEET_TENDER}; // every fleet begins with essential repair/resupply
@@ -6368,12 +6367,13 @@ function updateAlly(a,dt){
 // ---- shared: ships BUY weapons + aircraft over time (both teams) ----
 function shipEconomy(s,dt){
   if((s.upgT-=dt)<=0 && s.loadout.length<6){ growLoadout(s); s.upgT=12+Math.random()*9; }
-  if(!s.proxy){ syncNPCDeck(s); npcDeckRearm(s,dt); }   // keep the visible deck matching the real one
+  if(!s.proxy) syncNPCDeck(s);   // keep the visible deck matching the real one
   const hangar = hU(s.team,'hangar');                       // aircraft hangar boosts that side's air wing
   const cap = AIR_CAP + hangar*2;
   if((s.planeT-=dt)<=0){ s.planeT=(Math.max(5, 14 - hangar*2)+Math.random()*16)*SPAWN_SLOW;
     const deckOut = s.crit && s.crit.deck;     // wrecked flight deck grounds the air wing
-    if(!s.proxy && !deckOut && aiPlanes.reduce((n,p)=>n+(p.team===s.team?1:0),0) < cap && s.sinkT===0) launchFromDeck(s); }
+    if(!s.proxy && !deckOut && aiPlanes.reduce((n,p)=>n+(p.team===s.team?1:0),0) < cap && s.sinkT===0
+       && (s.build&&s.build.deckPlanes&&s.build.deckPlanes.length)) launchFromDeck(s); }   // nothing ranged = nothing to launch
 }
 function updateSupportShips(dt){
   const scanTender=tender=>{
@@ -6863,6 +6863,7 @@ function dispatchPlane(pa){
   // attached, the ship transform got applied twice and the aircraft rendered a kilometre off
   // the bow. flyPlane does the same detach for the same reason.
   scene.attach(pa.group);
+  if(pa.spot) pa.spot.taken=false;
   pa.aiTaxi={ speed:0, yaw:parkYaw(pa.spot), lp:pa.spot.pos.clone(), t:0 };
   sfxClick();
   flashPrompt(T('🤖 '+pa.def.name+' taxiing under AI control','🤖 '+trName(pa.def.name)+' 由 AI 飞行员滑出'));
@@ -7031,15 +7032,26 @@ function parkYaw(spot){ return spot ? (typeof spot.yaw==='number' ? spot.yaw : (
 // a numbered slot — and its spot becomes that position, so next time you board it there and
 // taxi from there. This is what replaced the old auto-recover.
 function parkWhereItStopped(P, pa){
+  // Stopped on the runway is not parked — she is blocking the strip. Taxi her back to a box the
+  // way a deck crew would, and only hand the controls back once she is actually stowed.
+  const spot=freeSpotFor(pa);
+  if(spot){
+    P.phase='taxihome'; P.homeSpot=spot; P.speed=0;
+    flashPrompt(T('✈️ Down safely — taxiing to her spot','✈️ 安全着舰——正在滑回停机位'),'ok');
+    return;
+  }
+  stowPlaneAt(P, pa, { pos:P.deckLocal.clone(), taken:true, park:false, adhoc:true, yaw:P.taxiYaw||0 });
+}
+// Put the aircraft on a spot and give the player back to the ship.
+function stowPlaneAt(P, pa, spot){
   const g=player.build.group;
-  const lp=P.deckLocal.clone();
-  pa.spot = { pos: lp.clone(), taken: true, park: false, adhoc: true, yaw: P.taxiYaw||0 };
+  if(pa.spot && pa.spot!==spot) pa.spot.taken=false;
+  pa.spot=spot; spot.taken=true;
   g.attach(pa.group);
-  pa.group.position.copy(lp);
-  pa.group.rotation.set(0, P.taxiYaw||0, 0);
+  pa.group.position.copy(spot.pos);
+  pa.group.rotation.set(0, parkYaw(spot), 0);
   pa.parked = true;
   setPlaneGearVisual(pa, true);
-  flashPrompt(T('✈️ Down safely — she waits here for you','✈️ 安全着舰——飞机就停在这里等你'),'ok');
   piloting=null; fpv=false; mouseDownFire=false; camPitch.v=0.04;
   updateMode();
 }
@@ -7119,6 +7131,9 @@ function flyPlane(pa){
     fuel,fuelMax:fuel,engineOn:true,gLoad:0,stallT:0,parts:initPlaneParts(pa.def) };
   // You take the aircraft exactly as it sits: the taxi heading starts at its parked yaw, so
   // a sideways-ranged fighter must actually be turned onto the runway before it can fly.
+  // Airborne means the box is free — someone else can buy into it or park there. She keeps a
+  // reference to it as her PREFERRED box, which is what freeSpotFor tries first on the way back.
+  if(pa.spot) pa.spot.taken=false;
   pa.parked=false; const parkedYaw=parkYaw(pa.spot);
   piloting.taxiYaw=parkedYaw; piloting.deckLocal=player.build.group.worldToLocal(piloting.pos.clone());
   camYaw.v=(player.heading||0)+parkedYaw; camPitch.v=0.05; warRecord('flew');
@@ -7134,7 +7149,19 @@ function applyPlaneDamageVisual(P){
   if(g.userData.gearVisuals)g.userData.gearVisuals.forEach((q,i)=>{q.rotation.z=pr.gear>=2?(i%2?-.3:.3):0;q.scale.y=pr.gear>=3?.35:1;});
   if(g.userData.burners&&pr.engL!==undefined){g.userData.burners.forEach((b,i)=>{const d=i<g.userData.burners.length/2?pr.engL:pr.engR;b.material.opacity=d>=3?0:d>=2?.3:.72;});}
 }
-function startLanding(){ if(piloting && piloting.phase==='fly'){ piloting.phase='landing';setPlaneGearVisual(piloting.plane,true);flashPrompt(T('Gear down — fly it onto the deck yourself','起落架放下——自己飞回甲板上'),'ok'); updateMode(); } }
+// Where will this aircraft go when it stops? Her own box if it is still hers, otherwise any
+// free one. Null means the deck is full — and then there is no point starting an approach.
+function freeSpotFor(pa){
+  if(pa && pa.spot && !pa.spot.adhoc && !pa.spot.taken) return pa.spot;   // her own box, if nobody took it
+  return planeSpots.find(sp=>!sp.taken) || null;
+}
+function startLanding(){
+  if(piloting && piloting.phase==='fly' && !freeSpotFor(piloting.plane)){
+    flashPrompt(T('Deck is full — no free spot to park. Send one up first.',
+                  '甲板停机位满了——没地方停。先放一架出去。'),'bad');
+    return;
+  }
+  if(piloting && piloting.phase==='fly'){ piloting.phase='landing';setPlaneGearVisual(piloting.plane,true);flashPrompt(T('Gear down — fly it onto the deck yourself','起落架放下——自己飞回甲板上'),'ok'); updateMode(); } }
 function recoverPlane(){ // safe landing on the ship
   const pr=piloting.parts;
   if(pr && pr.gear>=2 && Math.random()<0.4+0.3*(pr.gear-2)){ crashPlane('Landing gear collapsed on touchdown!'); return; }
@@ -7498,6 +7525,26 @@ function updatePilot(dt){
     }
     if(planeTerrainCollision(P)) return;
     if(P.pos.y<=0.8){ ditchInOcean(P); return; }
+    return;
+  }
+  // ---------- TAXI HOME: the deck crew walks her back to her box ------------------------
+  if(P.phase==='taxihome'){
+    const g=player.build.group, dp=deckPlan, sp=P.homeSpot;
+    if(!sp || !dp){ stowPlaneAt(P, pa, sp||pa.spot); return; }
+    const lp=P.deckLocal;
+    const dx=sp.pos.x-lp.x, dz=sp.pos.z-lp.z, d=Math.hypot(dx,dz);
+    if(d<1.2){ stowPlaneAt(P, pa, sp);
+      flashPrompt(T('✈️ Stowed — she is ready to go again','✈️ 已归位——随时可以再起飞'),'ok'); return; }
+    const want=Math.atan2(dx,dz);
+    let err=want-(P.taxiYaw||0); while(err>Math.PI)err-=2*Math.PI; while(err<-Math.PI)err+=2*Math.PI;
+    P.taxiYaw=(P.taxiYaw||0)+Math.max(-2.2*dt, Math.min(2.2*dt, err));
+    P.speed=Math.min(7, Math.min(d*1.6, P.speed+9*dt));      // walking pace, easing off as she arrives
+    lp.x+=Math.sin(P.taxiYaw)*P.speed*dt; lp.z+=Math.cos(P.taxiYaw)*P.speed*dt; lp.y=dp.y+1.0;
+    P.pos.copy(g.localToWorld(lp.clone()));
+    const yawW=(player.heading||0)+P.taxiYaw;
+    pa.group.position.copy(P.pos);
+    pa.group.quaternion.setFromEuler(new THREE.Euler(0, yawW, 0,'YXZ'));
+    camYaw.v=yawW; camPitch.v=0.03; spinProp(pa,dt);
     return;
   }
   // ---------- ROLLOUT: the landing is not over until you stop ----------------------------
@@ -8692,12 +8739,16 @@ function planeProfile(def){ const b=def.bomb;
 const deckRolls=[];
 function launchFromDeck(s){
   if(!s || !s.build || !s.build.group) { spawnAIPlane(s, s.team); return; }
-  npcDeckLaunch(s);
-  const def=PLANES[AI_PLANE_POOL[Math.floor(Math.random()*AI_PLANE_POOL.length)]];
-  const g=buildPlane({...def, col: s.team===1?0x8a6a6a:0x6a78a0});
-  scene.add(g); setPlaneGearVisual({group:g}, true);
+  // Roll the aircraft that is actually RANGED on the deck, rather than blinking it out of
+  // existence and building a second one for the taxi. The deck you can see is the deck that is.
+  const dp=s.build.deckPlanes||[];
+  const g=dp.length ? dp[dp.length-1] : null;
+  if(!g){ spawnAIPlane(s, s.team, null, s); return; }          // deck empty — she was already up
+  const def=g.userData.planeDef || PLANES[AI_PLANE_POOL[Math.floor(Math.random()*AI_PLANE_POOL.length)]];
+  dp.splice(dp.indexOf(g),1);
+  scene.attach(g);
   const hl=s.build.halfLen, deckY=(s.def.deckY||4)+0.6;
-  deckRolls.push({ ship:s, def, group:g, team:s.team, t:0,
+  deckRolls.push({ kind:'launch', ship:s, def, group:g, team:s.team, t:0,
     z:-hl*0.6, hl, deckY, speed:0, life:9 });
 }
 function updateDeckRolls(dt){
@@ -8711,13 +8762,28 @@ function updateDeckRolls(dt){
     if(!r.ship || !r.ship.build || !r.ship.build.group){
       const wp=r.group?r.group.getWorldPosition(new THREE.Vector3()):(r.ship?r.ship.pos.clone():null);
       destroyObject3D(r.group); deckRolls.splice(i,1);
-      if(wp) spawnAIPlane({pos:wp.setY((r.ship&&r.ship.pos.y||0)+r.deckY+4)}, r.team, r.def);
+      if(wp) spawnAIPlane({pos:wp.setY((r.ship&&r.ship.pos.y||0)+r.deckY+4)}, r.team, r.def, r.ship);
       continue;
     }
     // the parent hull sank, or took a deck hit mid-roll → the launch is lost
     if(r.ship.sinkT>0 || r.ship.dead || (r.ship.crit&&r.ship.crit.deck) || (r.life-=dt)<=0){
       const wp=r.group.getWorldPosition(new THREE.Vector3());
       boom(wp,0.8); destroyObject3D(r.group); deckRolls.splice(i,1); continue;
+    }
+    if(r.kind==='recover'){
+      // Touched down aft and rolling forward against the brakes. When she stops she is ranged
+      // again — a real aircraft back in the ship's inventory, not a respawned prop.
+      r.speed=Math.max(0, r.speed-26*dt);
+      r.z += r.speed*dt;
+      const local=new THREE.Vector3(0, r.deckY, r.z);
+      r.group.position.copy(r.ship.build.group.localToWorld(local.clone()));
+      r.group.rotation.set(0, r.ship.heading||0, 0);
+      if(r.speed<=0.3){
+        destroyObject3D(r.group); deckRolls.splice(i,1);
+        r.ship.deckInbound=Math.max(0,(r.ship.deckInbound||0)-1);
+        addNPCDeckPlane(r.ship, r.def);
+      }
+      continue;
     }
     r.speed=Math.min(r.def.maxSpeed*0.5, r.speed+30*dt);
     r.z += r.speed*dt;
@@ -8727,11 +8793,25 @@ function updateDeckRolls(dt){
     if(r.z > r.hl*0.75){                                  // off the bow — airborne
       const wp=r.group.getWorldPosition(new THREE.Vector3()).setY(r.ship.pos.y+r.deckY+4);
       destroyObject3D(r.group); deckRolls.splice(i,1);
-      spawnAIPlane({pos:wp}, r.team, r.def);
+      spawnAIPlane({pos:wp}, r.team, r.def, r.ship);
     }
   }
 }
-function spawnAIPlane(src, team, forceDef){
+// She is over her own ship with the wheels down: take her off the air-wing list and hand her to
+// the deck as a recovery roll. Aft threshold, forward under braking, then ranged on a free spot.
+function npcRecoverToDeck(p){
+  const s=p.homeShip;
+  if(!s||!s.build||!s.build.group||npcDeckRoom(s)<=0) return false;
+  const hl=s.build.halfLen, deckY=(s.def.deckY||4)+0.6;
+  const g=p.group; scene.attach(g);
+  deckRolls.push({ kind:'recover', ship:s, def:p.def, group:g, team:p.team, t:0,
+    z:-hl*0.62, hl, deckY, speed:p.def.maxSpeed*0.34, life:14 });
+  s.deckInbound=(s.deckInbound||0)+1;
+  p.group=null;                                  // the deck owns the model now
+  retireAIPlane(p);
+  return true;
+}
+function spawnAIPlane(src, team, forceDef, homeShip){
   const def=forceDef||PLANES[AI_PLANE_POOL[Math.floor(Math.random()*AI_PLANE_POOL.length)]];
   const bodyCol = team===1?0x8a6a6a:0x6a78a0;
   const g=buildPlane({...def,col:bodyCol}); scene.add(g);
@@ -8740,6 +8820,7 @@ function spawnAIPlane(src, team, forceDef){
   const ang=Math.random()*6.28, pos=src.pos.clone().add(new THREE.Vector3(Math.cos(ang)*30,34+Math.random()*14,Math.sin(ang)*30));
   const marker=teamMarker(team,7); scene.add(marker);
   aiPlanes.push({ def, team, group:g, pos, heading:Math.random()*6.28, hp:def.hp, maxhp:def.hp, marker,
+    homeShip: homeShip||null,        // the deck she flew off, so she has somewhere to come back to
     prof:planeProfile(def),bombs:def.bombs||0,gunAmmo:def.gunAmmo==null?null:def.gunAmmo,fireT:1.2+Math.random()*1.6,ordT:1+Math.random()*2,
     fuelMax:def.fuel||200, fuel:def.fuel||200,
     t:Math.random()*6, prop:g.userData.prop, props:g.userData.props, state:'ingress', stateT:0, breakDir:Math.random()<0.5?1:-1, jink:0, jinkT:0,
@@ -8786,12 +8867,25 @@ function updateAIPlane(p,dt){
   const engageR = pr.miss?300:140;
   let desired, targetY;
   if(p.state==='rtb' || p.state==='service'){                 // returning to refuel/rearm at a friendly deck/pad/strip
-    if(!airbaseAlive(p.baseNode)) p.baseNode=nearestFriendlyAirbase(p.team,p.pos);
+    // Her own deck first, if it is still afloat and has a spot free — that is where her ground
+    // crew is. Only when it is gone or full does she divert to the nearest friendly base.
+    if(!airbaseAlive(p.baseNode)){
+      const home=p.homeShip;
+      p.baseNode = (home && (home.sinkT||0)===0 && home.hp>0 && home.build && npcDeckRoom(home)>0)
+        ? { ref:home, r:(home.def.beam||8)/2+9, deckY:home.def.deckY, home:true }
+        : nearestFriendlyAirbase(p.team,p.pos);
+    }
     const n=p.baseNode;
     if(!n){ p.state='ingress'; desired=bearing; targetY=34; }  // nowhere friendly to land — keep flying
     else { const bp=n.ref.pos, dx=bp.x-p.pos.x, dz=bp.z-p.pos.z, d2=Math.hypot(dx,dz);
       desired=Math.atan2(dx,dz); targetY=(n.deckY||2)+(p.def.heli?7:14);
       if(p.state==='rtb'){
+        // Over her own ship: put her on the deck instead of loitering. Everywhere else keeps the
+        // old hover-and-top-up, which is all an island strip or a harbour can offer here.
+        // This window has to be WIDER than the service one below, or an aircraft arriving at, say,
+        // 34 m from a base whose service radius is 39 m starts hovering a few metres short of a
+        // deck it was perfectly placed to land on.
+        if(n.home && d2 < n.r+20 && npcRecoverToDeck(p)) return;
         if(d2<n.r+16){ p.state='service'; p._svcT=0; if(p.team===0&&typeof comms==='function') comms('AIR','Aircraft recovering to rearm — back up shortly.','#8fd0a0'); }
       } else {                                                 // service: loiter low over the base, top up fuel/hp/ordnance
         if(d2>8) desired=Math.atan2(dx,dz); else desired=p.heading+0.6;
@@ -8858,6 +8952,14 @@ function updateAIPlane(p,dt){
         spawnShell(b, from, new THREE.Vector3(0,-1,0), p.team, null, false, bv); }
     }
   }
+}
+// Landing safely is not being shot down: no wreck, no blast, no kill bounty. killAIPlane does
+// all three, so a recovery needs its own quiet exit from the air-wing list.
+function retireAIPlane(p){
+  if(!p||p.dead)return; p.dead=true;
+  destroyObject3D(p.group); p.group=null;
+  destroyObject3D(p.marker); p.marker=null;
+  const i=aiPlanes.indexOf(p); if(i>=0) aiPlanes.splice(i,1);
 }
 function killAIPlane(p){
   if(!p||p.dead)return;p.dead=true;

@@ -116,7 +116,7 @@ test('every non-carrier hull can launch an aircraft off its starboard sponson', 
   expect(failures).toEqual([]);
 });
 
-test('taxi, rotate, land and it stays where it stopped', async ({ page }) => {
+test('taxi, rotate, land, and she taxis herself back to her box', async ({ page }) => {
   await page.goto('http://localhost:3000/');
   await page.waitForFunction(() => typeof parkWhereItStopped === 'function');
   const r = await page.evaluate(() => {
@@ -150,8 +150,16 @@ test('taxi, rotate, land and it stays where it stopped', async ({ page }) => {
     for(let i=0;i<90 && piloting; i++){ t2+=0.05; update(0.05,t2); if(piloting && piloting.phase==='rollout') rollout='rollout'; }
     for(let i=0;i<140 && piloting && piloting.phase==='rollout'; i++){ K(['KeyS']); t2+=0.05; update(0.05,t2); }
     K([]);
+    // ...and after the rollout she taxis herself back to a parking box rather than being left
+    // stopped on the runway, so give her the time to get there
+    let taxiedHome = false;
+    for (let i = 0; i < 400 && piloting; i++) { if (piloting.phase === 'taxihome') taxiedHome = true; t2 += 0.05; update(0.05, t2); }
+    K([]);
     const stoppedPlane = planes[0];
-    return { parkedYaw, boardedYaw, refused, afterQ, airborne, landingPhase, rollout,
+    const onSpot = stoppedPlane && stoppedPlane.spot
+      ? Math.hypot(stoppedPlane.group.position.x - stoppedPlane.spot.pos.x,
+                   stoppedPlane.group.position.z - stoppedPlane.spot.pos.z) : 999;
+    return { parkedYaw, boardedYaw, refused, afterQ, airborne, landingPhase, rollout, taxiedHome, onSpot,
              stillFlying: !!piloting, planeCount: planes.length,
              adhocSpot: !!(stoppedPlane && stoppedPlane.spot && stoppedPlane.spot.adhoc),
              parked: !!(stoppedPlane && stoppedPlane.parked) };
@@ -162,10 +170,40 @@ test('taxi, rotate, land and it stays where it stopped', async ({ page }) => {
   expect(r.airborne).toBe('fly');
   expect(r.landingPhase).toBe('landing');
   expect(r.rollout).toBe('rollout');                  // touchdown becomes a rollout, not a teleport
+  expect(r.taxiedHome).toBe(true);                    // stopped on the strip is not parked
   expect(r.stillFlying).toBe(false);
   expect(r.planeCount).toBe(1);
   expect(r.parked).toBe(true);
-  expect(r.adhocSpot).toBe(true);                     // it kept the spot where it actually stopped
+  expect(r.adhocSpot).toBe(false);                    // she is in a real box, not stranded mid-deck
+  expect(r.onSpot).toBeLessThan(0.5);                 // and actually ON it
+});
+
+// Committing to an approach you cannot complete is worse than being told no.
+test('you cannot start a landing with nowhere to park', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof freeSpotFor === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    gameSettings.autoTakeoff = true;
+    startGame('destroyer'); skipBanner(); money = 99999;
+    buyPlane('fighter'); const pa = planes[0];
+    flyPlane(pa);
+    for (let i = 0; i < 320 && piloting && piloting.phase !== 'fly'; i++) { t2 += 0.05; update(0.05, t2); }
+    gameSettings.autoTakeoff = false;
+    const airborne = piloting && piloting.phase;
+    const spotFreedOnTakeoff = !pa.spot.taken;      // her box is released while she is up
+    pa.spot.taken = true;                            // somebody else took it
+    startLanding(); const refused = piloting.phase;
+    pa.spot.taken = false;
+    startLanding(); const allowed = piloting.phase;
+    piloting = null;
+    return { airborne, spotFreedOnTakeoff, refused, allowed };
+  });
+  expect(r.airborne).toBe('fly');
+  expect(r.spotFreedOnTakeoff).toBe(true);
+  expect(r.refused).toBe('fly');       // deck full — stays airborne
+  expect(r.allowed).toBe('landing');   // a box opens up, and the approach is on
 });
 
 test('taxiing into deck gear wrecks the aircraft; ditching puts the pilot in the water', async ({ page }) => {

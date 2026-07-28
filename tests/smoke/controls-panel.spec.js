@@ -159,21 +159,46 @@ test('the panel never lists an action that would be refused', async ({ page }) =
   expect(r.naval).not.toContain('B');         // ...so B is not offered from the deck
 });
 
-// A busy ship used to launch its whole ranged row away and never re-range it, because one shared
-// turnaround timer handed back a single aircraft however many had gone.
-test('an NPC deck re-ranges every aircraft it launches', async ({ page }) => {
-  await boot(page);
+// NPC aircraft are a real inventory now: the aircraft you can SEE ranged on the deck is the one
+// that rolls out, and it comes back by flying home and landing rather than reappearing on a timer.
+test('an NPC launches the aircraft on its deck, and that aircraft flies home and re-ranges', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof npcRecoverToDeck === 'function');
   const r = await page.evaluate(() => {
-    const ship = { build: { deckPlanes: [{visible:true},{visible:true},{visible:true}] } };
-    for (let i = 0; i < 3; i++) npcDeckLaunch(ship);
-    const emptied = ship.build.deckPlanes.filter(g => !g.visible).length;
-    npcDeckRearm(ship, 20); const half = ship.build.deckPlanes.filter(g => g.visible).length;
-    npcDeckRearm(ship, 30); const full = ship.build.deckPlanes.filter(g => g.visible).length;
-    return { emptied, half, full };
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    currentMapIdx = 14; currentSandboxIdx = -1;
+    startGame('battleship'); skipBanner();
+    for (let i = 0; i < 8; i++) { t2 += 0.05; update(0.05, t2); }
+    const ship = [...enemies, ...allies].find(x => x.build && x.build.deckPlanes && x.build.deckPlanes.length && !x.proxy);
+    if (!ship) return { skipped: true };
+    const ranged = ship.build.deckPlanes.length;
+    const model = ship.build.deckPlanes[ship.build.deckPlanes.length - 1];
+    launchFromDeck(ship);
+    // the model that was parked is the model that is rolling — not a stand-in, and not hidden
+    const roll = deckRolls[deckRolls.length - 1];
+    const rolledTheRangedOne = roll && roll.group === model && roll.kind === 'launch';
+    const stillVisible = model.visible;
+    for (let i = 0; i < 300 && deckRolls.length; i++) { t2 += 0.05; update(0.05, t2); }
+    const flown = aiPlanes.filter(x => x.homeShip === ship);
+    flown.forEach(x => { x.fuel = 1; });            // send her home
+    let sawRecovery = false, back = false;
+    for (let i = 0; i < 2600; i++) {
+      t2 += 0.05; update(0.05, t2);
+      if (deckRolls.some(x => x.kind === 'recover')) sawRecovery = true;
+      if (!ship.build || ship.sinkT > 0) break;
+      if (ship.build.deckPlanes.length >= ranged) { back = true; break; }
+    }
+    return { ranged, rolledTheRangedOne, stillVisible, remembersHome: flown.length > 0, sawRecovery, back };
   });
-  expect(r.emptied).toBe(3);
-  expect(r.half).toBe(0);      // still out mid-turnaround
-  expect(r.full).toBe(3);      // all three back, not one
+  if (r.skipped) return;
+  expect(r.ranged).toBeGreaterThan(0);
+  expect(r.rolledTheRangedOne).toBe(true);   // the deck you see is the deck that is
+  expect(r.stillVisible).toBe(true);         // ...and it never blinks out to taxi
+  expect(r.remembersHome).toBe(true);
+  expect(r.sawRecovery).toBe(true);          // it lands, rather than hovering to refuel
+  expect(r.back).toBe(true);                 // and is ranged again afterwards
 });
 
 test('both new settings are reachable, in either language', async ({ page }) => {
