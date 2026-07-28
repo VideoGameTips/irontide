@@ -113,8 +113,27 @@
     animation:tutpulse 1.6s ease-in-out infinite;}
   #tut .ts{margin-top:7px;font-size:12px;color:#9fb6cc;text-shadow:0 1px 3px #000;letter-spacing:1px;}
   @keyframes tutpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
-  #mode{position:absolute;right:22px;bottom:20px;font-size:12px;color:#7e93a8;text-align:right;line-height:1.7;}
-  #mode b{color:#cfe6fb;}
+  /* ---- "what can I do right now" panel: the game has 25 keys and a nine-year-old
+         should not have to remember them. Lives under the minimap, rebuilt on every
+         mode change, and lists ONLY what actually works in the current situation. ---- */
+  #actions{position:absolute;top:246px;right:18px;width:212px;max-height:calc(100vh - 300px);
+    overflow-y:auto;background:rgba(6,14,22,.72);border:1px solid #24405a;border-radius:9px;
+    padding:9px 10px 8px;font-size:11.5px;color:#b9cbdb;line-height:1.5;pointer-events:none;
+    box-shadow:0 3px 14px rgba(0,0,0,.35);scrollbar-width:thin;}
+  #actions.hidden{background:none;border:none;box-shadow:none;padding:4px 6px;}
+  #actions.hidden #actTitle,#actions.hidden .actgrp{display:none;}
+  #actTitle{color:#8fd6ff;font-weight:700;letter-spacing:.5px;font-size:11px;margin-bottom:6px;
+    text-transform:uppercase;border-bottom:1px solid #1e3548;padding-bottom:5px;}
+  .actrow{display:flex;gap:7px;align-items:baseline;margin:3px 0;}
+  .actkey{flex:none;min-width:40px;text-align:center;background:#16293b;border:1px solid #2e4c66;
+    border-radius:4px;color:#dceaf6;font-size:10px;font-weight:700;padding:1px 4px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;}
+  .actrow span{flex:1;}
+  .actgrp.more{margin-top:7px;padding-top:6px;border-top:1px solid #1b3145;opacity:.78;font-size:10px;
+    display:grid;grid-template-columns:1fr 1fr;gap:0 8px;}
+  .actgrp.more .actkey{min-width:28px;font-size:9px;padding:0 3px;}
+  .actgrp.more .actrow{margin:2px 0;gap:5px;}
+  #actFoot{margin-top:6px;color:#61798f;font-size:10px;text-align:right;}
   #chatbox{position:absolute;left:22px;bottom:58px;width:min(430px,calc(100vw - 44px));pointer-events:none;}
   #chatlog{display:flex;flex-direction:column;justify-content:flex-end;gap:3px;max-height:150px;overflow:hidden;
     padding:8px 10px;border-radius:7px;color:#dbe9f4;font-size:12px;line-height:1.35;text-shadow:0 1px 2px #000;}
@@ -265,7 +284,7 @@
      the keyboard hint card ("W/S throttle · Mouse look") shows on a device with neither.
      itch.io embeds this game in landscape, so that is how most phone players arrive. */
   @media (pointer:coarse) and (max-height:560px){
-    #mode{display:none;}
+    #actions{display:none!important;}
     #killfeed{display:none;}
     #objective{font-size:10px!important;}#objective div:last-child{font-size:9px!important;}
     #score{font-size:10px;max-width:34vw;text-align:right;}#money{font-size:15px;}
@@ -291,7 +310,7 @@
     #killfeed{display:none;}#score{font-size:10px;max-width:36vw;text-align:right;}#money{font-size:16px;}
     #objective{font-size:10px!important;}#objective div:last-child{font-size:9px!important;}
     #prompt{bottom:52px;max-width:82vw;font-size:12px;text-align:center;}
-    #shiphpwrap{left:18px;bottom:18px;width:185px;}#mode{display:none;}
+    #shiphpwrap{left:18px;bottom:18px;width:185px;}#actions{display:none!important;}
     #touchButtons{grid-template-columns:repeat(3,54px);right:12px;bottom:252px}.tbtn{height:44px;font-size:9px}.tbtn.primary{height:54px}
     .touch-look{width:154px;height:154px;right:10px;bottom:82px}.touch-stick{width:118px;height:118px;left:16px;bottom:74px}
   }
@@ -325,7 +344,7 @@
   <div id="shiphpwrap"><div class="lab">HULL INTEGRITY</div><div id="shiphp"><i></i></div></div>
   <div id="prompt"></div>
   <div id="tut"></div>
-  <div id="mode"></div>
+  <div id="actions"><div id="actTitle"></div><div id="actList"></div><div id="actFoot"></div></div>
   <div id="chatbox">
     <div id="chatlog"></div>
     <input id="chatinput" maxlength="180" autocomplete="off" spellcheck="false" placeholder="Message or /command · Enter to send · Esc to close">
@@ -3581,12 +3600,12 @@ let cameraShake=0,cameraShakePhase=0,hitFlashT=0;
 let settingsOpen=false;
 // pauseInArmory defaults OFF: the war keeps running while you shop. Captains who want the
 // old breathing room can turn it back on in the K panel.
-const gameSettings={combatFeedback:true,damageNumbers:true,cameraShake:true,pauseInArmory:false};
+const gameSettings={combatFeedback:true,damageNumbers:true,cameraShake:true,pauseInArmory:false,hideActions:false,autoTakeoff:false};
 const damageNumbers=[];
-const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool'};
+const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool',hideActions:'bool',autoTakeoff:'bool'};
 function loadGameSettings(){ applySettingsBlob(gameSettings, readSettingsBlob(), GAMESETTINGS_SPEC); }   // same validated read as SETTINGS
 function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({sv:SETTINGS_VER,...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
-function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
+function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory'],['hideActions','Hide the \u201cwhat can I do\u201d list']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
 function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;const sp=document.getElementById('settings');sp.style.display=settingsOpen?'block':'none';if(settingsOpen){
   sp.querySelector('h2').textContent=trText('⚙ SETTINGS'); sp.querySelector('p').innerHTML=isZh()?'战斗画面提示都可以自由开关。按 <b>K</b> 关闭。':'Visual combat feedback is optional. Press <b>K</b> to close.';mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
 function clearDamageNumbers(){while(damageNumbers.length){const d=damageNumbers.pop();d.el.remove();}}
@@ -4247,6 +4266,7 @@ addEventListener('keydown',e=>{
   if(e.code==='KeyI'&&!e.repeat) cycleGfxQuality();       // I cycles bloom/AO quality (a perf safety valve)
   if(e.code==='KeyL'&&!e.repeat) togglePhotoMode();       // L toggles a free-fly spectator camera for screenshots
   if(e.code==='KeyK'&&!e.repeat) toggleSettings();
+  if(e.code==='Slash'&&!e.repeat) toggleActions();        // / collapses the what-can-I-do list
   if(e.code==='KeyO'&&!e.repeat) fleetOrderCmd();         // O cycles a fleet order (attack / capture / regroup)
   if(e.code==='KeyT'){ fpv=!fpv;   // T toggles first-person / cockpit view (V is taken by mines)
     if(piloting||drivingTank||manning||driving) flashPrompt(driving?(fpv?'External chase view':'Bridge view'):(fpv?'First-person view':'Chase view')); } });
@@ -4969,6 +4989,10 @@ function makePlayerShip(shipId){
   // destroy that visible ally when the captain later requests a replacement.
   if(player && player.build && !player._convertedToAlly) destroyObject3D(player.build.group);
   placed.length=0; planes.length=0; crew.length=0; planeSpots.length=0;
+  // launches in progress belong to the last battle's hulls — carrying them over leaves rolls
+  // pointing at ships that no longer exist
+  for(const r of deckRolls) destroyObject3D(r.group);
+  deckRolls.length=0;
   manning=null; piloting=null; driving=false; onFoot=false; drivingTank=null; mouseDownFire=false; playerShipLost=false; resetFootHealth();
   const build=buildShip(def,false);
   const hpMul=def.boss?1:DIFF().playerHp;   // the one-life Leviathan keeps its authored hp on every difficulty
@@ -5032,7 +5056,10 @@ function makePlayerShip(shipId){
   const parkX = sub ? 0 : carrier ? -build.halfBeam*0.56 : (E.x0+E.x1)/2;
   // Positive yaw, checked against the DECK camera and not a top-down render — looking forward
   // from the deck the ranged row reads ////// ; a plan view mirrors it, which is easy to misread.
-  const PARK_YAW = sub ? 0 : Math.PI*(carrier ? 0.31 : 0.36);
+  // A carrier deck is wide enough to swing a hard-ranged aircraft round; a sponson is not —
+  // parked at 65 deg there, opening the throttle walks you over the outboard edge before you
+  // can straighten. Slanted enough to read as a ranged row, shallow enough to be flyable.
+  const PARK_YAW = sub ? 0 : Math.PI*(carrier ? 0.31 : 0.17);
   const z0 = sub ? -build.halfLen*0.30 : carrier ? -build.halfLen*0.48 : -build.halfLen*0.50;
   const z1 = sub ?  build.halfLen*0.30 : carrier ?  build.halfLen*0.64 : -build.halfLen*0.36;
   for(let i=0;i<ns;i++){
@@ -5790,7 +5817,47 @@ function buildAIShipModel(def,team){
     const h=mkBox(4.6,0.45,1.2,mat),v=mkBox(1.2,0.45,4.6,mat);h.position.y=v.position.y=def.deckY+4.8;build.group.add(h);build.group.add(v);}
   if(def.boss){const guns=[WEAPONS.sixteen,WEAPONS.eightin,WEAPONS.ciws,WEAPONS.patriot,WEAPONS.tomahawk];
     for(let i=0;i<16;i++){const idx=Math.floor(i*build.mounts.length/16),t=buildTurret(guns[i%guns.length]);t.position.copy(build.mounts[idx]);build.group.add(t);}}
+  build.npcTurrets=[]; build.deckPlanes=[];
   return build;
+}
+// NPC ships used to fight with invisible weapons: they carried a loadout, launched aircraft and
+// shot at you, but their decks were bare. These give the fleet the same furniture the player's
+// deck has — a turret for every gun they actually own, and aircraft ranged on the flight deck.
+const NPC_PLANE_MODELS=['fighter','divebomber','torpbomber'];
+function syncNPCDeck(s){
+  const b=s.build; if(!b||!b.npcTurrets||s.def.kind==='sub') return;
+  // one visible turret per weapon in the loadout — mounted where the player's would go, and
+  // rebuilt as the ship buys more (growLoadout runs all battle long)
+  while(b.npcTurrets.length < s.loadout.length && b.npcTurrets.length < b.mounts.length){
+    const i=b.npcTurrets.length, t=buildTurret(s.loadout[i]);
+    t.position.copy(b.mounts[i]); b.group.add(t); b.npcTurrets.push(t);
+  }
+  // ...and a small ranged air wing on the flight deck, slanted the way the player's is
+  if(!b.deckPlanes.length && b.ext){
+    const cx=(b.ext.x0+b.ext.x1)/2, z0=-b.halfLen*0.50, z1=-b.halfLen*0.36;
+    const n = s.def.len>150 ? 3 : 2;
+    for(let i=0;i<n;i++){
+      const d=PLANES[NPC_PLANE_MODELS[i%NPC_PLANE_MODELS.length]];
+      const g=buildPlane({...d, col: s.team===1?0x8a6a6a:0x6a78a0});
+      g.position.set(cx, s.def.deckY+0.3, n>1 ? z0+(z1-z0)*(i/(n-1)) : z0);
+      g.rotation.y=Math.PI*0.17;                 // same slant as the player's ranged row
+      setPlaneGearVisual({group:g}, true);
+      b.group.add(g); b.deckPlanes.push(g);
+    }
+  }
+}
+// One aircraft leaves the ranged row when the ship launches, and is back after a turnaround —
+// so the deck reflects what the ship is actually doing rather than being a static prop.
+function npcDeckLaunch(s){
+  const dp=s.build&&s.build.deckPlanes; if(!dp||!dp.length) return;
+  const g=dp.find(x=>x.visible); if(!g) return;
+  g.visible=false; s.rearmT=42;
+}
+function npcDeckRearm(s,dt){
+  if(!(s.rearmT>0)) return;
+  if((s.rearmT-=dt)>0) return;
+  const dp=s.build&&s.build.deckPlanes; if(!dp) return;
+  const g=dp.find(x=>!x.visible); if(g) g.visible=true;
 }
 function chooseNPCShipDef(team){
   const fleet=team===1?enemies:allies;
@@ -6211,6 +6278,7 @@ function updateAlly(a,dt){
 // ---- shared: ships BUY weapons + aircraft over time (both teams) ----
 function shipEconomy(s,dt){
   if((s.upgT-=dt)<=0 && s.loadout.length<6){ growLoadout(s); s.upgT=12+Math.random()*9; }
+  if(!s.proxy){ syncNPCDeck(s); npcDeckRearm(s,dt); }   // keep the visible deck matching the real one
   const hangar = hU(s.team,'hangar');                       // aircraft hangar boosts that side's air wing
   const cap = AIR_CAP + hangar*2;
   if((s.planeT-=dt)<=0){ s.planeT=(Math.max(5, 14 - hangar*2)+Math.random()*16)*SPAWN_SLOW;
@@ -6905,18 +6973,17 @@ function deckObstacleAt(lp, self){
     const q=other.spot.pos; if(Math.hypot(lp.x-q.x, lp.z-q.z) < R+0.6) return 'plane'; }
   for(const tk of playerTanks){ if(!tk.onDeck||!tk.group) continue;
     const q=tk.group.position; if(Math.hypot(lp.x-q.x, lp.z-q.z) < R+0.4) return 'tank'; }
-  // the island / superstructure: a block amidships-to-aft on the starboard side
-  // The island/superstructure sits clear of the runway — outboard of its starboard edge, the way
-  // a real flat-top keeps the strip unobstructed. Derive it from deckPlan so the two can never
-  // overlap again if the layout is retuned.
+  // The carrier's island: a block amidships, outboard of the strip's starboard edge, the way a
+  // real flat-top keeps the runway unobstructed. Derived from deckPlan so the two can never
+  // overlap if the layout is retuned.
+  // This is a CARRIER-only shape. On every other hull the flight deck is a sponson hung over the
+  // side, its superstructure is a centreline deckhouse the aircraft never go near, and "outboard
+  // of the strip" is open sea — checking it there reported the water as a building and killed
+  // anyone who drifted a metre wide instead of letting the deck netting catch them.
   const dpl=deckPlan;
-  if(dpl){
+  if(dpl && player.def.kind==='carrier'){
     const outboard = dpl.runX + dpl.runHalfW + 0.8;
-    if(player.def.kind==='carrier'){
-      if(lp.x > outboard && Math.abs(lp.z - player.build.halfLen*0.10) < player.build.halfLen*0.22) return 'island';
-    } else if(lp.x > outboard && Math.abs(lp.z - player.build.halfLen*0.06) < player.build.halfLen*0.20){
-      return 'superstructure';
-    }
+    if(lp.x > outboard && Math.abs(lp.z - player.build.halfLen*0.10) < player.build.halfLen*0.22) return 'island';
   }
   return null;
 }
@@ -7163,13 +7230,46 @@ function updatePilot(dt){
   if(P.phase==='taxi'){
     const dp=deckPlan;
     const g=player.build.group;
-    const steer=(keys['KeyD']?1:0)-(keys['KeyA']?1:0);   // A=port, D=starboard, matching the helm
-    const rollFrac=Math.min(1,P.speed/8);                // nosewheel only bites once you are moving
-    P.taxiYaw=(P.taxiYaw==null?0:P.taxiYaw)+steer*dt*2.6*rollFrac;   // deck turns are tight; you must be able to swing 90° in the width of the deck
-    const thr=(keys['KeyW']?1:0)-(keys['KeyS']?1:0);
-    P.speed=Math.max(0, Math.min(def.maxSpeed*0.55, P.speed + thr*14*dt - (thr<=0?16*dt:0)));   // gentler spool-up: a deck is a short place to change your mind
-    // move in DECK-LOCAL space so the ship can steer under you
     const lp = P.deckLocal || (P.deckLocal = g.worldToLocal(P.pos.clone()));
+    let steer=(keys['KeyD']?1:0)-(keys['KeyA']?1:0);   // A=port, D=starboard, matching the helm
+    let thr=(keys['KeyW']?1:0)-(keys['KeyS']?1:0);
+    let autoQ=false;
+    // AUTO TAKEOFF (settings): the deck crew drives you out to the strip and rotates for you.
+    // The taxi is a real skill with a real failure mode, and not everyone wants to practise it
+    // every single sortie. Touching any control hands the aircraft straight back — you are never
+    // locked out of your own plane — and it stays manual for the rest of that roll.
+    if(gameSettings.autoTakeoff && dp && !P.manualTaxi){
+      if(steer||thr||keys['KeyQ']) P.manualTaxi=true;
+      else {
+        const alignedX = Math.abs(lp.x-dp.runX) < dp.runHalfW*0.5;
+        const want = alignedX ? 0 : Math.atan2(dp.runX-lp.x, Math.max(6, dp.runZ1-lp.z));
+        const err = want-(P.taxiYaw||0);
+        steer = err>0.03 ? 1 : err<-0.03 ? -1 : 0;
+        thr = 1;
+        autoQ = alignedX && P.speed > def.maxSpeed*0.28 &&
+                lp.z > dp.runZ0 + (dp.runZ1-dp.runZ0)*0.45;
+        if(!P._autoSaid){ P._autoSaid=true;
+          flashPrompt(T('🛫 Auto takeoff — hands off, or touch a control to fly it yourself',
+                        '🛫 自动起飞中——不用管，想自己开就按一下方向键'),'ok'); }
+      }
+    }
+    // Nosewheel authority: nothing when stopped, full at walking pace, then tapering off as you
+    // build toward rotation speed. Without the taper you can crank a hard turn at 35 m/s, and on
+    // a 7-metre sponson a single tap of D throws you into the sea before you can let go. Signed,
+    // so reversing steers like a car backing up — and damped, because backing an aircraft around
+    // is a slow manoeuvre, not a handbrake turn.
+    const v=Math.abs(P.speed);
+    const bite=Math.min(1, v/8) * (v>10 ? Math.max(0.3, 10/v) : 1) * Math.sign(P.speed||1) * (P.speed<0 ? 0.5 : 1);
+    P.taxiYaw=(P.taxiYaw==null?0:P.taxiYaw)+steer*dt*2.6*bite;   // deck turns are tight; you must be able to swing 90° in the width of the deck
+    // S is a brake first and a reverse gear second: it stops you quickly, then walks you
+    // backwards at tug speed. A deck is a small place and boxing yourself into a corner with
+    // no way out but a crash is not a puzzle, it is a dead end.
+    const TAXI_REV=6;
+    if(thr>0)      P.speed += 14*dt;                       // gentler spool-up: a deck is a short place to change your mind
+    else if(thr<0) P.speed -= (P.speed>0 ? 30 : 10)*dt;
+    else           P.speed -= Math.sign(P.speed)*Math.min(Math.abs(P.speed), 16*dt);   // coast to a stop from either direction
+    P.speed=Math.max(-TAXI_REV, Math.min(def.maxSpeed*0.55, P.speed));
+    // move in DECK-LOCAL space so the ship can steer under you
     lp.x += Math.sin(P.taxiYaw)*P.speed*dt;
     lp.z += Math.cos(P.taxiYaw)*P.speed*dt;
     lp.y = dp ? dp.y+1.0 : lp.y;
@@ -7182,9 +7282,20 @@ function updatePilot(dt){
     const hit=deckObstacleAt(lp, pa);
     if(hit){ crashOnDeck(P, pa, hit); return; }
     // --- rolled off the edge? ---
+    // Real flight decks are rimmed with catch netting, and it is what makes a narrow strip
+    // survivable: wander off the side at taxi speed and you are simply stopped and pushed back
+    // aboard, slightly bent. Do it with the throttle open and the netting won't hold you.
     if(dp && (!overDeck(lp) && lp.z<=dp.runZ1)){
+      if(Math.abs(P.speed) < 12 && P.lastOnDeck){
+        lp.copy(P.lastOnDeck); P.speed=0;
+        P.pos.copy(g.localToWorld(lp.clone())); pa.group.position.copy(P.pos);
+        flashPrompt(T('🕸 Caught the deck netting — back aboard, take it slower',
+                      '🕸 挂到甲板防护网上了——退回甲板，慢一点'),'bad');
+        return;
+      }
       crashOnDeck(P, pa, 'edge'); return;
     }
+    P.lastOnDeck = (P.lastOnDeck || new THREE.Vector3()).copy(lp);
     // Running off the BOW is different from going over the side. At flying speed she staggers
     // into the air anyway — an ugly unassisted takeoff, which is what really happens and what
     // stops a missed Q from being an instant kill. Below rotation speed nothing holds her up.
@@ -7197,14 +7308,14 @@ function updatePilot(dt){
     // --- Q to rotate ---
     const onRunway = dp && Math.abs(lp.x-dp.runX) < dp.runHalfW+0.6;
     const runwayLeft = dp ? (dp.runZ1 - lp.z) : 999;
-    if(keys['KeyQ'] && !P._qHeld){
+    if((keys['KeyQ']||autoQ) && !P._qHeld){
       P._qHeld=true;
       const vmin=def.maxSpeed*0.26;
       if(!onRunway) flashPrompt(T('Line up on the runway first','先把飞机开到跑道上'),'bad');
       else if(P.speed<vmin) flashPrompt(T('Too slow to rotate — more throttle','速度不够——加大油门'),'bad');
       else { P.phase='takeoff'; P.taxiT=0; P.rotateYaw=yawW; flashPrompt(T('Rotate!','拉起！'),'ok'); }
     }
-    if(!keys['KeyQ']) P._qHeld=false;
+    if(!keys['KeyQ'] && !autoQ) P._qHeld=false;
     // running out of deck at speed with no rotation = over the bow
     if(dp && lp.z>dp.runZ1 && P.speed>2){ crashOnDeck(P, pa, 'edge'); return; }
     return;
@@ -7877,6 +7988,7 @@ function update(dt,t){
   updateDeckRolls(dt);                                     // NPC carriers rolling their air wing off the bow
   updateSupportShips(dt);
   updateFogOfWar(dt);
+  tickActions(dt);                                         // keep the what-can-I-do list honest
   updateProxyPointCloud();
   // --- land units + harbors ---
   landUnits.forEach(u=>updateLandUnit(u,dt));
@@ -8460,6 +8572,7 @@ function planeProfile(def){ const b=def.bomb;
 const deckRolls=[];
 function launchFromDeck(s){
   if(!s || !s.build || !s.build.group) { spawnAIPlane(s, s.team); return; }
+  npcDeckLaunch(s);
   const def=PLANES[AI_PLANE_POOL[Math.floor(Math.random()*AI_PLANE_POOL.length)]];
   const g=buildPlane({...def, col: s.team===1?0x8a6a6a:0x6a78a0});
   scene.add(g); setPlaneGearVisual({group:g}, true);
@@ -8470,8 +8583,19 @@ function launchFromDeck(s){
 function updateDeckRolls(dt){
   for(let i=deckRolls.length-1;i>=0;i--){
     const r=deckRolls[i];
+    // The roll is animated in the parent hull's local space, so it only exists while that hull
+    // has a model. A ship far enough away is swapped for a point-cloud proxy and destroyShipVisual
+    // nulls its build outright — mid-roll that used to dereference null and take the whole frame
+    // down. Off-screen there is nothing to watch anyway: hand the aircraft straight to the air
+    // wing instead of animating a launch nobody can see.
+    if(!r.ship || !r.ship.build || !r.ship.build.group){
+      const wp=r.group?r.group.getWorldPosition(new THREE.Vector3()):(r.ship?r.ship.pos.clone():null);
+      destroyObject3D(r.group); deckRolls.splice(i,1);
+      if(wp) spawnAIPlane({pos:wp.setY((r.ship&&r.ship.pos.y||0)+r.deckY+4)}, r.team, r.def);
+      continue;
+    }
     // the parent hull sank, or took a deck hit mid-roll → the launch is lost
-    if(!r.ship || r.ship.sinkT>0 || (r.ship.crit&&r.ship.crit.deck) || (r.life-=dt)<=0){
+    if(r.ship.sinkT>0 || r.ship.dead || (r.ship.crit&&r.ship.crit.deck) || (r.life-=dt)<=0){
       const wp=r.group.getWorldPosition(new THREE.Vector3());
       boom(wp,0.8); destroyObject3D(r.group); deckRolls.splice(i,1); continue;
     }
@@ -9297,25 +9421,143 @@ function tacticalMapClick(e){
 }
 document.getElementById('tacticalCanvas').addEventListener('click',tacticalMapClick);
 document.getElementById('minimap').addEventListener('click',()=>toggleTacticalMap(true));
+// =====================================================================
+//  "WHAT CAN I DO RIGHT NOW" PANEL
+// =====================================================================
+// Twenty-five keys is more than anyone should have to hold in their head, and the one-line
+// hint in the corner only ever showed a handful of them. This lists every action that works
+// in the CURRENT situation and nothing that doesn't — a key you press that does nothing is
+// worse than a key you never knew about. Everything below is read from live state (are you
+// in a sub? is a plane parked? are you rolling out after a landing?) rather than a fixed
+// table, so it cannot drift away from what the game actually does.
+let actionsHidden=false;
+function actionPlan(){
+  const zh=isZh();
+  const R=(key,en,cn)=>[key, zh?cn:en];
+  const sub = player && player.def && player.def.kind==='sub';
+  const parkedPlane = planes.some(p=>p.parked);
+
+  // --- panels take over the screen, so they get their own short list ---
+  if(chatOpen)     return {t:R('','RADIO','无线电')[1], rows:[R('Enter','send','发送'), R('Esc','close','关闭')], more:[]};
+  if(shopOpen)     return {t:zh?'军械库':'ARMORY', rows:[
+      R('Click','buy a weapon, plane or tank','点击购买 武器/飞机/坦克'), R('Tab','close','关闭'),
+      R('Esc','close','关闭')], more:[]};
+  if(harborOpen)   return {t:zh?'海港指挥部':'HARBOR', rows:[R('Click','buy a fleet upgrade','点击购买舰队升级'), R('H','close','关闭')], more:[]};
+  if(buildOpen)    return {t:zh?'岛屿工程':'ENGINEERS', rows:[R('Click','build a defence','点击建造防御'), R('B','close','关闭')], more:[]};
+  if(settingsOpen) return {t:zh?'设置':'SETTINGS', rows:[R('K','close','关闭')], more:[]};
+  if(tacticalOpen) return {t:zh?'战术地图':'TACTICAL MAP', rows:[R('Click','pick a target','点击选择目标'), R('N','close','关闭')], more:[]};
+  if(photoMode)    return {t:zh?'拍照模式':'PHOTO MODE', rows:[
+      R('WASD','fly the camera','移动镜头'), R('Space','up','上升'), R('Shift','down','下降'),
+      R('Mouse','look','鼠标转视角'), R('L','exit','退出')], more:[]};
+
+  const always = [
+    R('N', 'tactical map', '战术地图'), R('Tab','armory (buy things)','军械库（买东西）'),
+    R('H', 'harbor upgrades', '海港升级'), R('B','island engineers','岛屿工程'),
+    R('O', 'order the fleet', '给舰队下令'), R('Enter','radio the fleet','和舰队喊话'),
+    R('K', 'settings', '设置'), R('L','photo mode','拍照模式'),
+    R('M', 'sound on/off', '音效开关'), R('J','music on/off','音乐开关'),
+  ];
+
+  if(drivingTank) return {t:zh?'开坦克':'DRIVING A TANK', rows:[
+    R('W/S','drive','前进 / 后退'), R('A/D','turn','左右转'),
+    R('Mouse','aim','鼠标瞄准'), R('Click','fire','开炮'),
+    R('G','switch land / water','切换 陆行/涉水'), R('T','change view','切换视角'),
+    R('E','get out','下车')], more:always};
+
+  if(onFoot){
+    if(playerShipLost) return {t:zh?'幸存者':'SURVIVOR', rows:[
+      R('WASD','swim / walk to a friendly harbor','游/走回我方海港'), R('P','claim a replacement ship','领一条新船'),
+      R('Click','rifle','开枪')], more:always};
+    const rows=[R('WASD', footLand?'walk':'swim', footLand?'走动':'游泳'), R('Mouse','look','鼠标看四周'),
+      R('Click','fire your gun','开枪'), R('Q','switch weapon','换武器')];
+    if(footLand){ rows.push(R('E','board a tank','上坦克'), R('B','build a defence','建造防御')); }
+    rows.push(landCampaignMode ? R('','capture the command posts','占领指挥所') : R('G','back aboard your ship','回到船上'));
+    return {t: landCampaignMode?(zh?'空降突击':'AIRBORNE ASSAULT'):(footLand?(zh?'登岸':'ASHORE'):(zh?'游泳中':'SWIMMING')),
+            rows:rows.filter(r=>r[0]||r[1]), more:always};
+  }
+
+  if(piloting){
+    const ph=piloting.phase;
+    if(ph==='taxi') return {t:zh?'滑行':'TAXIING', rows:[
+      R('W','forward','前进'), R('S','brake, then reverse','刹车，继续按就倒车'), R('A/D','steer','转向'),
+      R('Q','pull up — once you are ON the runway','开上跑道后按 Q 拉起'),
+      R('','watch out: hitting anything wrecks it','小心：撞到东西就废了'),
+      R('K', gameSettings.autoTakeoff?'auto takeoff is ON — hands off':'settings → turn on auto takeoff',
+             gameSettings.autoTakeoff?'自动起飞已开——不用管':'设置里可以打开自动起飞')], more:[]};
+    if(ph==='takeoff') return {t:zh?'起飞':'TAKING OFF', rows:[R('','climbing out…','正在爬升…')], more:[]};
+    if(ph==='landing') return {t:zh?'降落':'LANDING', rows:[
+      R('A/D','steer','左右修正'), R('S','slow down','减速'), R('W','more power','加油门'),
+      R('','line up OVER your ship and sink onto it','对准自己的船，慢慢落上去'),
+      R('E','abort, climb away','中止，拉起来')], more:[]};
+    if(ph==='rollout') return {t:zh?'着舰滑跑':'ROLLING OUT', rows:[
+      R('S','BRAKE','刹车'), R('A/D','keep it straight','把住方向'),
+      R('','stop before the bow or you go in the sea','停不住就冲下海了')], more:[]};
+    const rows=[R('Mouse','fly','鼠标操纵'), R('A/D','roll','横滚'), R('W/S','throttle','油门'),
+      R('Click','guns','机炮')];
+    if(piloting.plane&&piloting.plane.def&&piloting.plane.def.bomb) rows.push(R('Space','drop bombs','投弹'));
+    rows.push(R('T','change view','切换视角'), R('E','come in to land','准备降落'), R('P','bail out','跳伞'));
+    return {t:zh?'飞行中':'IN FLIGHT', rows, more:always};
+  }
+
+  if(manning) return {t:zh?'炮手位':'ON THE GUN', rows:[
+    R('Mouse','aim','鼠标瞄准'), R('Click','fire','开火'),
+    R('T','change view','切换视角'), R('E','let go of the gun','离开炮位')], more:always};
+
+  if(driving){
+    const rows=[R('W/S','throttle','油门 加/减'), R('A/D','rudder','左右舵'), R('Mouse','look around','鼠标看四周')];
+    if(sub) rows.push(R('C','dive / surface','下潜 / 上浮'));
+    rows.push(R('R','sonar ping','声呐'), R('V','drop a mine','布水雷'), R('Z','damage control','损管修理'),
+              R('T','change view','切换视角'), R('E','step away from the helm','离开舵位'));
+    return {t:zh?'掌舵中':'AT THE HELM', rows, more:always};
+  }
+
+  // standing on your own deck
+  const rows=[R('WASD','walk','走动'), R('Mouse','look around','鼠标看四周'),
+    R('E','take the helm, a gun, or a plane','掌舵 / 上炮位 / 开飞机')];
+  if(parkedPlane) rows.push(R('Y','send a plane up with an AI pilot','让 AI 飞行员开走一架'));
+  rows.push(R('F','install a gun you bought','装上买好的炮'), R('X','scrap the gun you are next to','拆掉旁边的炮'),
+    R('R','sonar ping','声呐'), R('V','drop a mine','布水雷'), R('Z','damage control','损管修理'),
+    R('G','go ashore','登岸'), R('P','parachute out','跳伞'));
+  return {t:zh?'在自己甲板上':'ON YOUR DECK', rows, more:always};
+}
+function renderActions(){
+  const box=document.getElementById('actions'); if(!box) return;
+  if(phase!=='play'){ box.style.display='none'; return; }
+  box.style.display='block';
+  actionsHidden = !!gameSettings.hideActions;
+  box.classList.toggle('hidden', actionsHidden);
+  const foot=document.getElementById('actFoot');
+  if(actionsHidden){ foot.textContent=isZh()?'/ 显示能做什么':'/ show controls'; return; }
+  const plan=actionPlan();
+  document.getElementById('actTitle').textContent=plan.t;
+  const grp=list=>'<div class="actgrp'+(list===plan.more?' more':'')+'">'+list.map(([k,d])=>
+    '<div class="actrow">'+(k?'<b class="actkey">'+k+'</b>':'<b class="actkey" style="opacity:.25">·</b>')+'<span>'+d+'</span></div>').join('')+'</div>';
+  document.getElementById('actList').innerHTML = grp(plan.rows) + (plan.more.length?grp(plan.more):'');
+  foot.textContent = isZh()?'/ 收起':'/ hide';
+}
+function toggleActions(){
+  if(phase!=='play') return;
+  gameSettings.hideActions=!gameSettings.hideActions; saveGameSettings();
+  renderActions(); if(typeof refreshSettings==='function') refreshSettings();
+}
+// Phase changes inside a flight (taxi -> takeoff -> fly, landing -> rollout) don't route through
+// updateMode, and buying a plane makes a new action legal, so the panel also re-reads itself on a
+// slow tick. It only touches the DOM when the rendered text actually changed.
+let _actT=0, _actLast='';
+function tickActions(dt){
+  if((_actT-=dt)>0) return; _actT=0.35;
+  if(phase!=='play') return;
+  const k=[driving,manning,onFoot,footLand,drivingTank,shopOpen,harborOpen,buildOpen,settingsOpen,
+    tacticalOpen,chatOpen,photoMode,playerShipLost,landCampaignMode,
+    piloting&&piloting.phase, planes.some(p=>p.parked), isZh(), gameSettings.hideActions].join('|');
+  if(k===_actLast) return; _actLast=k; renderActions();
+}
+// The mode readout used to be a one-line hint in the bottom corner. renderActions() replaced it
+// with the full contextual list, and keeping both meant two places to edit every time a key
+// changed — which is exactly how the old hint ended up missing Y, X, O, T and the landing brake.
 function updateMode(){
-  const el=document.getElementById('mode');
-  el.innerHTML = drivingTank ? T('<b>TANK</b><br>W/S drive · A/D turn<br>Mouse aim · Click fire · E dismount','<b>坦克</b><br>W/S 前进后退 · A/D 转向<br>鼠标瞄准 · 点击开火 · E 下车')
-    : shopOpen ? (gameSettings.pauseInArmory                     // hoisted next to buildOpen: an open panel announces
-        ? T('<b>⏸ ARMORY OPEN — war paused</b><br>Click weapon/plane · Tab to close','<b>⏸ 军械库——战斗已暂停</b><br>点击武器/飞机购买 · Tab 关闭')
-        : T('<b>🔥 ARMORY OPEN — the fight goes on!</b><br>Click weapon/plane · Tab to close','<b>🔥 军械库——外面还在打！</b><br>点击武器/飞机购买 · Tab 关闭'))
-    : buildOpen ? T('<b>⏸ ISLAND ENGINEERS — war paused</b><br>Click a defense to build<br>B to close','<b>⏸ 岛屿工程——战斗已暂停</b><br>点击建造防御设施<br>B 关闭')
-    : onFoot ? (playerShipLost?T('<b>SURVIVOR</b><br>Get to friendly harbor<br>P replacement ship','<b>幸存者</b><br>回到我方海港<br>按 P 领取新船')
-        : landCampaignMode?T('<b>AIRBORNE ASSAULT</b><br>WASD walk/swim · Click = rifle · B build<br>E board tank · Capture command posts','<b>空降突击</b><br>WASD 行走/游泳 · 点击开枪 · B 建造<br>E 上坦克 · 占领指挥所')
-        : footLand?T('<b>ASHORE</b><br>WASD walk · Click = rifle · B build<br>E board tank · G re-board ship','<b>登岸</b><br>WASD 行走 · 点击开枪 · B 建造<br>E 上坦克 · G 回船'):T('<b>SWIMMING</b><br>WASD swim to land or ship<br>Click = rifle','<b>游泳中</b><br>WASD 游向陆地或船只<br>点击开枪'))
-    : driving ? (T('<b>AT THE HELM</b><br>W/S throttle · A/D rudder','<b>掌舵中</b><br>W/S 油门 · A/D 舵')+(player.def.kind==='sub'?T(' · C dive',' · C 下潜'):'')+T('<br>Mouse look · E to step away','<br>鼠标看四周 · E 离开舵位'))
-    : piloting ? (piloting.phase==='taxi' ? T('<b>TAXI</b><br>W/S throttle · A/D steer<br>Q to rotate on the runway','<b>滑行</b><br>W/S 油门 · A/D 转向<br>开上跑道后按 Q 拉起')
-        : piloting.phase==='takeoff' ? T('<b>TAKEOFF</b><br>Climbing out…','<b>起飞</b><br>正在爬升…')
-        : piloting.phase==='landing' ? T('<b>LANDING</b><br>Descend over the ship<br>E to abort','<b>降落</b><br>对准舰船上方下降<br>E 取消')
-        : T('<b>IN FLIGHT</b><br>Mouse + A/D steer · W/S throttle<br>Click guns · Space bombs · P parachute · E land','<b>飞行中</b><br>鼠标 + A/D 操纵 · W/S 油门<br>点击开炮 · 空格投弹 · P 跳伞 · E 降落'))
-    : manning ? T('<b>GUNNERY</b><br>Mouse aim · Click fire · E exit','<b>炮手位</b><br>鼠标瞄准 · 点击开火 · E 离开')
-    : harborOpen ? T('<b>⏸ HARBOR COMMAND — war paused</b><br>Click an upgrade to buy · H to close','<b>⏸ 海港指挥部——战斗已暂停</b><br>点击购买升级 · H 关闭')
-    : T('<b>ON DECK</b><br>WASD walk · Mouse look<br>F install · E man/fly · G ashore<br>R sonar · V mine · Z damage control<br>N map · Tab shop · H harbor · Enter chat','<b>甲板上</b><br>WASD 走动 · 鼠标看四周<br>F 装炮 · E 上炮位/开飞机 · G 登岸<br>R 声呐 · V 水雷 · Z 损管<br>N 地图 · Tab 商店 · H 海港 · Enter 聊天');
   refreshTouchControls();
+  renderActions();
 }
 
 // =====================================================================
