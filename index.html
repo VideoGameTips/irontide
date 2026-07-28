@@ -592,7 +592,9 @@ const SHIPS = {
 // no flight deck, and their aircraft launch straight off the casing.
 // Note this makes ships bigger targets too — shipRadius and shell hits both derive from these —
 // but it applies to both sides equally, so the fight stays fair, just closer-quarters.
-const HULL_SCALE=1.5, CARRIER_STRETCH=1.2;
+// SPAWN_SLOW stretches every reinforcement interval: hulls this big need room and time,
+// and a fleet that trickles in is readable where one that pours in is a traffic jam.
+const HULL_SCALE=2.25, CARRIER_STRETCH=1.2, SPAWN_SLOW=1.5;
 for(const k in SHIPS){ const d=SHIPS[k];
   if(d.kind==='sub') continue;
   d.beam = Math.round(d.beam*HULL_SCALE*10)/10;
@@ -1881,6 +1883,7 @@ function addShipWeathering(g,def,L,B,deckY,enemy){
 function buildShip(def, enemy){
   const g=new THREE.Group();
   const L=def.len/2, B=def.beam/2, deckY=def.deckY, col = enemy?0x596067:0x77818a;
+  let ext=null;                                   // starboard flight-deck sponson, non-carriers only
   // Paint only the broad hull/superstructure panels matte. Hardware remains metal.
   const hullPaint=PAINT(col), deckPaint=PAINT(enemy?0x444a50:0x586169);
   const mounts=[];
@@ -1962,6 +1965,31 @@ function buildShip(def, enemy){
       for(const sx of [-1,1]){ const ring=new THREE.Mesh(new THREE.TorusGeometry(0.26,0.07,6,14),new THREE.MeshStandardMaterial({color:0xe8e4d8,roughness:0.8}));
         ring.rotation.y=Math.PI/2; ring.position.set(sx*(gap*0.5+sideW+0.06),deckY+1.9,houseZ); g.add(ring); }                   // liferings on the deckhouse
     }
+    // ---- STARBOARD FLIGHT-DECK EXTENSION -------------------------------------------------
+    // A destroyer's deck is narrower than one fighter's wingspan, so its airstrip is bolted on
+    // rather than squeezed in: a sponson cantilevered over the water down the starboard side,
+    // carrying the runway and the aircraft ranged at its aft end. Carriers don't get one — they
+    // already ARE a flight deck. The numbers live on build.ext so deckPlan and the collision
+    // rules read exactly the same strip the model draws.
+    const extW=Math.max(7, B*0.40), extX0=B*0.98;
+    ext={ x0:extX0, x1:extX0+extW, z0:-L*0.55, z1:L*0.94 };
+    // Top face flush with the hull deck, so an aircraft rolls from one onto the other without
+    // a step — and so the painted strip (drawn just above deckY) lands ON the plate, not inside it.
+    const extY=deckY-0.17, extLen=ext.z1-ext.z0, extMidZ=(ext.z0+ext.z1)/2, extMidX=(ext.x0+ext.x1)/2;
+    // Built on both sides so the ship still reads as a ship rather than a listing outrigger.
+    // Only the starboard one is a runway — deckPlan never looks at the port plate — but both are
+    // solid deck underfoot, because a plate you can see and fall through is a bug, not a detail.
+    for(const side of [1,-1]){
+      const plate=mkBox(extW, 0.34, extLen, deckPaint);
+      plate.position.set(side*extMidX, extY, extMidZ); plate.receiveShadow=true; g.add(plate);
+      const lip=mkBox(0.3, 0.62, extLen, SILVER(enemy?0x4a5158:0x6b747d));           // outboard safety rail
+      lip.position.set(side*(ext.x1-0.15), extY+0.48, extMidZ); g.add(lip);
+      for(let i=0;i<4;i++){                                                          // struts down to the hull
+        const z=ext.z0 + extLen*(0.12+i*0.25);
+        const strut=mkCyl(0.26,0.26, extW*0.95, SILVER(0x5a6169), 8);
+        strut.rotation.z=Math.PI/2 - side*0.42; strut.position.set(side*extMidX, extY-1.5, z); g.add(strut);
+      }
+    }
     // mounts: fore/aft centerline + side galleries
     const half=Math.ceil(def.mounts/2);
     for(let i=0;i<def.mounts;i++){
@@ -1975,14 +2003,14 @@ function buildShip(def, enemy){
       // ...and aft of it they sit on the PORT quarter, because the starboard quarter is where
       // the helipad is. Port aft is the one piece of deck no aircraft ever uses: the apron
       // ends well forward of it and the runway threshold is forward of it too.
-      const x = z < -L*0.62 ? -B*0.45 : B*0.92;
+      const x = z < -L*0.62 ? -B*0.45 : B*0.70;   // inboard of the sponson, clear of the taxi lane
       mounts.push(new THREE.Vector3(x, deckY+0.15, z));
     }
   }
   addShipWeathering(g,def,L,B,deckY,enemy);
   addShipGraphicDetails(g,def,L,B,deckY,enemy);
   scene.add(g);
-  return { group:g, mounts, deckY:def.deckY, halfLen:L, halfBeam:B, def };
+  return { group:g, mounts, deckY:def.deckY, halfLen:L, halfBeam:B, ext, def };
 }
 
 // =====================================================================
@@ -3899,7 +3927,7 @@ function updateWarPacing(dt){
       p.deckRearmT=(p.deckRearmT||0)+dt; if(p.deckRearmT>=5){ p.deckRearmT=0; p.bombsLeft++; } } else p.deckRearmT=0; });
   // escalating offensives — announced surges that grow as the war drags on (never on a land theater)
   offensiveT-=dt;
-  if(offensiveT<=0 && !ground){ offensiveN++; offensiveT=170+Math.random()*80;
+  if(offensiveT<=0 && !ground){ offensiveN++; offensiveT=(170+Math.random()*80)*SPAWN_SLOW;
     const n=Math.min(3+Math.floor(offensiveN/2),6);
     if(enemies.length<12){ for(let i=0;i<n;i++) spawnEnemy();
       flashPrompt('⚠ ENEMY OFFENSIVE — '+n+' warships inbound!'); sfxAlarm(); } }
@@ -4973,24 +5001,40 @@ function makePlayerShip(shipId){
   // and the helipad sits in the aft-starboard corner clear of both.
   // A submarine has no flight deck — deckPlan stays null and its aircraft launch straight off
   // the casing, so nobody is asked to taxi a fighter along a 7-metre cylinder.
-  deckPlan = sub ? null : {
+  // A carrier IS a flight deck: the strip runs down the middle, the air wing ranges along the
+  // port edge. Everyone else flies off the starboard sponson (build.ext) — the strip and the
+  // aircraft both live out there, cantilevered over the water, because the hull between the
+  // deckhouse and the funnels has no lane an aircraft could taxi down.
+  const E = build.ext;
+  deckPlan = sub ? null : carrier ? {
     y: dy,
-    runX: build.halfBeam*0.14,                     // just off the centreline, clear of the parked row
+    runX: build.halfBeam*0.14,
     runHalfW: Math.max(2.3, build.halfBeam*0.30),
-    runZ0: -build.halfLen*0.60,                    // aft threshold — where the roll starts
-    runZ1: build.halfLen*0.94,                     // bow end — past this you are off the deck
-    padPos: new THREE.Vector3(build.halfBeam*0.62, dy, -build.halfLen*0.80),   // aft-starboard corner
+    runZ0: -build.halfLen*0.60,
+    runZ1: build.halfLen*0.94,
+    padPos: new THREE.Vector3(build.halfBeam*0.62, dy, -build.halfLen*0.80),
     padR: Math.max(2.2, build.halfBeam*0.26),
+  } : {
+    y: dy,
+    runX: (E.x0+E.x1)/2,
+    runHalfW: (E.x1-E.x0)/2 - 1.0,               // wingtips overhang the sponson, wheels do not
+    runZ0: -build.halfLen*0.30,                  // aft of this is the ranging area, not the strip
+    runZ1: E.z1,
+    padPos: new THREE.Vector3(build.halfBeam*0.55, dy, -build.halfLen*0.80),   // pad stays on the hull
+    padR: Math.max(2.2, build.halfBeam*0.26),
+    ext: E,
   };
   const ns = carrier?8:2;
-  // Aircraft park along the port edge on a slant — neither nose-forward nor square across the
-  // beam, but angled toward the bow the way a real deck ranges its air wing. The slant is what
-  // makes it work: it keeps the wingtips clear of the strip, and the nose is already half-turned
-  // toward it, so taxiing out is one short swing instead of a standing pivot. Narrow hulls slant
-  // harder, because a wing swung across a destroyer's beam would hang over the water.
-  const parkX = sub ? 0 : -build.halfBeam*0.56;
-  const PARK_YAW = sub ? 0 : Math.PI*(build.halfBeam>10 ? 0.31 : 0.38);   // 56° on a flat-top, 68° on a tin can
-  const z0 = -build.halfLen*(sub?0.30:0.48), z1 = build.halfLen*(sub?0.30:0.64);
+  // Aircraft range on a slant — neither nose-forward down the deck nor square across the beam.
+  // The slant keeps the wingtips clear of the strip and leaves the nose already half-turned
+  // toward it, so taxiing out is one short swing instead of a standing pivot. On a carrier they
+  // line the port edge; on a sponson they queue at its aft end and roll straight off the front.
+  const parkX = sub ? 0 : carrier ? -build.halfBeam*0.56 : (E.x0+E.x1)/2;
+  // Positive yaw, checked against the DECK camera and not a top-down render — looking forward
+  // from the deck the ranged row reads ////// ; a plan view mirrors it, which is easy to misread.
+  const PARK_YAW = sub ? 0 : Math.PI*(carrier ? 0.31 : 0.36);
+  const z0 = sub ? -build.halfLen*0.30 : carrier ? -build.halfLen*0.48 : -build.halfLen*0.50;
+  const z1 = sub ?  build.halfLen*0.30 : carrier ?  build.halfLen*0.64 : -build.halfLen*0.36;
   for(let i=0;i<ns;i++){
     const z = ns>1 ? z0 + (z1-z0)*(i/(ns-1)) : 0;
     planeSpots.push({ pos:new THREE.Vector3(parkX, dy, z), taken:false, park:!sub, yaw:PARK_YAW });
@@ -6169,7 +6213,7 @@ function shipEconomy(s,dt){
   if((s.upgT-=dt)<=0 && s.loadout.length<6){ growLoadout(s); s.upgT=12+Math.random()*9; }
   const hangar = hU(s.team,'hangar');                       // aircraft hangar boosts that side's air wing
   const cap = AIR_CAP + hangar*2;
-  if((s.planeT-=dt)<=0){ s.planeT=Math.max(5, 14 - hangar*2)+Math.random()*16;
+  if((s.planeT-=dt)<=0){ s.planeT=(Math.max(5, 14 - hangar*2)+Math.random()*16)*SPAWN_SLOW;
     const deckOut = s.crit && s.crit.deck;     // wrecked flight deck grounds the air wing
     if(!s.proxy && !deckOut && aiPlanes.reduce((n,p)=>n+(p.team===s.team?1:0),0) < cap && s.sinkT===0) launchFromDeck(s); }
 }
@@ -6672,7 +6716,7 @@ function updateAITaxi(pa, dt){
   pa.group.rotation.set(0,(player.heading||0)+st.yaw,0);
   // deck hazards apply to the AI too
   const hit=deckObstacleAt(st.lp, pa);
-  if(hit || Math.abs(st.lp.x)>player.build.halfBeam*1.02 || Math.abs(st.lp.z)>player.build.halfLen*1.02){
+  if(hit || !overDeck(st.lp)){
     const edge = !hit;
     boom(wp.clone(), edge?0.6:1.0);
     if(!edge) explodeAt(wp.clone(), 0, 24, 7, null); else splashAt(wp.clone().setY(0.4), 2.0);
@@ -6842,6 +6886,14 @@ function ditchInOcean(P){
   resetFootHealth(); camPitch.v=0.02;
   flashPrompt(T('🌊 Ditched — you are in the water. Swim back to the ship.','🌊 迫降入海——你落水了，游回舰上去。'),'bad');
   updateMode();
+}
+// Is this deck-local point still on something an aircraft can roll on? The hull, or — on a
+// ship whose airstrip is bolted to its starboard side — the sponson. Off both is the water.
+function overDeck(lp){
+  const b=player.build;
+  if(Math.abs(lp.x)<=b.halfBeam*1.02 && Math.abs(lp.z)<=b.halfLen*1.02) return true;
+  const E=b.ext, ax=Math.abs(lp.x);
+  return !!(E && ax>=E.x0-0.6 && ax<=E.x1+0.6 && lp.z>=E.z0-0.6 && lp.z<=E.z1+0.6);
 }
 function deckObstacleAt(lp, self){
   const R=2.4;
@@ -7130,13 +7182,13 @@ function updatePilot(dt){
     const hit=deckObstacleAt(lp, pa);
     if(hit){ crashOnDeck(P, pa, hit); return; }
     // --- rolled off the edge? ---
-    if(dp && (Math.abs(lp.x)>player.build.halfBeam*1.02 || lp.z<-player.build.halfLen*1.02)){
+    if(dp && (!overDeck(lp) && lp.z<=dp.runZ1)){
       crashOnDeck(P, pa, 'edge'); return;
     }
     // Running off the BOW is different from going over the side. At flying speed she staggers
     // into the air anyway — an ugly unassisted takeoff, which is what really happens and what
     // stops a missed Q from being an instant kill. Below rotation speed nothing holds her up.
-    if(dp && lp.z>player.build.halfLen*1.02){
+    if(dp && lp.z>dp.runZ1){
       if(P.speed >= def.maxSpeed*0.26){ P.phase='takeoff'; P.taxiT=0; P.rotateYaw=yawW;
         flashPrompt(T('Off the bow — she flies!','冲出舰艏——总算飞起来了！'),'ok'); }
       else crashOnDeck(P, pa, 'edge');
@@ -7205,7 +7257,7 @@ function updatePilot(dt){
     P.roll=THREE.MathUtils.lerp(P.roll,0,0.1);
     pa.group.position.copy(P.pos); pa.group.quaternion.setFromEuler(new THREE.Euler(0.1,yaw,P.roll,'YXZ'));setAircraftControlSurfaces(pa.group,P.roll,-.1);spinProp(pa,dt);
     const local=player.build.group.worldToLocal(P.pos.clone());
-    const overShip = Math.abs(local.x)<player.build.halfBeam && Math.abs(local.z)<player.build.halfLen;
+    const overShip = overDeck(local);
     if(P.pos.y<=deckY+1.3 && overShip){
       // touchdown → roll out under your own momentum, in deck-local space
       P.phase='rollout'; P.deckLocal=local.clone(); P.deckLocal.y=(deckPlan?deckPlan.y:0)+1.0;
@@ -7241,7 +7293,7 @@ function updatePilot(dt){
     camYaw.v=yawW; camPitch.v=0.03; spinProp(pa,dt);
     const hit=deckObstacleAt(lp,pa);
     if(hit){ crashOnDeck(P,pa,hit); return; }
-    if(Math.abs(lp.x)>player.build.halfBeam*1.02 || Math.abs(lp.z)>player.build.halfLen*1.02){ crashOnDeck(P,pa,'edge'); return; }
+    if(!overDeck(lp)){ crashOnDeck(P,pa,'edge'); return; }
     if(P.speed<=0.4){ parkWhereItStopped(P,pa); return; }   // stopped safely — it stays here
     return;
   }
@@ -7804,7 +7856,7 @@ function update(dt,t){
   updateShipModelProxies(dt);
   enemies.forEach(e=>updateEnemy(e,dt));
   for(let i=enemies.length-1;i>=0;i--){ if(enemies[i].dead){ destroyShipVisual(enemies[i]); enemies.splice(i,1); } }
-  const enemyReinforceRate=(0.18/2.25)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1)*DIFF().reinforce; // scaled by theater intensity and difficulty
+  const enemyReinforceRate=(0.18/2.25/SPAWN_SLOW)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1)*DIFF().reinforce; // scaled by theater intensity and difficulty
   const enemyFleetCap=Math.round(18*((window._MAP&&window._MAP.reinforce!=null)?Math.min(2,window._MAP.reinforce):1));   // hard ceiling — long battles no longer snowball into unbounded fleets
   if(!(window._MAP&&window._MAP.ground) && t2>DIFF().grace && enemies.length<enemyFleetCap && Math.random()<dt*enemyReinforceRate) spawnEnemy();   // grace: no reinforcements in the first minutes
   updateWarPacing(dt);   // escalating enemy offensives + rotating bonus objectives + parked-plane rearm
@@ -7812,7 +7864,7 @@ function update(dt,t){
   allies.forEach(a=>updateAlly(a,dt));
   shipCollisions(dt);   // hulls repel, rams detonate
   for(let i=allies.length-1;i>=0;i--){ if(allies[i].dead){ destroyShipVisual(allies[i]); allies.splice(i,1); } }
-  const allyReinforceRate=(0.18/2.25)*(1+hU(0,'fastBuild')*0.6+hU(0,'slots')*0.35);
+  const allyReinforceRate=(0.18/2.25/SPAWN_SLOW)*(1+hU(0,'fastBuild')*0.6+hU(0,'slots')*0.35);
   if(!(window._MAP&&window._MAP.ground) && allies.length<18 && Math.random()<dt*allyReinforceRate) spawnAlly();
   updateIslandControl(dt);
   // --- passive income ('Resource Storage' upgrade) ---
@@ -8578,7 +8630,7 @@ function updateSupportBuilding(u,dt){
   if(u.power){u.group.rotation.y+=Math.sin(t2*.5+u.pos.x)*dt*.002;return true;}
   if(u.command||u.bridge||u.sonar||u.airstrip||u.helipad||u.fuel)return true;
   if(u.barracks){
-    const army=mapArmyProfile(u.team), cap=Math.max(1,Math.round(3*army.soldiers)), interval=Math.max(7,24/Math.sqrt(army.prod));
+    const army=mapArmyProfile(u.team), cap=Math.max(1,Math.round(3*army.soldiers)), interval=Math.max(7,24/Math.sqrt(army.prod))*SPAWN_SLOW;
     u.prodT=(u.prodT||Math.min(8,interval*.45))-dt;if(u.prodT<=0&&isl){u.prodT=interval;
       // Count by BIRTHPLACE (homeIsl), not by who is standing on the island right now: squads
       // march off to fight, stop matching u.island, and the barracks kept producing forever —
@@ -8595,7 +8647,7 @@ function updateSupportBuilding(u,dt){
     if(drivingTank&&!drivingTank.onDeck&&drivingTank.island===isl&&drivingTank.pos.distanceTo(u.pos)<130){
       drivingTank.hp=Math.min(drivingTank.maxhp,drivingTank.hp+13*boost*dt);
       u.repairT=(u.repairT||0)+dt;if(u.workshop&&u.repairT>5){u.repairT=0;const damaged=Object.keys(drivingTank.parts||{}).filter(k=>drivingTank.parts[k]>0);if(damaged.length)drivingTank.parts[damaged[0]]--;}}
-    if(u.tankdepot&&isl){const army=mapArmyProfile(u.team), cap=Math.max(1,Math.round(2*army.tanks)), interval=Math.max(12,42/Math.sqrt(army.prod));
+    if(u.tankdepot&&isl){const army=mapArmyProfile(u.team), cap=Math.max(1,Math.round(2*army.tanks)), interval=Math.max(12,42/Math.sqrt(army.prod))*SPAWN_SLOW;
       u.prodT=(u.prodT||Math.min(20,interval*.5))-dt;if(u.prodT<=0){u.prodT=interval;
       if(landUnits.filter(x=>!x.dead&&x.team===u.team&&x.kind==='tank'&&(x.homeIsl||x.island)===isl).length<cap){const p=u.pos.clone().add(new THREE.Vector3(18,0,0));p.y=2;buildAndPushLand('tank',u.team,p,2,isl);}}}   // same birthplace-count as the barracks
     return true;

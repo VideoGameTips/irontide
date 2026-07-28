@@ -16,6 +16,7 @@ test('deck layout keeps runway, parking and helipad separate', async ({ page }) 
       parkAngles: planes.map(p => p.group.rotation.y),
       parkingClear: planeSpots.every(sp => clearOfRunway(sp.pos.x)),
       parkingToPort: planeSpots.every(sp => sp.pos.x < deckPlan.runX),
+      carrierHasNoSponson: !player.build.ext,
       padClear: clearOfRunway(deckPlan.padPos.x),
       padAft: deckPlan.padPos.z < 0,                 // helipad in the aft corner
       padStarboard: deckPlan.padPos.x > deckPlan.runX,
@@ -30,11 +31,13 @@ test('deck layout keeps runway, parking and helipad separate', async ({ page }) 
   });
   expect(r.spots).toBeGreaterThan(1);
   for (const a of r.parkAngles) {
-    expect(a).toBeGreaterThan(0.35);        // not lined up along the deck...
+    // all leaning the same way, so from the deck a ranged row reads ////// not \\\\\\
+    expect(a).toBeGreaterThan(0.35);             // not lined up along the deck...
     expect(a).toBeLessThan(Math.PI / 2 - 0.15);  // ...and not square across it either
   }
   expect(r.parkingClear).toBe(true);        // never blocking the strip
-  expect(r.parkingToPort).toBe(true);       // the air wing lives on the port side
+  expect(r.parkingToPort).toBe(true);       // on a carrier the air wing lives on the port side
+  expect(r.carrierHasNoSponson).toBe(true); // a carrier already IS a flight deck
   expect(r.padClear).toBe(true);
   expect(r.padAft).toBe(true);
   expect(r.padStarboard).toBe(true);
@@ -73,6 +76,44 @@ test('every hull keeps its guns off the flight deck, and the sub has no flight d
   expect(r.hulls).toBeGreaterThan(25);
   expect(r.offenders).toEqual([]);
   expect(r.subPhase).toBe('takeoff');       // no taxi phase without a runway
+});
+
+// Every non-carrier flies off a sponson cantilevered over the starboard side, because the hull
+// between the deckhouse and the funnels has no lane wide enough to taxi down. The strip only
+// counts if an aircraft can actually get airborne from it, so fly one off each of them.
+test('every non-carrier hull can launch an aircraft off its starboard sponson', async ({ page }) => {
+  test.setTimeout(180000);
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof SHIPS !== 'undefined');
+  const hulls = await page.evaluate(() => Object.keys(SHIPS).filter(k => SHIPS[k].kind === 'surface'));
+  expect(hulls.length).toBeGreaterThan(15);
+
+  const failures = [];
+  // Reload every few hulls: startGame does not free the previous battle's meshes (a known,
+  // pre-existing leak), so a single page walking two dozen hulls slows to a crawl and the
+  // simulation loop below stops finishing inside the timeout.
+  for (let i = 0; i < hulls.length; i += 4) {
+    const batch = hulls.slice(i, i + 4);
+    await page.goto('http://localhost:3000/');
+    await page.waitForFunction(() => typeof dispatchPlane === 'function');
+    const bad = await page.evaluate(list => {
+      const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+      if(b&&s&&s.style.display==='flex') b.click();
+      const out=[];
+      for (const hull of list) {
+        startGame(hull); skipBanner(); money = 99999;
+        if (!player.build.ext) { out.push(hull + ':no-sponson'); continue; }
+        buyPlane('fighter');
+        const pa = planes[0], before = aiPlanes.length;
+        dispatchPlane(pa);
+        for (let k = 0; k < 340 && pa.aiTaxi; k++) { t2 += 0.05; update(0.05, t2); }
+        if (aiPlanes.length - before !== 1 || planes.length !== 0) out.push(hull + ':' + promptMsg);
+      }
+      return out;
+    }, batch);
+    failures.push(...bad);
+  }
+  expect(failures).toEqual([]);
 });
 
 test('taxi, rotate, land and it stays where it stopped', async ({ page }) => {
