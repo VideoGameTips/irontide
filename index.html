@@ -584,6 +584,20 @@ const SHIPS = {
   nimitz:     { name:'USS Nimitz', cls:'Market Supercarrier', len:142, beam:24, depth:6.2, deckY:5.4, hp:980, kind:'carrier', mounts:10, marketOnly:true,
                 desc:'Marketplace ship. Nuclear supercarrier: enormous flight deck, tough hull, and room to run a serious air war.' },
 };
+// ---- FLIGHT DECK REFIT ---------------------------------------------------------------
+// Every surface hull now operates aircraft, and a historical warship simply has no room for it:
+// a Fletcher is 8.8 m across, narrower than one fighter's wingspan. So every hull is scaled up
+// half again, and carriers get a further stretch in length — a flight deck is only a flight deck
+// if the roll is long enough to feel like one. Submarines keep their real dimensions: they have
+// no flight deck, and their aircraft launch straight off the casing.
+// Note this makes ships bigger targets too — shipRadius and shell hits both derive from these —
+// but it applies to both sides equally, so the fight stays fair, just closer-quarters.
+const HULL_SCALE=1.5, CARRIER_STRETCH=1.2;
+for(const k in SHIPS){ const d=SHIPS[k];
+  if(d.kind==='sub') continue;
+  d.beam = Math.round(d.beam*HULL_SCALE*10)/10;
+  d.len  = Math.round(d.len*HULL_SCALE*(d.kind==='carrier'?CARRIER_STRETCH:1));
+}
 const FLEET_TENDER={name:'Fleet Tender',cls:'Support',len:64,beam:11,depth:4.4,deckY:3.5,hp:360,kind:'surface',mounts:4,support:true};
 Object.values(SHIPS).forEach(s=>s.mounts=Math.max(1,Math.round(s.mounts*1.5))); // 75% of the previous doubled capacity
 // kinds: gun (straight), cannon (arc), missile (homing), torpedo (water-skim), bomb (arc lob)
@@ -1888,8 +1902,8 @@ function buildShip(def, enemy){
     const lowerHull=hullMesh(L*.985,B*.965,def.depth*.44,0x633633);lowerHull.position.y=deckY-def.depth-.03;g.add(lowerHull);
     // Chamfered flight deck follows the hull rather than floating as a rectangular slab.
     const fd=deckPlanform(L*.98,B*.94,.5,deckPaint,true);fd.position.y=deckY;g.add(fd);
-    // deck centerline stripe
-    const stripe=mkBox(0.6,0.06,def.len*0.8, new THREE.MeshStandardMaterial({color:0xe8e2c0,roughness:0.9,metalness:0})); stripe.position.y=deckY+0.55; g.add(stripe);
+    // (the old painted centreline is gone — paintFlightDeck draws the real runway now, and two
+    //  white lines down the same deck read as two runways)
     // island superstructure on starboard (+x)
     const islandX=B*.68,islandZ=-def.len*.1,isl=navalBlock(3.6,4.3,12,hullPaint,.72);isl.position.set(islandX,deckY+2.65,islandZ);g.add(isl);
     const upper=navalBlock(3,2.1,7,hullPaint,.76);upper.position.set(islandX,deckY+5.7,islandZ+1);g.add(upper);
@@ -1898,9 +1912,12 @@ function buildShip(def, enemy){
     const funnel=mkCyl(1.0,1.2,3.4,SILVER(0x5b6268));funnel.position.set(islandX,deckY+7.5,islandZ-2);g.add(funnel);
     const fcap=mkCyl(1.16,1.05,.38,SILVER(0x24292d));fcap.position.set(islandX,deckY+9.35,islandZ-2);g.add(fcap);
     g.userData.walkBlocks.push({x:islandX,z:islandZ,hx:2,hz:6.5});
-    for(let i=0;i<4;i++){ mounts.push(new THREE.Vector3((i%2?1:-1)*B*0.8, deckY+0.5, (i<2?1:-1)*L*0.6)); }
-    mounts.push(new THREE.Vector3(-B*0.6,deckY+0.5,0), new THREE.Vector3(B*0.5,deckY+0.5,L*0.3),
-                new THREE.Vector3(-B*0.4,deckY+0.5,-L*0.4), new THREE.Vector3(B*0.3,deckY+0.5,-L*0.2));
+    // Guns go on starboard sponsons and the quarterdeck, never on the flight deck itself:
+    // the strip runs up the middle and the air wing ranges along the port edge. Keep this in
+    // step with deckPlan/planeSpots below — a mount inside either one is a turret parked on
+    // the runway, which is exactly the collision the deck rules are meant to describe.
+    for(const z of [L*0.72, L*0.34, -L*0.06, -L*0.44]) mounts.push(new THREE.Vector3(B*0.92, deckY+0.5, z));
+    for(const z of [-L*0.70, -L*0.88]) for(const sx of [1,-1]) mounts.push(new THREE.Vector3(sx*B*0.45, deckY+0.5, z));
   } else { // surface ship
     const hull=hullMesh(L,B,def.depth,col,hullPaint); hull.position.y=deckY-def.depth; g.add(hull);
     const lowerHull=hullMesh(L*.985,B*.965,def.depth*.44,0x633633);lowerHull.position.y=deckY-def.depth-.03;g.add(lowerHull);
@@ -1952,7 +1969,13 @@ function buildShip(def, enemy){
       const idx = fore?i:(i-half);
       const cnt = fore?half:(def.mounts-half);
       const z = fore ? (L*0.78 - idx*(L*0.5/Math.max(1,cnt-1||1))) : (-L*0.78 + idx*(L*0.5/Math.max(1,cnt-1||1)));
-      const x = (i%2 && def.beam>9) ? (i%4<2? B*0.55 : -B*0.55) : 0;
+      // Anything forward of the runway threshold has to hug the starboard rail — the strip
+      // and the parking apron own the rest of the deck. Aft of the threshold the deck is
+      // clear again, so those mounts sit on the centreline where they always did.
+      // ...and aft of it they sit on the PORT quarter, because the starboard quarter is where
+      // the helipad is. Port aft is the one piece of deck no aircraft ever uses: the apron
+      // ends well forward of it and the runway threshold is forward of it too.
+      const x = z < -L*0.62 ? -B*0.45 : B*0.92;
       mounts.push(new THREE.Vector3(x, deckY+0.15, z));
     }
   }
@@ -4944,41 +4967,106 @@ function makePlayerShip(shipId){
   // Dimensions scale with the hull, so a destroyer's strip is genuinely short and unforgiving.
   const dy=def.deckY+(def.kind==='carrier'?0.55:0.3);
   const carrier=def.kind==='carrier';
+  const sub=def.kind==='sub';
   // Layout follows a real flat-top: the runway is the full-length axial strip, aircraft park
   // SIDEWAYS along the port edge with their noses inboard (wings folded, as on a real deck),
   // and the helipad sits in the aft-starboard corner clear of both.
-  deckPlan={
+  // A submarine has no flight deck — deckPlan stays null and its aircraft launch straight off
+  // the casing, so nobody is asked to taxi a fighter along a 7-metre cylinder.
+  deckPlan = sub ? null : {
     y: dy,
-    runX: build.halfBeam*0.12,                     // axial strip, nudged to starboard of the parked row
-    runHalfW: Math.max(1.8, build.halfBeam*0.36),
-    runZ0: -build.halfLen*0.72,                    // aft threshold — where the roll starts
+    runX: build.halfBeam*0.14,                     // just off the centreline, clear of the parked row
+    runHalfW: Math.max(2.3, build.halfBeam*0.30),
+    runZ0: -build.halfLen*0.60,                    // aft threshold — where the roll starts
     runZ1: build.halfLen*0.94,                     // bow end — past this you are off the deck
-    padPos: new THREE.Vector3(build.halfBeam*0.60, dy, -build.halfLen*0.74),   // aft-starboard corner
-    padR: Math.max(2.0, build.halfBeam*0.28),
+    padPos: new THREE.Vector3(build.halfBeam*0.62, dy, -build.halfLen*0.80),   // aft-starboard corner
+    padR: Math.max(2.2, build.halfBeam*0.26),
   };
-  const runLen=deckPlan.runZ1-deckPlan.runZ0;
   const ns = carrier?8:2;
-  // Far enough inboard that a sideways-parked aircraft has room to swing its nose onto the
-  // runway — parked hard against the edge, the first metre of taxi puts it in the water.
-  const parkX = -build.halfBeam*0.52;
-  const z0 = -build.halfLen*0.52, z1 = build.halfLen*0.62;
+  // Aircraft park along the port edge on a slant — neither nose-forward nor square across the
+  // beam, but angled toward the bow the way a real deck ranges its air wing. The slant is what
+  // makes it work: it keeps the wingtips clear of the strip, and the nose is already half-turned
+  // toward it, so taxiing out is one short swing instead of a standing pivot. Narrow hulls slant
+  // harder, because a wing swung across a destroyer's beam would hang over the water.
+  const parkX = sub ? 0 : -build.halfBeam*0.56;
+  const PARK_YAW = sub ? 0 : Math.PI*(build.halfBeam>10 ? 0.31 : 0.38);   // 56° on a flat-top, 68° on a tin can
+  const z0 = -build.halfLen*(sub?0.30:0.48), z1 = build.halfLen*(sub?0.30:0.64);
   for(let i=0;i<ns;i++){
     const z = ns>1 ? z0 + (z1-z0)*(i/(ns-1)) : 0;
-    planeSpots.push({ pos:new THREE.Vector3(parkX, dy, z), taken:false, park:true });
+    planeSpots.push({ pos:new THREE.Vector3(parkX, dy, z), taken:false, park:!sub, yaw:PARK_YAW });
   }
+  if(deckPlan) paintFlightDeck(build, def, deckPlan, planeSpots, PARK_YAW);
   for(let i=0;i<6;i++){ const s=buildSailor('crew'); const lx=(Math.random()-0.5)*build.halfBeam*1.2, lz=(Math.random()-0.5)*build.halfLen*1.4;
     s.position.set(lx, def.deckY+(def.kind==='carrier'?0.5:0), lz); build.group.add(s);
     crew.push({mesh:s, base:new THREE.Vector3(lx,s.position.y,lz), phase:Math.random()*6.28, dir:Math.random()*6.28, t:Math.random()*6}); }
   // drivable tanks — bought from the Motor Pool (Tab), then parked on these deck slots
   playerTanks.length=0; tankSpots.length=0;
   const dTop=def.deckY+(def.kind==='carrier'?0.5:0)-0.4;
-  const slots=[[0,build.halfLen*0.52],[build.halfBeam*0.45,-build.halfLen*0.35],[-build.halfBeam*0.45,-build.halfLen*0.55],[0,-build.halfLen*0.72]];
+  // Tanks park on the quarterdeck, abaft the runway threshold — the one stretch of deck the air
+  // wing never uses. A tank anywhere forward of it sits on the strip, the apron or the helipad,
+  // and deckObstacleAt counts a parked tank as something aircraft crash into.
   const nT=def.len>70?4:def.len>48?3:2;
-  for(let i=0;i<nT;i++) tankSpots.push({ pos:new THREE.Vector3(slots[i][0],dTop,slots[i][1]), taken:false });
+  const qz=(deckPlan?deckPlan.runZ0:-build.halfLen*0.60)-2.5, aftZ=-build.halfLen*0.96;
+  const lat=[-0.55, -0.25, -0.40, -0.10];               // all port of centre: starboard-aft is the helipad
+  for(let i=0;i<nT;i++){
+    const z = nT>1 ? qz + (aftZ-qz)*(i/(nT-1)) : (qz+aftZ)/2;
+    tankSpots.push({ pos:new THREE.Vector3(build.halfBeam*lat[i%4], dTop, z), taken:false });
+  }
   if(def.boss)installBossStarterGuns(build);
   else if(def.kind==='sub') installStarterGuns(build,[WEAPONS.deckgun,WEAPONS.deckgun],[0,2]);   // skip mounts[1] — the sail top, where the periscope lives
   else installStarterGuns(build, def.len>60?[WEAPONS.deckgun,WEAPONS.deckgun,WEAPONS.aa]:[WEAPONS.deckgun,WEAPONS.deckgun]);
   walkPos.set(0, deckEyeY(), def.len*0.28); camYaw.v=player.heading; camPitch.v=0.04;
+}
+// ---- deck markings ------------------------------------------------------------------
+// The runway has to be *visible*, or the rule "taxi onto the strip before you pull up" is a
+// secret. So it is painted like a real one: a long dark rectangle with a dashed centreline,
+// a threshold bar at the aft end, arrestor wires across the touchdown zone, outlined parking
+// boxes on the apron, and a ringed H on the helipad. Everything is derived from deckPlan, so
+// the paint can never drift out of step with the collision rules that use the same numbers.
+function paintFlightDeck(build, def, dp, spots, parkYawA){
+  const g=build.group;
+  const surf=def.deckY+(def.kind==='carrier'?0.5:0)+0.04;   // just proud of the walking surface
+  const flat=(c,op=1)=>new THREE.MeshStandardMaterial({color:c,roughness:0.92,metalness:0.02,
+    transparent:op<1,opacity:op,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+  const tarmac=flat(0x2f353b), paintW=flat(0xd9dcd2), paintY=flat(0xd8b23c), wire=flat(0x8d939a);
+  const add=(mesh,x,z,y=0,ry=0)=>{ mesh.position.set(x,surf+y,z); mesh.rotation.y=ry;
+    mesh.castShadow=false; mesh.receiveShadow=true; g.add(mesh); return mesh; };
+  const runLen=dp.runZ1-dp.runZ0, runMid=(dp.runZ0+dp.runZ1)/2;
+
+  add(mkBox(dp.runHalfW*2, 0.05, runLen, tarmac), dp.runX, runMid);            // the strip itself
+  for(const sx of [-1,1])                                                      // edge lines
+    add(mkBox(0.22, 0.06, runLen, paintW), dp.runX+sx*(dp.runHalfW-0.14), runMid, 0.01);
+  const dashes=Math.max(5, Math.round(runLen/7));                              // dashed centreline
+  for(let i=0;i<dashes;i++){
+    const z=dp.runZ0 + runLen*((i+0.5)/dashes);
+    add(mkBox(0.2, 0.06, runLen/dashes*0.5, paintW), dp.runX, z, 0.01);
+  }
+  add(mkBox(dp.runHalfW*1.7, 0.06, 0.55, paintW), dp.runX, dp.runZ0+0.7, 0.01);   // aft threshold bar
+  for(let i=0;i<4;i++)                                                            // arrestor wires
+    add(mkBox(dp.runHalfW*1.9, 0.05, 0.14, wire), dp.runX, dp.runZ0+runLen*(0.10+i*0.09), 0.01);
+  for(const sx of [-1,1])                                                         // bow-end warning bars
+    add(mkBox(dp.runHalfW*1.8, 0.06, 0.3, paintY), dp.runX, dp.runZ1-0.5-sx*0.55, 0.01);
+
+  // parking boxes on the apron — one outline per spot, slanted the way the aircraft sits
+  // Sized to the aircraft, then held back from the runway edge — a box that touches the foul
+  // line reads as though the parked aircraft are already on the strip.
+  const room=Math.max(2.6, (dp.runX-dp.runHalfW) - spots[0].pos.x - 0.9);
+  const bw=Math.min(8.4, Math.max(5.2, room*1.5)), bl=Math.min(6.0, Math.max(4.0, build.halfBeam*0.55));
+  for(const sp of spots){
+    const box=new THREE.Group();
+    for(const sx of [-1,1]){ const bar=mkBox(0.16,0.06,bl,paintY); bar.position.x=sx*bw/2; bar.castShadow=false; box.add(bar); }
+    for(const sz of [-1,1]){ const bar=mkBox(bw,0.06,0.16,paintY); bar.position.z=sz*bl/2; bar.castShadow=false; box.add(bar); }
+    add(box, sp.pos.x, sp.pos.z, 0.005, parkYawA);
+  }
+
+  // helipad: ring + H, aft-starboard corner, clear of the strip
+  const ring=new THREE.Mesh(new THREE.RingGeometry(dp.padR*0.82, dp.padR, 28), paintW);
+  ring.rotation.x=-Math.PI/2; add(ring, dp.padPos.x, dp.padPos.z, 0.012);
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(dp.padR*0.82, 28), tarmac);
+  disc.rotation.x=-Math.PI/2; add(disc, dp.padPos.x, dp.padPos.z, 0.006);
+  const hs=dp.padR*0.5;
+  for(const sx of [-1,1]) add(mkBox(0.24,0.06,hs*1.6,paintW), dp.padPos.x+sx*hs*0.55, dp.padPos.z, 0.02);
+  add(mkBox(hs*1.1,0.06,0.24,paintW), dp.padPos.x, dp.padPos.z, 0.02);
 }
 // every hull sails with free basic guns already mounted — autoGun fires them, so a
 // brand-new captain has firepower before ever opening the armory
@@ -5682,7 +5770,7 @@ function spawnEnemy(){
   const build=buildAIShipModel(def,1);
   const z=(enemyHarbor?enemyHarbor.pos.z:0)+90+Math.random()*160;
   const pos=new THREE.Vector3((Math.random()-0.5)*420,0,z);
-  keepOffIslands(pos,def.beam/2+8);
+  keepOffIslands(pos,def.beam/2+8); keepOffShips(pos,def);
   const e={ build, hp:def.hp, maxhp:def.hp, def, pos, team:1,
     heading:0, fireT:1+Math.random()*3, sinkT:0, turnT:0,
     standoff: (t==='scout'?110:t==='battleship'?190:150) + (Math.random()-0.5)*40,  // preferred engagement range
@@ -5699,7 +5787,7 @@ function spawnAlly(near){
   const build=buildAIShipModel(def,0);
   const z=(friendlyHarbor?friendlyHarbor.pos.z:0)-90-Math.random()*160;
   const pos=new THREE.Vector3((Math.random()-0.5)*420, 0, z);
-  keepOffIslands(pos, def.beam/2+8);
+  keepOffIslands(pos, def.beam/2+8); keepOffShips(pos,def);
   const a={ build, hp:def.hp, maxhp:def.hp, def, pos, team:0, heading:Math.PI,
     fireT:1+Math.random()*3, sinkT:0, turnT:0, standoff:(t==='scout'?110:t==='battleship'?190:150)+(Math.random()-0.5)*40, orbitDir:Math.random()<0.5?1:-1,
     loadout:[], upgT:7+Math.random()*7, planeT:12+Math.random()*16 };
@@ -5713,7 +5801,7 @@ function spawnAlly(near){
 function spawnCargoConvoy(){
   const def={...SHIPS.destroyer,name:'Cargo Freighter',cls:'Supply Convoy',hp:360,support:true};
   const build=buildAIShipModel(def,0), start=friendlyHarbor?friendlyHarbor.pos:new THREE.Vector3();
-  const pos=start.clone().add(new THREE.Vector3((Math.random()-.5)*90,0,-120-Math.random()*45));keepOffIslands(pos,def.beam/2+8);
+  const pos=start.clone().add(new THREE.Vector3((Math.random()-.5)*90,0,-120-Math.random()*45));keepOffIslands(pos,def.beam/2+8); keepOffShips(pos,def);
   const dest=islands.filter(i=>i.capturable&&i.owner!==1).sort((a,b)=>b.pos.distanceTo(start)-a.pos.distanceTo(start))[0]||enemyHarbor;
   const a={build,hp:def.hp,maxhp:def.hp,def,pos,team:0,heading:Math.PI,vel:new THREE.Vector3(),fireT:2.4,sinkT:0,turnT:0,
     standoff:110,orbitDir:1,loadout:[AI_WEAPS[3],AI_WEAPS[5]],upgT:1e9,planeT:99,callsign:'CONVOY-'+(_callsignN+1),role:'convoy',convoyTarget:dest,commsT:14,_sos:0};
@@ -5722,7 +5810,7 @@ function spawnCargoConvoy(){
 function spawnBoss(team,announce){
   if((team===0&&friendlyBossUsed)||(team===1&&enemyBossUsed))return null;
   const def={...SHIPS.boss},build=buildAIShipModel(def,team),h=team===0?friendlyHarbor:enemyHarbor;
-  const pos=new THREE.Vector3(team===0?-320:320,0,h.pos.z+(team===0?-360:360));keepOffIslands(pos,def.beam/2+10);
+  const pos=new THREE.Vector3(team===0?-320:320,0,h.pos.z+(team===0?-360:360));keepOffIslands(pos,def.beam/2+10); keepOffShips(pos,def,24);
   const ship={build,hp:def.hp,maxhp:def.hp,def,pos,team,heading:team===0?Math.PI:0,fireT:1.5,sinkT:0,turnT:0,
     standoff:330,orbitDir:team===0?1:-1,loadout:[],upgT:1e9,planeT:10+Math.random()*8,boss:true};
   const arsenal=[1,1,0,2,2,5,5,4,1,0,2,5,4,1,2,5];
@@ -5771,7 +5859,7 @@ function attachNemesisLabel(s,nem){
 function spawnNemesis(nem){
   const def={...SHIPS[nem.hull||'cruiser']}, build=buildAIShipModel(def,1);
   const z=(enemyHarbor?enemyHarbor.pos.z:0)+120+Math.random()*120;
-  const pos=new THREE.Vector3((Math.random()-0.5)*360,0,z); keepOffIslands(pos,def.beam/2+10);
+  const pos=new THREE.Vector3((Math.random()-0.5)*360,0,z); keepOffIslands(pos,def.beam/2+10); keepOffShips(pos,def);
   const hp=Math.round(def.hp*(nem.hpMul||1.5));
   const e={ build, hp, maxhp:hp, def, pos, team:1, heading:0, fireT:1+Math.random()*2, sinkT:0, turnT:0,
     standoff:(nem.standoff||150)+(Math.random()-0.5)*30, orbitDir:Math.random()<0.5?1:-1,
@@ -6049,6 +6137,10 @@ function updateAlly(a,dt){
   if(!objective){ if(a.role==='assist'){a.assist=null;a.role='attack';} if(a.role==='regroup')a.role='attack';
     objective=(tgtShip&&tgtShip.pos.distanceTo(a.pos)<340+fleetRange())?tgtShip.pos:(enemyHarbor?enemyHarbor.pos:new THREE.Vector3());
     stand=(tgtShip&&objective===tgtShip.pos)?a.standoff:0; }
+  // hulls are half again as big since the flight-deck refit, and a supercarrier's bow now
+  // reaches further than a scout's preferred range — keep the standoff outside both hulls
+  // so ships orbit each other instead of trying to park inside one another.
+  if(stand>0 && tgtShip && tgtShip.def) stand=Math.max(stand, shipRadius(a.def)+shipRadius(tgtShip.def)+30);
   const to=objective.clone().sub(a.pos); const dP=Math.hypot(to.x,to.z); const bearing=Math.atan2(to.x,to.z);
   let desired = stand>0 ? (dP>stand+45?bearing:dP<stand-45?bearing+Math.PI:bearing+Math.PI/2*a.orbitDir) : bearing;
   // occasional radio chatter
@@ -6079,7 +6171,7 @@ function shipEconomy(s,dt){
   const cap = AIR_CAP + hangar*2;
   if((s.planeT-=dt)<=0){ s.planeT=Math.max(5, 14 - hangar*2)+Math.random()*16;
     const deckOut = s.crit && s.crit.deck;     // wrecked flight deck grounds the air wing
-    if(!s.proxy && !deckOut && aiPlanes.reduce((n,p)=>n+(p.team===s.team?1:0),0) < cap && s.sinkT===0) spawnAIPlane(s, s.team); }
+    if(!s.proxy && !deckOut && aiPlanes.reduce((n,p)=>n+(p.team===s.team?1:0),0) < cap && s.sinkT===0) launchFromDeck(s); }
 }
 function updateSupportShips(dt){
   const scanTender=tender=>{
@@ -6547,12 +6639,61 @@ function nearestPlane(){
   return best;
 }
 // hand a parked plane to an AI pilot — it takes off and fights for your side (team 0)
+// Y hands the aircraft to an AI pilot — who has to fly it off the deck exactly like you do.
+// It taxis to the runway, rotates, and can wreck itself on deck gear on the way. Watching your
+// own deck crew bin a fighter is the point: the deck is a hazard for everyone.
 function dispatchPlane(pa){
-  if(!pa||!pa.parked||pa.removed) return;pa.removed=true;
-  destroyObject3D(pa.group); pa.group=null; pa.spot.taken=false;
-  const i=planes.indexOf(pa); if(i>=0) planes.splice(i,1);
-  spawnAIPlane({pos: player.pos.clone()}, 0, pa.def);
-  refreshShop(); sfxClick(); flashPrompt('🤖 '+pa.def.name+' launched under AI control — it fights for you');
+  if(!pa||!pa.parked||pa.removed) return;
+  if(pa.aiTaxi) return;                                  // already rolling
+  if(player.crit && player.crit.deck){ flashPrompt(T('✈️ Flight deck wrecked — nothing can launch','✈️ 飞行甲板被毁——无法起飞')); return; }
+  pa.parked=false;
+  pa.aiTaxi={ speed:0, yaw:parkYaw(pa.spot), lp:pa.spot.pos.clone(), t:0 };
+  sfxClick();
+  flashPrompt(T('🤖 '+pa.def.name+' taxiing under AI control','🤖 '+trName(pa.def.name)+' 由 AI 飞行员滑出'));
+}
+// One AI aircraft rolling out on deck. Same runway, same obstacles, same edge — the only
+// difference is that the pilot is a simple autopilot instead of the player.
+function updateAITaxi(pa, dt){
+  const st=pa.aiTaxi, dp=deckPlan, g=player.build.group;
+  if(!dp||!g){ pa.aiTaxi=null; return; }
+  st.t+=dt;
+  // steer toward the runway centre-line, then straight up the deck
+  const alignedX = Math.abs(st.lp.x-dp.runX) < dp.runHalfW*0.5;
+  const want = alignedX ? 0 : Math.atan2(dp.runX-st.lp.x, Math.max(6, dp.runZ1-st.lp.z));
+  let err=want-st.yaw; while(err>Math.PI)err-=6.283; while(err<-Math.PI)err+=6.283;
+  const rollFrac=Math.min(1,st.speed/8);
+  st.yaw += Math.max(-1, Math.min(1, err*2.2)) * dt * 2.6 * rollFrac;
+  st.speed = Math.min(pa.def.maxSpeed*0.55, st.speed + 14*dt);
+  st.lp.x += Math.sin(st.yaw)*st.speed*dt;
+  st.lp.z += Math.cos(st.yaw)*st.speed*dt;
+  st.lp.y = dp.y+1.0;
+  const wp=g.localToWorld(st.lp.clone());
+  pa.group.position.copy(wp);
+  pa.group.rotation.set(0,(player.heading||0)+st.yaw,0);
+  // deck hazards apply to the AI too
+  const hit=deckObstacleAt(st.lp, pa);
+  if(hit || Math.abs(st.lp.x)>player.build.halfBeam*1.02 || Math.abs(st.lp.z)>player.build.halfLen*1.02){
+    const edge = !hit;
+    boom(wp.clone(), edge?0.6:1.0);
+    if(!edge) explodeAt(wp.clone(), 0, 24, 7, null); else splashAt(wp.clone().setY(0.4), 2.0);
+    flashPrompt(edge ? T('💥 Deck crew lost one over the side','💥 甲板事故——一架飞机冲下海了')
+                     : T('💥 Deck crew wrecked an aircraft taxiing','💥 甲板事故——一架飞机滑行时撞毁'),'bad');
+    const i=planes.indexOf(pa); if(i>=0) planes.splice(i,1);
+    if(pa.spot) pa.spot.taken=false;
+    destroyObject3D(pa.group); pa.aiTaxi=null; refreshShop();
+    return;
+  }
+  // airborne once it has speed on the strip
+  const onRunway = Math.abs(st.lp.x-dp.runX) < dp.runHalfW+0.6;
+  if(onRunway && st.speed > pa.def.maxSpeed*0.26 && st.lp.z > dp.runZ0 + (dp.runZ1-dp.runZ0)*0.45){
+    const launchPos = wp.clone().setY(wp.y+3);
+    const i=planes.indexOf(pa); if(i>=0) planes.splice(i,1);
+    if(pa.spot) pa.spot.taken=false;
+    destroyObject3D(pa.group); pa.aiTaxi=null;
+    spawnAIPlane({pos: launchPos}, 0, pa.def);
+    refreshShop();
+    flashPrompt(T('🤖 Airborne — she fights for you','🤖 已升空——她为你而战'),'ok');
+  }
 }
 function boardableEnemyShip(){
   if(!onFoot||!player||!player.def)return null;
@@ -6669,14 +6810,14 @@ function deckTopWorldY(){ return player.build.group.position.y + player.def.deck
 // aircraft, deck tanks, and the superstructure/island. Returns a label for the crash message.
 // Parked aircraft sit ACROSS the deck edge with their noses inboard, the way a real flat-top
 // ranges its air wing along the port side. spot.park marks the sideways rows.
-function parkYaw(spot){ return spot&&spot.park ? Math.PI/2 : 0; }
+function parkYaw(spot){ return spot ? (typeof spot.yaw==='number' ? spot.yaw : (spot.park?Math.PI*0.31:0)) : 0; }
 // The aircraft stopped safely on deck. It stays exactly where it stopped — no teleport back to
 // a numbered slot — and its spot becomes that position, so next time you board it there and
 // taxi from there. This is what replaced the old auto-recover.
 function parkWhereItStopped(P, pa){
   const g=player.build.group;
   const lp=P.deckLocal.clone();
-  pa.spot = { pos: lp.clone(), taken: true, park: false, adhoc: true };
+  pa.spot = { pos: lp.clone(), taken: true, park: false, adhoc: true, yaw: P.taxiYaw||0 };
   g.attach(pa.group);
   pa.group.position.copy(lp);
   pa.group.rotation.set(0, P.taxiYaw||0, 0);
@@ -6704,8 +6845,10 @@ function ditchInOcean(P){
 }
 function deckObstacleAt(lp, self){
   const R=2.4;
+  // A deck gun is a much smaller thing than a parked aircraft — 2.4 m around a turret would
+  // wall off the strip on a narrow hull, so turrets get a radius closer to their real footprint.
   for(const pl of placed){ if(!pl.group) continue;
-    const q=pl.group.position; if(Math.hypot(lp.x-q.x, lp.z-q.z) < R) return 'turret'; }
+    const q=pl.group.position; if(Math.hypot(lp.x-q.x, lp.z-q.z) < 1.9) return 'turret'; }
   for(const other of planes){ if(other===self||!other.parked||!other.spot) continue;
     const q=other.spot.pos; if(Math.hypot(lp.x-q.x, lp.z-q.z) < R+0.6) return 'plane'; }
   for(const tk of playerTanks){ if(!tk.onDeck||!tk.group) continue;
@@ -6749,7 +6892,7 @@ function flyPlane(pa){
   const wp=pa.group.getWorldPosition(new THREE.Vector3());
   scene.attach(pa.group);                          // detach to world, keep transform
   const fuel=pa.def.fuel||200;
-  piloting={ plane:pa, pos:wp.clone(), speed:0, gunCd:0, bombCd:0, roll:0, lastYaw:player.heading||0, phase:(pa.def.heli?'takeoff':'taxi'), taxiT:0, hp:pa.def.hp, maxhp:pa.def.hp,
+  piloting={ plane:pa, pos:wp.clone(), speed:0, gunCd:0, bombCd:0, roll:0, lastYaw:player.heading||0, phase:(pa.def.heli||!deckPlan?'takeoff':'taxi'), taxiT:0, hp:pa.def.hp, maxhp:pa.def.hp,
     fuel,fuelMax:fuel,engineOn:true,gLoad:0,stallT:0,parts:initPlaneParts(pa.def) };
   // You take the aircraft exactly as it sits: the taxi heading starts at its parked yaw, so
   // a sideways-ranged fighter must actually be turned onto the runway before it can fly.
@@ -6987,8 +7130,17 @@ function updatePilot(dt){
     const hit=deckObstacleAt(lp, pa);
     if(hit){ crashOnDeck(P, pa, hit); return; }
     // --- rolled off the edge? ---
-    if(dp && (Math.abs(lp.x)>player.build.halfBeam*1.02 || lp.z<-player.build.halfLen*1.02 || lp.z>player.build.halfLen*1.02)){
+    if(dp && (Math.abs(lp.x)>player.build.halfBeam*1.02 || lp.z<-player.build.halfLen*1.02)){
       crashOnDeck(P, pa, 'edge'); return;
+    }
+    // Running off the BOW is different from going over the side. At flying speed she staggers
+    // into the air anyway — an ugly unassisted takeoff, which is what really happens and what
+    // stops a missed Q from being an instant kill. Below rotation speed nothing holds her up.
+    if(dp && lp.z>player.build.halfLen*1.02){
+      if(P.speed >= def.maxSpeed*0.26){ P.phase='takeoff'; P.taxiT=0; P.rotateYaw=yawW;
+        flashPrompt(T('Off the bow — she flies!','冲出舰艏——总算飞起来了！'),'ok'); }
+      else crashOnDeck(P, pa, 'edge');
+      return;
     }
     // --- Q to rotate ---
     const onRunway = dp && Math.abs(lp.x-dp.runX) < dp.runHalfW+0.6;
@@ -7669,6 +7821,8 @@ function update(dt,t){
   if(islandIncomeAcc>=1){ const g=Math.floor(islandIncomeAcc); money+=g; islandIncomeAcc-=g; updateHUD(); refreshShop(); }
   // --- aircraft (both sides; ships launch them via shipEconomy) ---
   aiPlanes.forEach(p=>updateAIPlane(p,dt));
+  for(let i=planes.length-1;i>=0;i--){ const pa=planes[i]; if(pa.aiTaxi) updateAITaxi(pa,dt); }   // deck crew rolling out under Y
+  updateDeckRolls(dt);                                     // NPC carriers rolling their air wing off the bow
   updateSupportShips(dt);
   updateFogOfWar(dt);
   updateProxyPointCloud();
@@ -8099,6 +8253,25 @@ function keepOffIslands(pos,margin,heading,halfLen){   // push a ship out of any
   pos.x+=corr.dx; pos.z+=corr.dz;
   return corr.grounded;
 }
+// ...and the same for other hulls. Spawn points are picked at random inside a box and never
+// consulted each other, so two capital ships could start 3 m apart — fully inside one another.
+// That was survivable when a battleship was 82 m long; at the current scale it is a wreck on
+// frame one. Push the new hull clear of everything already floating before it is placed.
+function keepOffShips(pos, def, margin=14){
+  const fleet=[player,...enemies,...allies].filter(s=>s&&s.def&&s.pos&&!s.proxy&&s.sinkT===0);
+  for(let pass=0; pass<8; pass++){
+    let moved=false;
+    for(const o of fleet){
+      const need=(def.len+o.def.len)*0.5*0.62 + margin;   // hulls are long: separate on length, not beam
+      let dx=pos.x-o.pos.x, dz=pos.z-o.pos.z, d=Math.hypot(dx,dz);
+      if(d>=need) continue;
+      if(d<0.001){ dx=Math.cos(pass*2.4); dz=Math.sin(pass*2.4); d=1; }   // exactly co-located: pick a direction
+      pos.x=o.pos.x+dx/d*need; pos.z=o.pos.z+dz/d*need; moved=true;
+    }
+    if(!moved) break;
+  }
+  return pos;
+}
 function groundingInfo(ship){
   if(!ship||!ship.pos||!ship.def)return null;
   const margin=Math.max(6,shipRadius(ship.def)*0.78), speed=ship.vel?ship.vel.length():Math.abs(ship.speed||0);
@@ -8229,6 +8402,39 @@ const AI_PLANE_POOL=['fighter','divebomber','torpbomber','f18','a10','f22','b2',
   'm27','mh221','m42','mhkl235','ss17','p11','sp9r','a251','chicken3']; // fortress helos and nuclear aircraft remain player-only
 function planeProfile(def){ const b=def.bomb;
   return {torp:!!(b&&b.kind==='torpedo'),miss:!!(b&&b.homing),bomber:!!(b&&b.kind!=='torpedo'&&!b.homing),fighter:!!def.antiAirOnly||!b}; }
+// NPC carriers fly their aircraft off the deck too, rather than conjuring them at altitude.
+// The roll is short and abstracted — an AI hull has no deckPlan — but it starts at deck level,
+// runs the length of the ship, and can be aborted the same way a wrecked deck aborts the player.
+const deckRolls=[];
+function launchFromDeck(s){
+  if(!s || !s.build || !s.build.group) { spawnAIPlane(s, s.team); return; }
+  const def=PLANES[AI_PLANE_POOL[Math.floor(Math.random()*AI_PLANE_POOL.length)]];
+  const g=buildPlane({...def, col: s.team===1?0x8a6a6a:0x6a78a0});
+  scene.add(g); setPlaneGearVisual({group:g}, true);
+  const hl=s.build.halfLen, deckY=(s.def.deckY||4)+0.6;
+  deckRolls.push({ ship:s, def, group:g, team:s.team, t:0,
+    z:-hl*0.6, hl, deckY, speed:0, life:9 });
+}
+function updateDeckRolls(dt){
+  for(let i=deckRolls.length-1;i>=0;i--){
+    const r=deckRolls[i];
+    // the parent hull sank, or took a deck hit mid-roll → the launch is lost
+    if(!r.ship || r.ship.sinkT>0 || (r.ship.crit&&r.ship.crit.deck) || (r.life-=dt)<=0){
+      const wp=r.group.getWorldPosition(new THREE.Vector3());
+      boom(wp,0.8); destroyObject3D(r.group); deckRolls.splice(i,1); continue;
+    }
+    r.speed=Math.min(r.def.maxSpeed*0.5, r.speed+30*dt);
+    r.z += r.speed*dt;
+    const local=new THREE.Vector3(0, r.deckY, r.z);
+    r.group.position.copy(r.ship.build.group.localToWorld(local.clone()));
+    r.group.rotation.set(0, r.ship.heading||0, 0);
+    if(r.z > r.hl*0.75){                                  // off the bow — airborne
+      const wp=r.group.getWorldPosition(new THREE.Vector3()).setY(r.ship.pos.y+r.deckY+4);
+      destroyObject3D(r.group); deckRolls.splice(i,1);
+      spawnAIPlane({pos:wp}, r.team, r.def);
+    }
+  }
+}
 function spawnAIPlane(src, team, forceDef){
   const def=forceDef||PLANES[AI_PLANE_POOL[Math.floor(Math.random()*AI_PLANE_POOL.length)]];
   const bodyCol = team===1?0x8a6a6a:0x6a78a0;

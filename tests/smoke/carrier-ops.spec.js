@@ -12,21 +12,67 @@ test('deck layout keeps runway, parking and helipad separate', async ({ page }) 
     const clearOfRunway = p => Math.abs(p - deckPlan.runX) > deckPlan.runHalfW;
     return {
       spots: planeSpots.length,
-      parkedSideways: planes.every(p => Math.abs(p.group.rotation.y - Math.PI/2) < 0.01),
+      // ranged on a slant: neither nose-forward down the deck nor square across the beam
+      parkAngles: planes.map(p => p.group.rotation.y),
       parkingClear: planeSpots.every(sp => clearOfRunway(sp.pos.x)),
+      parkingToPort: planeSpots.every(sp => sp.pos.x < deckPlan.runX),
       padClear: clearOfRunway(deckPlan.padPos.x),
       padAft: deckPlan.padPos.z < 0,                 // helipad in the aft corner
       padStarboard: deckPlan.padPos.x > deckPlan.runX,
       runwayLen: deckPlan.runZ1 - deckPlan.runZ0,
+      // and no gun mount may sit on the strip, the apron or the pad — a turret there is a
+      // turret parked on the runway, which is the one collision the deck rules can't excuse
+      mountsOnFlightDeck: player.build.mounts.filter(m =>
+        (Math.abs(m.x - deckPlan.runX) < deckPlan.runHalfW + 1 && m.z > deckPlan.runZ0 - 1 && m.z < deckPlan.runZ1 + 1) ||
+        planeSpots.some(sp => Math.hypot(m.x - sp.pos.x, m.z - sp.pos.z) < 3.4) ||
+        Math.hypot(m.x - deckPlan.padPos.x, m.z - deckPlan.padPos.z) < deckPlan.padR + 1.2).length,
     };
   });
   expect(r.spots).toBeGreaterThan(1);
-  expect(r.parkedSideways).toBe(true);      // aircraft ranged across the deck, as on a real flat-top
-  expect(r.parkingClear).toBe(true);        // ...and never blocking the strip
+  for (const a of r.parkAngles) {
+    expect(a).toBeGreaterThan(0.35);        // not lined up along the deck...
+    expect(a).toBeLessThan(Math.PI / 2 - 0.15);  // ...and not square across it either
+  }
+  expect(r.parkingClear).toBe(true);        // never blocking the strip
+  expect(r.parkingToPort).toBe(true);       // the air wing lives on the port side
   expect(r.padClear).toBe(true);
   expect(r.padAft).toBe(true);
   expect(r.padStarboard).toBe(true);
   expect(r.runwayLen).toBeGreaterThan(40);
+  expect(r.mountsOnFlightDeck).toBe(0);
+});
+
+test('every hull keeps its guns off the flight deck, and the sub has no flight deck at all', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof deckPlan !== 'undefined');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    const offenders = [];
+    for (const hull of Object.keys(SHIPS)) {
+      startGame(hull); skipBanner();
+      if (SHIPS[hull].kind === 'sub') { if (deckPlan) offenders.push(hull + ':sub-has-runway'); continue; }
+      const dp = deckPlan;
+      const onFlightDeck = (x, z, pad) =>
+        (Math.abs(x - dp.runX) < dp.runHalfW + 1 && z > dp.runZ0 - 1 && z < dp.runZ1 + 1) ||
+        planeSpots.some(sp => Math.hypot(x - sp.pos.x, z - sp.pos.z) < 3.4) ||
+        Math.hypot(x - dp.padPos.x, z - dp.padPos.z) < dp.padR + pad;
+      const bad = player.build.mounts.filter(m => onFlightDeck(m.x, m.z, 1.2)).length;
+      if (bad) offenders.push(hull + ':guns:' + bad);
+      // parked tanks are obstacles aircraft crash into, so their slots must clear it too
+      const badTanks = tankSpots.filter(sp => onFlightDeck(sp.pos.x, sp.pos.z, 1.8) ||
+        Math.abs(sp.pos.x) > player.build.halfBeam * 0.98 ||
+        Math.abs(sp.pos.z) > player.build.halfLen * 0.98).length;
+      if (badTanks) offenders.push(hull + ':tanks:' + badTanks);
+    }
+    // a submarine's aircraft launch straight off the casing rather than taxiing a 7 m cylinder
+    startGame('submarine'); skipBanner(); money = 99999;
+    buyPlane('fighter'); flyPlane(planes[0]);
+    return { offenders, subPhase: piloting && piloting.phase, hulls: Object.keys(SHIPS).length };
+  });
+  expect(r.hulls).toBeGreaterThan(25);
+  expect(r.offenders).toEqual([]);
+  expect(r.subPhase).toBe('takeoff');       // no taxi phase without a runway
 });
 
 test('taxi, rotate, land and it stays where it stopped', async ({ page }) => {
@@ -113,4 +159,51 @@ test('taxiing into deck gear wrecks the aircraft; ditching puts the pilot in the
   expect(r.ditched.flying).toBe(false);
   expect(r.ditched.planes).toBe(0);          // airframe lost
   expect(r.ditched.inWater).toBe(true);      // and the pilot swims home
+});
+
+// The deck rules bind everyone, not just the player: an aircraft the AI flies out (Y) taxis
+// from its parking spot like you do and can wreck itself doing it, and enemy carriers fly
+// their air wing off the bow instead of conjuring it at altitude.
+test('AI-flown and enemy aircraft use the deck too', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof updateAITaxi === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    const step=(n,stop)=>{ for(let i=0;i<n;i++){ t2+=0.05; update(0.05,t2); if(stop&&stop()) return i; } return -1; };
+
+    // Y: the AI taxis out under its own power and gets airborne
+    startGame('carrier'); skipBanner(); money=99999;
+    buyPlane('fighter'); const pa=planes[0]; const before=aiPlanes.length;
+    dispatchPlane(pa);
+    const taxiing = !!pa.aiTaxi;
+    step(260, ()=>!pa.aiTaxi);
+    const dispatched = { taxiing, launched: aiPlanes.length-before, leftOnDeck: planes.length };
+
+    // ...and the same obstacle rules kill it: park it on top of a turret and send it
+    startGame('carrier'); skipBanner(); money=99999;
+    buyPlane('fighter'); const pb=planes[0], t=placed[0];
+    dispatchPlane(pb);
+    pb.aiTaxi.lp.set(t.group.position.x, deckPlan.y+1, t.group.position.z-2);
+    pb.aiTaxi.yaw=0; pb.aiTaxi.speed=12;
+    const n0=aiPlanes.length;
+    step(50, ()=>!pb.aiTaxi);
+    const aiCrash = { planes: planes.length, launched: aiPlanes.length-n0 };
+
+    // enemy carrier: the aircraft rolls the length of the deck before it exists as an AI plane
+    startGame('destroyer'); skipBanner();
+    const foe=enemies.find(e=>!e.proxy && e.sinkT===0);
+    foe.planeT=0.01; step(4);
+    const rolling=deckRolls.length; const a0=aiPlanes.length;
+    step(320, ()=>deckRolls.length===0);
+    return { dispatched, aiCrash, npc:{ rolling, done: deckRolls.length===0, launched: aiPlanes.length-a0 } };
+  });
+  expect(r.dispatched.taxiing).toBe(true);     // Y no longer teleports it into the air
+  expect(r.dispatched.launched).toBe(1);
+  expect(r.dispatched.leftOnDeck).toBe(0);
+  expect(r.aiCrash.planes).toBe(0);            // an AI pilot can wreck it on deck gear too
+  expect(r.aiCrash.launched).toBe(0);
+  expect(r.npc.rolling).toBeGreaterThan(0);    // enemy aircraft start on the deck...
+  expect(r.npc.done).toBe(true);
+  expect(r.npc.launched).toBeGreaterThan(0);   // ...and become airborne only off the bow
 });
