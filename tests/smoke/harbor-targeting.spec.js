@@ -27,7 +27,10 @@ test('warships in range shell the enemy harbour instead of ignoring it', async (
     squad.forEach(station);
     for (let i = 0; i < 60 * 90; i++) {
       t2 += 1 / 60; update(1 / 60, t2);
-      if (i % 20 === 0) squad.forEach((a, j) => { if (a.sinkT === 0) station(a, j); });
+      // ...and keep them alive while they are parked in front of a harbour that shoots back.
+      // This test is about whether ships in range ENGAGE the harbour, not whether they survive
+      // doing it — letting the squad sink out was the whole reason it flaked roughly 1 run in 5.
+      if (i % 20 === 0) squad.forEach((a, j) => { if (a.sinkT === 0) { station(a, j); a.hp = a.maxhp; } });
       if (phase !== 'play') break;
     }
     return Math.round(dmg);

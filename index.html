@@ -3253,6 +3253,14 @@ const SANDBOX_MAPS=[
   {name:'Chernobyl', theme:'Abandoned reactor zone: fog, exclusion islands, radar sites, and slow armored ground combat.', enemies:4, allies:4, isles:7, reinforce:0.65, weather:'fog', tod:0.47, boss:false, hqZ:3400, bigIsles:true, sandbox:true, weatherLock:true, army:{soldiers:1.45,tanks:1.75,prod:1.15}},
   {name:'Desert Test Range', theme:'Dry open proving ground with scattered compounds for huge tank and aircraft tests.', enemies:0, allies:3, isles:9, reinforce:0, weather:'clear', tod:0.58, boss:false, hqZ:1600, bigIsles:false, ground:true, sandbox:true, army:{soldiers:1.55,tanks:2.7,prod:1.55}},
   {name:'Volcanic Caldera', theme:'A ring of heavy islands around a central kill zone — perfect for fortress artillery.', enemies:7, allies:5, isles:9, reinforce:1.25, weather:'overcast', tod:0.48, boss:true, hqZ:4200, bigIsles:true, sandbox:true, army:{soldiers:1.8,tanks:1.45,prod:1.4}},
+  // Appended, never inserted: saved games store a sandbox INDEX, so putting this at the front
+  // would have silently reassigned every existing save to a different map. The picker sorts it
+  // to the top instead. Three enemies so the gunnery lesson has a real warship to shoot at, a
+  // near harbour so it is a short sail, an island close enough to drive a tank onto, and a full
+  // purse — the course asks you to buy a gun, a plane and a tank, and being broke is not a lesson.
+  {name:'Training Ground', theme:'Learn everything here: sail, mount guns, fly, drive a tank, go ashore, build. Nothing here can really hurt you.',
+   enemies:3, allies:2, isles:3, reinforce:0, weather:'clear', tod:0.42, boss:false, hqZ:900, bigIsles:true,
+   sandbox:true, training:true, army:{soldiers:0.6,tanks:0.6,prod:0.5}},
 ];
 let currentMapIdx=0, currentSandboxIdx=-1;
 function mapsUnlocked(){ return Math.max(1, Math.min(CAMPAIGN.length, career.mapsUnlocked||1)); }
@@ -3988,7 +3996,7 @@ function updateWarPacing(dt){
       p.deckRearmT=(p.deckRearmT||0)+dt; if(p.deckRearmT>=5){ p.deckRearmT=0; p.bombsLeft++; } } else p.deckRearmT=0; });
   // escalating offensives — announced surges that grow as the war drags on (never on a land theater)
   offensiveT-=dt;
-  if(offensiveT<=0 && !ground){ offensiveN++; offensiveT=(170+Math.random()*80)*SPAWN_SLOW;
+  if(offensiveT<=0 && !ground && !(window._MAP&&window._MAP.training)){ offensiveN++; offensiveT=(170+Math.random()*80)*SPAWN_SLOW;
     const n=Math.min(3+Math.floor(offensiveN/2),6);
     if(enemies.length<12){ for(let i=0;i<n;i++) spawnEnemy();
       flashPrompt('⚠ ENEMY OFFENSIVE — '+n+' warships inbound!'); sfxAlarm(); } }
@@ -4587,11 +4595,13 @@ function buildCampaignPicker(){
   sbh.style.cssText='width:100%;text-align:center;color:#ffd060;font-size:12px;letter-spacing:3px;margin:14px 0 8px;';
   box.appendChild(sbh);
   const sbRow=document.createElement('div'); sbRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;';
-  SANDBOX_MAPS.forEach((M,i)=>{ const sel=i===currentSandboxIdx;
+  // training ground first in the picker, everything else in declaration order
+  SANDBOX_MAPS.map((M,i)=>({M,i})).sort((a,b)=>(b.M.training?1:0)-(a.M.training?1:0))
+    .forEach(({M,i})=>{ const sel=i===currentSandboxIdx;
     const c=document.createElement('div');
     c.style.cssText='width:164px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:pointer;border:1px solid '+(sel?'#ffd060':'#3a3020')+';background:'+(sel?'#2a2212':'#141b22')+';';
     { const sz=isZh()&&typeof SANDBOX_ZH!=='undefined'&&SANDBOX_ZH[M.name];
-    c.innerHTML='<div style="color:#ffe6a0;font-weight:700;font-size:13px">☢ '+(sz?sz.name:M.name)+'</div>'+
+    c.innerHTML='<div style="color:#ffe6a0;font-weight:700;font-size:13px">'+(M.training?'🎓':'☢')+' '+(sz?sz.name:M.name)+'</div>'+
       '<div style="color:#9fb1bd;margin-top:4px;line-height:1.4">'+(sz?sz.theme:M.theme)+'</div>'; }
     c.onclick=()=>{ currentSandboxIdx = currentSandboxIdx===i ? -1 : i; buildCampaignPicker(); };   // click the selected one again to deselect
 
@@ -5288,7 +5298,8 @@ function startGame(shipId){
     if(shipId==='boss'){friendlyBossUsed=true;warRecord('flagship');}else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
     flashPrompt('⚔ '+M.name.toUpperCase()+' — '+M.theme);
     startDrive();          // spawn already at the helm: W moves the ship within seconds of clicking a card
-    startTutorial();       // first-ever battle walks through W → mouse → first kill → armory (no-op once completed)
+    if(onTrainingMap()) startTrainingCourse();   // the training theater teaches the whole game, every time you enter it
+    else startTutorial();  // first-ever battle walks through W → mouse → first kill → armory (no-op once completed)
   }
   _eventT=38+Math.random()*22; _eventCount=0;  // arm the dynamic mid-battle events ticker
   applySimpleHud();
@@ -8129,7 +8140,7 @@ function update(dt,t){
   for(let i=enemies.length-1;i>=0;i--){ if(enemies[i].dead){ destroyShipVisual(enemies[i]); enemies.splice(i,1); } }
   const enemyReinforceRate=(0.18/2.25/SPAWN_SLOW)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1)*DIFF().reinforce; // scaled by theater intensity and difficulty
   const enemyFleetCap=Math.round(18*((window._MAP&&window._MAP.reinforce!=null)?Math.min(2,window._MAP.reinforce):1));   // hard ceiling — long battles no longer snowball into unbounded fleets
-  if(!(window._MAP&&window._MAP.ground) && t2>DIFF().grace && enemies.length<enemyFleetCap && Math.random()<dt*enemyReinforceRate) spawnEnemy();   // grace: no reinforcements in the first minutes
+  if(!(window._MAP&&window._MAP.ground) && !(window._MAP&&window._MAP.training) && t2>DIFF().grace && enemies.length<enemyFleetCap && Math.random()<dt*enemyReinforceRate) spawnEnemy();   // grace: no reinforcements in the first minutes
   updateWarPacing(dt);   // escalating enemy offensives + rotating bonus objectives + parked-plane rearm
   // --- friendly fleet — identical NPC reinforcement and destruction rules ---
   allies.forEach(a=>updateAlly(a,dt));
@@ -9684,18 +9695,18 @@ function actionPlan(){
   const canBuild = onFoot && footLand && !((footLand.capRing && footLand.owner!==0) || footLand.team===1);
   const always = [
     R('Tab','armory (buy things)','军械库（买东西）'),
-    R('H', 'harbor upgrades', '海港升级'),
-    R('O', 'order the fleet', '给舰队下令'), R('Enter','radio the fleet','和舰队喊话'),
+    R('H','upgrades for your whole fleet','给整支舰队买升级'),
+    R('O','tell your side what to do','指挥友军'), R('Enter','radio the fleet','和舰队喊话'),
     R('K', 'settings', '设置'), R('L','photo mode','拍照模式'),
     R('M', 'sound on/off', '音效开关'), R('J','music on/off','音乐开关'),
   ];
-  if(mapAllowed) always.unshift(R('N','tactical map','战术地图'));
-  if(canBuild)   always.push(R('B','island engineers','岛屿工程'));
+  if(mapAllowed) always.unshift(R('N','big map of the battle','整场战斗的大地图'));
+  if(canBuild)   always.push(R('B','build something on this island','在这座岛上盖东西'));
 
   if(drivingTank) return {t:zh?'开坦克':'DRIVING A TANK', rows:[
     R('W/S','drive','前进 / 后退'), R('A/D','turn','左右转'),
     R('Mouse','aim','鼠标瞄准'), R('Click','fire','开炮'),
-    R('G','switch land / water','切换 陆行/涉水'), R('T','change view','切换视角'),
+    R('G','float on water / drive on land','切换 水上漂 / 陆地开'), R('T','change view','切换视角'),
     R('E','get out','下车')], more:always};
 
   if(onFoot){
@@ -9713,8 +9724,8 @@ function actionPlan(){
   if(piloting){
     const ph=piloting.phase;
     if(ph==='taxi') return {t:zh?'滑行':'TAXIING', rows:[
-      R('W','forward','前进'), R('S','brake, then reverse','刹车，继续按就倒车'), R('A/D','steer','转向'),
-      R('Q','pull up — once you are ON the runway','开上跑道后按 Q 拉起'),
+      R('W','forward','前进'), R('S','brake · keep holding to back up','刹车 · 一直按住就倒车'), R('A/D','steer','转向'),
+      R('Q','lift off — once you are ON the runway','开上跑道后按 Q 起飞'),
       R('','watch out: hitting anything wrecks it','小心：撞到东西就废了'),
       R('K', gameSettings.autoTakeoff?'auto takeoff is ON — hands off':'settings → turn on auto takeoff',
              gameSettings.autoTakeoff?'自动起飞已开——不用管':'设置里可以打开自动起飞')], more:[]};
@@ -9722,14 +9733,14 @@ function actionPlan(){
     if(ph==='landing') return {t:zh?'降落':'LANDING', rows:[
       R('A/D','steer','左右修正'), R('S','slow down','减速'), R('W','more power','加油门'),
       R('','line up OVER your ship and sink onto it','对准自己的船，慢慢落上去'),
-      R('E','abort, climb away','中止，拉起来')], more:[]};
+      R('E','change your mind, fly back up','不降了，拉起来')], more:[]};
     if(ph==='rollout') return {t:zh?'着舰滑跑':'ROLLING OUT', rows:[
       R('S','BRAKE','刹车'), R('A/D','keep it straight','把住方向'),
       R('','stop before the bow or you go in the sea','停不住就冲下海了')], more:[]};
     const rows=[R('Mouse','fly','鼠标操纵'), R('A/D','roll','横滚'), R('W/S','throttle','油门'),
       R('Click','guns','机炮')];
     if(piloting.plane&&piloting.plane.def&&piloting.plane.def.bomb) rows.push(R('Space','drop bombs','投弹'));
-    rows.push(R('T','change view','切换视角'), R('E','come in to land','准备降落'), R('P','bail out','跳伞'));
+    rows.push(R('T','change view','切换视角'), R('E','come back down and land','回去降落'), R('P','bail out','跳伞'));
     return {t:zh?'飞行中':'IN FLIGHT', rows, more:always};
   }
 
@@ -9738,20 +9749,20 @@ function actionPlan(){
     R('T','change view','切换视角'), R('E','let go of the gun','离开炮位')], more:always};
 
   if(driving){
-    const rows=[R('W/S','throttle','油门 加/减'), R('A/D','rudder','左右舵'), R('Mouse','look around','鼠标看四周')];
-    if(sub) rows.push(R('C','dive / surface','下潜 / 上浮'));
-    rows.push(R('R','sonar ping','声呐'), R('V','drop a mine','布水雷'), R('Z','damage control','损管修理'),
-              R('T','change view','切换视角'), R('E','step away from the helm','离开舵位'));
+    const rows=[R('W/S','go / slow down','前进 / 减速'), R('A/D','steer left / right','向左 / 向右拐'), R('Mouse','look around','鼠标看四周')];
+    if(sub) rows.push(R('C','go underwater / come back up','潜到水下 / 浮上来'));
+    rows.push(R('R','find hidden submarines','找水下的潜艇'), R('V','drop a floating bomb','放一颗漂浮炸弹'), R('Z','repair your ship','修自己的船'),
+              R('T','change view','切换视角'), R('E','leave the steering wheel','离开方向盘'));
     return {t:zh?'掌舵中':'AT THE HELM', rows, more:always};
   }
 
   // standing on your own deck
   const rows=[R('WASD','walk','走动'), R('Mouse','look around','鼠标看四周'),
-    R('E','take the helm, a gun, or a plane','掌舵 / 上炮位 / 开飞机')];
-  if(parkedPlane) rows.push(R('Y','send a plane up with an AI pilot','让 AI 飞行员开走一架'));
-  rows.push(R('F','install a gun you bought','装上买好的炮'), R('X','scrap the gun you are next to','拆掉旁边的炮'),
+    R('E','use whatever you are standing next to','用你旁边的东西（方向盘/大炮/飞机）')];
+  if(parkedPlane) rows.push(R('Y','let the computer fly one for you','让电脑替你开走一架'));
+  rows.push(R('F','put a cannon you bought on the ship','把买好的大炮装到船上'), R('X','sell the cannon next to you','把旁边的大炮拆了卖掉'),
     R('R','sonar ping','声呐'), R('V','drop a mine','布水雷'), R('Z','damage control','损管修理'),
-    R('G','go ashore','登岸'), R('P','parachute out','跳伞'));
+    R('G','get off onto land','下船上岸'), R('P','jump out with a parachute','跳伞逃生'));
   return {t:zh?'在自己甲板上':'ON YOUR DECK', rows, more:always};
 }
 function renderActions(){
@@ -10063,6 +10074,8 @@ const TOUCH=(()=>{ try{ const q=new URLSearchParams(location.search).get('touch'
 // ---------- first-battle tutorial: one big hint at a time, condition-driven, shown once ----------
 const TUT_DONE_KEY='ironTideTutorialDone';
 const TUT_PLANE_KEY='ironTideTutorialPlaneDone', TUT_TANK_KEY='ironTideTutorialTankDone';
+const TUT_TRAIN_KEY='ironTideTrainingRun';   // per-run only: the training course is meant to be replayable
+function onTrainingMap(){ const M=(typeof currentSandboxIdx!=='undefined'&&currentSandboxIdx>=0)?SANDBOX_MAPS[currentSandboxIdx]:null; return !!(M&&M.training); }
 let tutSteps=null, tutIdx=-1, tutHold=0, tutCamBase=0, tutPlacedBase=0, tutSunkBase=0, _tutLast='';
 let tutDoneKey=TUT_DONE_KEY, _tutGunBase=0, _tutBombBase=0, _tutTankPos=null;
 function tutorialDone(){ try{ return localStorage.getItem(TUT_DONE_KEY)==='1'; }catch(e){ return false; } }
@@ -10082,6 +10095,89 @@ function startTutorial(){
   ];
   tutIdx=0; tutHold=0; _tutLast=''; if(tutSteps[0].enter)tutSteps[0].enter(); tutShow();
 }
+// ---------------------------------------------------------------------------------------
+//  THE TRAINING COURSE — one guided run through every system the game has.
+// ---------------------------------------------------------------------------------------
+// The three short tracks above teach a thing at the moment you first meet it. This is the other
+// half: a place you can go ON PURPOSE to be shown all of it, in order, with a target to shoot at
+// and enough money to buy what each lesson needs. Every step verifies the real thing happened —
+// no step advances on a timer unless there is genuinely nothing to check.
+// Deliberately NOT taught: the money cheat. If you know it you know it.
+let _tSunk=0,_tPlaced=0,_tCam=0,_tPlanes=0,_tTanks=0,_tBuilt=0;
+function startTrainingCourse(){
+  if(!onTrainingMap()) return;
+  tutDoneKey=TUT_TRAIN_KEY;
+  money=Math.max(money, 60000);                        // every lesson below costs something
+  const has=k=>planes.some(p=>p.def&&!p.def.uav);
+  tutSteps=[
+    // Written for someone who has never played this. No "deck gun", no "throttle", no "rudder",
+    // no "sonar" — say what the thing IS and what pressing the key does. If a word needs the game
+    // to explain it, it does not belong in the lesson that is doing the explaining.
+    { text:()=>T('Welcome! This is a safe place to learn. Nothing here can sink you, so try anything.',
+                 '欢迎！这里是安全的练习场，没有东西能把你打沉，随便试。'), hold:6 },
+    { text:()=>T('You are standing at the steering wheel of your ship. Hold W to go · S to slow down.',
+                 '你正站在船的方向盘前。按住 W 往前开 · 按 S 减速。'), done:()=>player&&player.throttle>0.3 },
+    { enter:()=>_tCam=camYaw.v,
+      text:()=>T('Move the mouse to look around · A turns the ship left, D turns it right.',
+                 '动鼠标可以东张西望 · A 让船向左拐，D 向右拐。'), done:()=>Math.abs(camYaw.v-_tCam)>0.5 },
+    { text:()=>T('The list on the right always says what you can press RIGHT NOW. If you forget something, look there.',
+                 '右边那张表随时写着「你现在能按什么」。忘了就看它。'), hold:8 },
+    { enter:()=>_tSunk=sunk,
+      text:()=>T('The cannons on your ship shoot by themselves. Drive toward the RED ship and let them do it.',
+                 '你船上的大炮会自己开火。朝红色的那条船开过去，让它们打就行。'), done:()=>sunk>_tSunk },
+    { text:()=>T('You sank it — and got paid for it! Press Tab to open the shop.',
+                 '打沉了，还拿到钱了！按 Tab 打开商店。'), done:()=>shopOpen },
+    { enter:()=>_tPlaced=placed.length,
+      text:()=>T('Click a cannon to buy it · Tab closes the shop · then walk around with WASD and press F to put it on your ship.',
+                 '点一门大炮买下来 · 按 Tab 关掉商店 · 然后用 WASD 走一走，找个空位按 F 把它装上去。'), done:()=>placed.length>_tPlaced },
+    { text:()=>T('Walk right up to a cannon and press E to shoot it yourself.',
+                 '走到大炮旁边，按 E 就能自己开炮。'), done:()=>manning },
+    { text:()=>T('Now YOU are aiming — move the mouse, click to shoot. Press E when you have had enough.',
+                 '现在是你在瞄准了——动鼠标、点击开炮。玩够了按 E 下来。'), done:()=>!manning },
+    { enter:()=>_tPlanes=planes.length,
+      text:()=>T('Open the shop again (Tab) and buy a plane. It will be waiting in the yellow box on deck.',
+                 '再按 Tab 打开商店，买一架飞机。它会停在甲板上那个黄色的框里。'), done:()=>planes.length>_tPlanes },
+    { text:()=>T('Walk over to the plane and press E to get in.',
+                 '走到飞机旁边，按 E 坐进去。'), done:()=>!!piloting },
+    { text:()=>T('On the ship a plane drives like a car: W goes, S stops (keep holding it to back up), A/D turn. Drive onto the dark grey runway.',
+                 '飞机在船上就像一辆车：W 前进，S 刹车（一直按住就倒车），A/D 转弯。开到那条深灰色的跑道上。'),
+      done:()=>!piloting||piloting.phase!=='taxi' },
+    { text:()=>T('Now press Q to lift off! (If this is fiddly, press K and turn on "Auto takeoff" — the game will do it for you.)',
+                 '现在按 Q 就飞起来了！（觉得难就按 K，把「自动起飞」打开，游戏会替你做。）'),
+      done:()=>!piloting||piloting.phase==='fly' },
+    { text:()=>T('You are flying! Mouse steers · W faster, S slower · click to shoot. Press E when you want to come back down.',
+                 '飞起来了！鼠标控制方向 · W 加速、S 减速 · 点击开火。想回来的时候按 E。'),
+      done:()=>!piloting||piloting.phase==='landing' },
+    { text:()=>T('Aim to come down ON TOP of your own ship. Once the wheels stop, the plane parks itself.',
+                 '瞄准自己的船，落到它上面去。轮子停稳后，飞机会自己开回停机位。'), done:()=>!piloting },
+    { enter:()=>_tTanks=playerTanks.length,
+      text:()=>T('Nice landing. One more thing to buy — open the shop and get a TANK. It parks at the back of the ship.',
+                 '降得漂亮。还有一样要买——打开商店买一辆坦克，它会停在船的后半截。'), done:()=>playerTanks.length>_tTanks },
+    { text:()=>T('Walk to the tank and press E to climb in · W/S to drive · A/D to turn · mouse aims the gun.',
+                 '走到坦克旁按 E 爬进去 · W/S 前进后退 · A/D 转弯 · 鼠标控制炮口。'), done:()=>!!drivingTank },
+    { text:()=>T('Press G and the tank can float. Then just drive off the ship and up onto the sand.',
+                 '按一下 G，坦克就能浮在水上了。然后直接开下船，冲上沙滩。'), done:()=>!drivingTank||(drivingTank.island&&!drivingTank.onDeck) },
+    { text:()=>T('You made it ashore! Click to fire the big gun · R fixes the tank if it gets hurt · E to get out and walk.',
+                 '上岸了！点击开炮 · 坦克被打坏了按 R 修 · 按 E 下车走路。'), done:()=>onFoot },
+    { text:()=>T('Now you are on foot: WASD to walk · click to shoot · Q swaps to a different weapon.',
+                 '现在你自己在走路了：WASD 移动 · 点击开枪 · Q 换一把武器。'), hold:9 },
+    { enter:()=>_tBuilt=landUnits.filter(u=>u.team===0&&!u.dead).length,
+      text:()=>T('Standing on your own island, press B to build something — a gun tower, a wall, whatever you like.',
+                 '站在自己的岛上按 B，就能盖东西——炮塔、围墙，随你。'),
+      done:()=>landUnits.filter(u=>u.team===0&&!u.dead).length>_tBuilt },
+    { text:()=>T('Walk back to your ship and press G to climb aboard again.',
+                 '走回自己的船边，按 G 就能爬回船上。'), done:()=>!onFoot },
+    { text:()=>T('Three handy keys on the ship: R looks for submarines hiding underwater · V drops a floating bomb behind you · Z repairs your ship.',
+                 '船上还有三个好用的键：R 找藏在水下的潜艇 · V 在身后放一颗漂浮的炸弹 · Z 修自己的船。'), hold:10 },
+    { text:()=>T('N shows a big map of the whole battle · H buys upgrades for your whole fleet · O tells your blue friends what to do.',
+                 'N 打开整场战斗的大地图 · H 给你整支舰队买升级 · O 指挥蓝色的友军该干什么。'), hold:10 },
+    { text:()=>T('K opens Settings. Auto takeoff lives in there, and so does "pause the fight while I shop".',
+                 'K 打开设置。「自动起飞」在里面，「买东西时暂停战斗」也在里面。'), hold:9 },
+    { text:()=>T('That is the whole game. Go pick a real battle from the menu whenever you are ready.',
+                 '整个游戏就这些了。准备好了就去菜单里挑一场真正的仗吧。'), hold:10 },
+  ];
+  tutIdx=0; tutHold=0; _tutLast=''; if(tutSteps[0].enter)tutSteps[0].enter(); tutShow();
+}
 function tutShow(){
   const el=document.getElementById('tut'); if(!el) return;
   if(tutIdx<0||!tutSteps){ el.style.display='none'; _tutLast=''; return; }
@@ -10090,7 +10186,11 @@ function tutShow(){
   if(html!==_tutLast){ el.innerHTML=html; _tutLast=html; }
   el.style.display='block';
 }
-function skipTutorial(){ if(tutIdx<0)return; tutIdx=-1; tutSteps=null; try{localStorage.setItem(tutDoneKey,'1');}catch(e){} tutShow(); }
+function skipTutorial(){ if(tutIdx<0)return; tutIdx=-1; tutSteps=null;
+  // The training course is somewhere you go on purpose, so it never marks itself done — walk in
+  // again next week and it runs again. The one-shot tracks still remember.
+  if(tutDoneKey!==TUT_TRAIN_KEY){ try{localStorage.setItem(tutDoneKey,'1');}catch(e){} }
+  tutShow(); }
 // #27: first-flight / first-tank walkthroughs, riding the same step machinery.
 // Each track owns its own done-flag; leaving the vehicle ends (and completes) the track —
 // the player has flown/driven once, which is all these teach.
@@ -10132,10 +10232,15 @@ function updateTutorial(dt){
   if(tutDoneKey===TUT_PLANE_KEY&&!piloting){ skipTutorial(); return; }   // left the plane — lesson over
   if(tutDoneKey===TUT_TANK_KEY&&!drivingTank){ skipTutorial(); return; }
   const s=tutSteps[tutIdx];
-  if(s.hold!=null){ tutHold+=dt; if(tutHold>=s.hold){ skipTutorial(); return; } }
-  else if(s.done&&s.done()){ tutIdx++; tutHold=0;
+  // A timed step ADVANCES; it does not end the lesson. This used to call skipTutorial() outright,
+  // so any hold step that was not the last one killed everything after it — which silently cost
+  // the flight track three of its four steps and the tank track two of its four. It only looked
+  // right because in the very first track the timed step happened to be last.
+  const advance=()=>{ tutIdx++; tutHold=0;
     if(tutIdx>=tutSteps.length){ skipTutorial(); return; }
-    if(tutSteps[tutIdx].enter) tutSteps[tutIdx].enter(); }
+    if(tutSteps[tutIdx].enter) tutSteps[tutIdx].enter(); };
+  if(s.hold!=null){ tutHold+=dt; if(tutHold>=s.hold){ advance(); if(tutIdx<0) return; } }
+  else if(s.done&&s.done()){ advance(); if(tutIdx<0) return; }
   tutShow();
 }
 
@@ -10815,6 +10920,7 @@ const MARKET_ZH = {
 
 // ---------- 沙盒地图(SANDBOX_MAPS,按英文名回查) ----------
 const SANDBOX_ZH = {
+  'Training Ground':   {name:'\u8bad\u7ec3\u573a',       theme:'\u5728\u8fd9\u91cc\u628a\u4ec0\u4e48\u90fd\u5b66\u4e00\u904d\uff1a\u5f00\u8239\u3001\u88c5\u70ae\u3001\u5f00\u98de\u673a\u3001\u5f00\u5766\u514b\u3001\u4e0a\u5cb8\u3001\u5efa\u9020\u3002\u8fd9\u91cc\u6ca1\u6709\u4e1c\u897f\u80fd\u771f\u7684\u4f24\u5230\u4f60\u3002'},
   'Southhaven':        {name:'南港',           theme:'老家海港沙盒：海路均衡、基地岛齐全，随便你演练舰队。'},
   '100% Land':         {name:'百分百陆地',     theme:'几乎全是战场、几乎没有海军：巨大的连片陆地，坦克和步兵的天下。'},
   'Omaha Beach':       {name:'奥马哈海滩',     theme:'抢滩沙盒：一整条设防的海岸线，登陆区、碉堡，还有坦克大冲锋。'},
