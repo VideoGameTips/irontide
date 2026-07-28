@@ -82,6 +82,18 @@ test('the training course reaches every one of its steps, and can be replayed', 
     const untranslated = tutSteps.map((st,i) => ({i, t: st.text()})).filter(x => !/[一-鿿]/.test(x.t)).map(x => x.i);
     setLang('en');
     const teachesCheat = tutSteps.some(st => /backslash|money code|\\\\/i.test(st.text()));
+    // the course issues the two aircraft its lessons need, and holds the enemy's fire
+    const issued = planes.map(x => x.def.name);
+    const shot = team => { const n = shells.length;
+      spawnShell(WEAPONS.deckgun, player.pos.clone().setY(10), new THREE.Vector3(0,0,1), team, null);
+      return shells.length - n; };
+    const enemyBlocked = shot(1) === 0, yoursUnaffected = shot(0) === 1;
+    const liftStep = tutSteps.findIndex(st => st.enter && /tutCeasefire=false/.test('' + st.enter));
+    if (liftStep >= 0) tutSteps[liftStep].enter();
+    const enemyFreeAfterLift = shot(1) === 1;
+    tutCeasefire = true;   // put it back before walking the rest of the course
+    const keyed = tutSteps.filter(st => st.key).length;   // capture before the walk empties tutSteps
+
     const seen = []; let guard = 0;
     while (tutIdx >= 0 && guard < 4000) {
       if (!seen.includes(tutIdx)) seen.push(tutIdx);
@@ -89,7 +101,11 @@ test('the training course reaches every one of its steps, and can be replayed', 
       if (st.hold != null) tutHold = 999; else st.done = () => true;
       updateTutorial(0.05); guard++;
     }
-    return { name: M.name, idx, training: !!M.training, started, total, stuck, untranslated, teachesCheat,
+    return { name: M.name, idx, training: !!M.training, issued,
+             heli: planes.some(x => x.def.heli),
+             missiles: planes.some(x => x.def.bomb && x.def.bomb.kind === 'missile'),
+             enemyBlocked, yoursUnaffected, liftStep, enemyFreeAfterLift,
+             keyed, started, total, stuck, untranslated, teachesCheat,
              walked: seen.length, funds: money, enemies: enemies.filter(e => !e.proxy).length,
              replayable: localStorage.getItem('ironTideTrainingRun') !== '1' };
   });
@@ -105,4 +121,30 @@ test('the training course reaches every one of its steps, and can be replayed', 
   expect(r.funds).toBeGreaterThanOrEqual(60000);   // you can afford the gun, plane and tank it asks for
   expect(r.enemies).toBeGreaterThan(0);     // there is something to shoot at
   expect(r.replayable).toBe(true);          // walk in again next week and it runs again
+  // the lessons that need a specific aircraft get one issued rather than depending on shop stock
+  expect(r.heli).toBe(true);
+  expect(r.missiles).toBe(true);
+  expect(r.keyed).toBeGreaterThan(15);      // most steps show the key as a chip, not buried in prose
+  // nobody shoots at a student — except in the one lesson about being shot
+  expect(r.enemyBlocked).toBe(true);
+  expect(r.yoursUnaffected).toBe(true);     // your own guns still work
+  expect(r.liftStep).toBeGreaterThan(0);
+  expect(r.enemyFreeAfterLift).toBe(true);
+});
+
+test('the ceasefire is confined to the Training Ground', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof spawnShell === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    try { localStorage.setItem('ironTideTutorialDone','1'); } catch(e) {}
+    currentSandboxIdx = -1; currentMapIdx = 4; quickMode = false;
+    startGame('destroyer'); skipBanner();
+    const n = shells.length;
+    spawnShell(WEAPONS.deckgun, player.pos.clone().setY(10), new THREE.Vector3(0,0,1), 1, null);
+    return { ceasefire: tutCeasefire, enemyFired: shells.length - n };
+  });
+  expect(r.ceasefire).toBe(false);   // a real battle is a real battle
+  expect(r.enemyFired).toBe(1);
 });

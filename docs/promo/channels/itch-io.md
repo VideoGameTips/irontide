@@ -187,7 +187,7 @@ WHAT'S INSIDE
 - Photo mode (press L) for screenshots, plus quality settings with adaptive bloom
 - Gamepad support and full touch controls — plays on desktop and mobile
 - Fully bilingual: English / 中文, switchable any time
-- Single-player: a 31-theater campaign, a quick-battle mode, and 7 sandbox maps
+- Single-player: a 31-theater campaign, a quick-battle mode, 7 sandbox maps, and a Training Ground that walks you through every system
 
 CONTROLS
 

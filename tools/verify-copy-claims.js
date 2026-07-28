@@ -52,7 +52,7 @@ const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
     ['61 aircraft',                     g.planes === 61,          g.planes],
     ['22 tanks',                        g.tanks === 22,           g.tanks],
     ['100 medals',                      g.medals === 100,         g.medals],
-    ['7 sandbox maps',                  g.sandbox === 7,          g.sandbox],
+    ['8 sandbox maps (7 + training)',   g.sandbox === 8,          g.sandbox],
     ['music profile per theater',       g.musicProfiles === g.theaters + 1, `${g.musicProfiles} profiles / ${g.theaters} theaters`],
     ['three.js r128',                   g.three === '128',        g.three],
     ['rival is Grand Marshal Varga',    g.rival,                  g.rival],
