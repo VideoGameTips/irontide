@@ -112,20 +112,83 @@ test('NPC ships show the guns and aircraft they actually have', async ({ page })
     currentMapIdx = 14; currentSandboxIdx = -1;
     startGame('battleship'); skipBanner();
     for (let i = 0; i < 6; i++) { t2 += 0.05; update(0.05, t2); }
-    const fleet = [...enemies, ...allies].filter(s => s.build && s.def.kind !== 'sub' && !s.proxy);
+    // bosses are excluded: buildAIShipModel already places their full 16-gun arsenal, and
+    // syncing the loadout on top of that put a second turret on eleven of their mounts
+    const fleet = [...enemies, ...allies].filter(s => s.build && s.def.kind !== 'sub' && !s.proxy && !s.def.boss);
     const before = fleet.map(s => ({ guns: s.build.npcTurrets.length, load: s.loadout.length,
                                      planes: s.build.deckPlanes.length }));
     for (let i = 0; i < 600; i++) { t2 += 0.05; update(0.05, t2); }   // they buy more weapons over time
-    const alive = [...enemies, ...allies].filter(s => s.build && s.def.kind !== 'sub' && !s.proxy && s.sinkT === 0);
+    const alive = [...enemies, ...allies].filter(s => s.build && s.def.kind !== 'sub' && !s.proxy && !s.def.boss && s.sinkT === 0);
+    const boss = [...enemies].find(s => s.def.boss && s.build);
     return { count: fleet.length,
+             bossExtraTurrets: boss ? boss.build.npcTurrets.length : 0,
              allArmed: before.every(b => b.guns === Math.min(b.load, 99)),
              allRanged: before.every(b => b.planes > 0),
              matchesLoadout: alive.every(s => s.build.npcTurrets.length === Math.min(s.loadout.length, s.build.mounts.length)),
              grew: alive.some(s => s.build.npcTurrets.length > 1) };
   });
-  expect(r.count).toBeGreaterThan(3);
+  expect(r.count).toBeGreaterThan(1);   // enemy fleet composition is random; we just need a sample
+  expect(r.bossExtraTurrets).toBe(0);   // the flagship must NOT get a second layer of guns
   expect(r.allArmed).toBe(true);
   expect(r.allRanged).toBe(true);
   expect(r.matchesLoadout).toBe(true);   // turrets keep tracking the loadout as it grows
   expect(r.grew).toBe(true);
+});
+
+// A key listed that refuses when you press it is exactly what this panel exists to prevent.
+test('the panel never lists an action that would be refused', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(() => {
+    const keysOf = () => { for(let i=0;i<12;i++){ t2+=0.05; update(0.05,t2); }
+      return [...document.querySelectorAll('#actList .actgrp.more .actrow')]
+        .map(x => x.querySelector('.actkey').textContent); };
+    currentSandboxIdx = -1;
+    currentMapIdx = 1;  startGame('destroyer'); skipBanner(); const banned = keysOf();
+    currentMapIdx = 14; startGame('destroyer'); skipBanner(); const naval  = keysOf();
+    // and prove the refusals are real, not imagined
+    promptMsg=''; const t0=tacticalOpen; currentMapIdx = 1; startGame('destroyer'); skipBanner();
+    toggleTacticalMap(); const mapRefused = tacticalOpen === t0; if(tacticalOpen) toggleTacticalMap();
+    currentMapIdx = 14; startGame('destroyer'); skipBanner();
+    const b0 = buildOpen; toggleBuild(); const buildRefused = buildOpen === b0; if(buildOpen) toggleBuild();
+    return { banned, naval, mapRefused, buildRefused };
+  });
+  expect(r.mapRefused).toBe(true);            // strategic weapons barred on that theatre
+  expect(r.banned).not.toContain('N');        // ...so N is not offered there
+  expect(r.naval).toContain('N');             // ...but is where it works
+  expect(r.buildRefused).toBe(true);          // engineers need you ashore
+  expect(r.naval).not.toContain('B');         // ...so B is not offered from the deck
+});
+
+// A busy ship used to launch its whole ranged row away and never re-range it, because one shared
+// turnaround timer handed back a single aircraft however many had gone.
+test('an NPC deck re-ranges every aircraft it launches', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(() => {
+    const ship = { build: { deckPlanes: [{visible:true},{visible:true},{visible:true}] } };
+    for (let i = 0; i < 3; i++) npcDeckLaunch(ship);
+    const emptied = ship.build.deckPlanes.filter(g => !g.visible).length;
+    npcDeckRearm(ship, 20); const half = ship.build.deckPlanes.filter(g => g.visible).length;
+    npcDeckRearm(ship, 30); const full = ship.build.deckPlanes.filter(g => g.visible).length;
+    return { emptied, half, full };
+  });
+  expect(r.emptied).toBe(3);
+  expect(r.half).toBe(0);      // still out mid-turnaround
+  expect(r.full).toBe(3);      // all three back, not one
+});
+
+test('both new settings are reachable, in either language', async ({ page }) => {
+  await boot(page);
+  const read = lang => page.evaluate(l => {
+    setLang(l); startGame('destroyer'); skipBanner(); toggleSettings();
+    const r = [...document.querySelectorAll('#settingsList .setitem')].map(d => d.querySelector('span').textContent);
+    toggleSettings(); return r;
+  }, lang);
+  const en = await read('en');
+  expect(en.some(r => r.includes('Auto takeoff'))).toBe(true);      // the feature is reachable at all
+  expect(en.some(r => r.includes('what can I do'))).toBe(true);
+  const zh = await read('zh');
+  expect(zh.some(r => r.includes('自动起飞'))).toBe(true);
+  expect(zh.some(r => r.includes('现在能做什么'))).toBe(true);
+  // every row translated — a half-Chinese settings panel is how the old rows were spotted
+  expect(zh.filter(r => /[a-zA-Z]{4,}/.test(r))).toEqual([]);
 });

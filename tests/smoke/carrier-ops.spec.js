@@ -248,3 +248,37 @@ test('AI-flown and enemy aircraft use the deck too', async ({ page }) => {
   expect(r.npc.done).toBe(true);
   expect(r.npc.launched).toBeGreaterThan(0);   // ...and become airborne only off the bow
 });
+
+// Deck markings are drawn on top of a plate that deckPlanform extrudes UPWARD from deckY — 0.5
+// thick on a carrier, 0.28 on everyone else. Painted at deckY they end up buried inside the deck
+// and only polygonOffset drags them into view, which showed up as a helipad rendering as a sliver
+// at the deck edge. Assert the paint is genuinely above the surface it is painted on.
+test('deck markings sit on top of the deck, not inside it', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof paintFlightDeck === 'function');
+  const r = await page.evaluate(() => {
+    const bad = [];
+    for (const hull of Object.keys(SHIPS)) {
+      if (SHIPS[hull].kind === 'sub') continue;
+      startGame(hull); skipBanner();
+      const carrier = SHIPS[hull].kind === 'carrier';
+      const plateTop = player.def.deckY + (carrier ? 0.5 : 0.28);
+      // every polygon-offset marking mesh the painter added, measured in the SHIP's frame —
+      // the parking boxes are nested in a group, so their local y is 0 and means nothing
+      let lowest = Infinity;
+      const v = new THREE.Vector3();
+      player.build.group.updateMatrixWorld(true);
+      player.build.group.traverse(o => {
+        if (!(o.material && o.material.polygonOffset && o.geometry)) return;
+        o.getWorldPosition(v);
+        lowest = Math.min(lowest, player.build.group.worldToLocal(v.clone()).y);
+      });
+      if (lowest < plateTop) bad.push(`${hull}: paint at ${lowest.toFixed(2)} under deck ${plateTop.toFixed(2)}`);
+      // ...and the whole helipad ring has to be on deck, not overhanging the tapered stern
+      const dp = deckPlan, w = deckHalfWidthAt(player.build, dp.padPos.z, carrier);
+      if (Math.abs(dp.padPos.x) + dp.padR > w - 0.5) bad.push(`${hull}: pad overhangs`);
+    }
+    return bad;
+  });
+  expect(r).toEqual([]);
+});
