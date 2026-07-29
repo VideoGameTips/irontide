@@ -92,13 +92,15 @@ FEATURES
 - Battleship + planes + amphibious tanks + infantry combat
 - Mount extra deck cannons at the port shop
 - 12 in-game medals, a 3-star rating on every theater, and a battle report card you can save as a PNG
+- Working flight decks: taxi to the runway, take off, land back aboard, park
+- A Training Ground level that teaches the whole game with the enemy holding fire
 - Quick battle mode and sandbox maps
 - Dynamic weather, and procedural music with a unique profile for every theater
 - Photo mode (press L)
 - Quality settings + adaptive quality with bloom
 - Keyboard/mouse, gamepad and touch — plays on desktop and mobile
 - English / 中文
-- Single-player campaign, quick battle, and sandbox maps
+- Single-player campaign, quick battle, sandbox maps, and a Training Ground
 
 Free, no account, no ads, loads in seconds. Built with three.js, and fully open source (link in the author comments).
 ```
@@ -113,7 +115,7 @@ This game was designed and built almost entirely by my kid, solo (GitHub handle:
 It's fully open source — one repo, everything in it: https://github.com/VideoGameTips/irontide
 
 A few notes:
-- The 12 medals are in-game medals, not Newgrounds API medals (maybe someday).
+- The 100 medals are in-game medals, not Newgrounds API medals (maybe someday).
 - Multiplayer is EXPERIMENTAL and early — single player is the real game.
 - Tips: press Tab for the armory, buy a gun, then F to bolt it onto your deck; press L for photo mode.
 

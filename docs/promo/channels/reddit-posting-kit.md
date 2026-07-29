@@ -107,7 +107,9 @@ What's in it:
 - A 31-theater world campaign with a rival boss, "Grand Marshal Varga", who taunts you over story radio dialogue
 - You command a battleship, but you can also fly planes, drive amphibious tanks, and fight on foot
 - Buy extra deck guns in the armory (Tab), bolt them on with F, and man one yourself with E
-- 12 medals, 3-star ratings per theater, quick battle mode, sandbox maps, dynamic weather
+- Real flight decks — taxi, take off, land back on your own ship, and it taxis itself to its parking box
+- A Training Ground level that teaches every system with the enemy holding fire
+- 100 medals, 3-star ratings per theater, quick battle mode, sandbox maps, dynamic weather
 - Procedural music that changes per theater, photo mode (L key), gamepad + touch support, English/Chinese
 - Runs on desktop and mobile; it's a PWA so you can install it if you want (no install needed to play)
 - There is also a very early experimental multiplayer mode — it's rough, judge the single-player

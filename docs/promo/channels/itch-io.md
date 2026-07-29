@@ -181,7 +181,9 @@ WHAT'S INSIDE
 - A 31-theater world campaign, with a rival waiting at the end of it: Grand Marshal Varga, who talks to you over story radio dialogue
 - Ship, plane, tank and on-foot combat in one seamless battle — the tanks are amphibious
 - Mount extra cannons on your deck: buy them in the armory (Tab), place them with F, then man them yourself with E
-- 12 medals, a 3-star rating on every theater, and a shareable battle report
+- 100 medals, a 3-star rating on every theater, and a shareable battle report
+- Real flight decks: taxi to the runway, rotate, fly, then land back on your own moving ship — she taxis herself to her parking box afterwards. Helicopters work off the helipad.
+- A Training Ground level that teaches every system, with the enemy holding fire until the lesson about being shot at
 - Quick battle mode and sandbox maps for when you just want a scrap
 - Dynamic weather, and procedural music with a distinct profile for each of the 31 theaters
 - Photo mode (press L) for screenshots, plus quality settings with adaptive bloom

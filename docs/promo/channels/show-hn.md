@@ -65,7 +65,7 @@ Show HN: Iron Tide – command a battleship, fly planes, drive tanks (in-browser
 ```text
 Hi HN — poster (and parent) here.
 
-Iron Tide is a naval action game that runs entirely in the browser: you command a battleship through a 31-theater world campaign, and along the way you can also fly planes, drive amphibious tanks, fight on foot, and mount extra cannons onto your deck at port. There's a rival, Grand Marshal Varga, who talks to you over story radio; each theater gets its own procedurally generated music (31 profiles); plus dynamic weather, a photo mode (L key), quick battle and sandbox modes, gamepad and touch support, and English/Chinese localization. Free, no account, no ads, no install.
+Iron Tide is a naval action game that runs entirely in the browser: you command a battleship through a 31-theater world campaign, and along the way you can also fly planes, drive amphibious tanks, fight on foot, and mount extra cannons onto your deck at port. Every hull carries a marked flight deck, so launching an aircraft means taxiing it to the runway and rotating, and recovering one means flying it back onto your own moving ship. There's a rival, Grand Marshal Varga, who talks to you over story radio; each theater gets its own procedurally generated music (31 profiles); plus dynamic weather, a photo mode (L key), quick battle and sandbox modes, a Training Ground that teaches every system, gamepad and touch support, and English/Chinese localization. Free, no account, no ads, no install.
 
 Transparency up front, since I know the question is coming: my kid (GitHub handle VideoGameTips) designed and built the vast majority of this solo — the gameplay, the campaign, the systems.
 

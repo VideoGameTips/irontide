@@ -72,7 +72,7 @@ battleship through a 31-theater world campaign. You're not locked to the
 helm — hop into a plane, drive an amphibious tank ashore, or fight on
 foot, and mount extra cannons on your deck between battles. A rival
 admiral, Grand Marshal Varga, taunts you over story radio dialogue as
-you chase 3-star ratings, 12 medals, and a shareable battle report card.
+you chase 3-star ratings, 100 medals, and a shareable battle report card. A Training Ground level teaches every system before you commit to a campaign.
 Dynamic weather, procedural music for every theater, photo mode, quick
 battle and sandbox modes, full English/Chinese localization. Built with
 three.js as (almost) a single HTML file — no install, no account, no ads.

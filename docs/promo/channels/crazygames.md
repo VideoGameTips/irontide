@@ -197,7 +197,9 @@ Fight through a 31-theater world campaign against rival commander Grand Marshal 
 
 You are never stuck at the helm: walk the deck, man the turrets yourself, take off in planes, drive amphibious tanks onto the beach, or grab a rifle and fight on foot to capture islands.
 
-Also includes quick battles, sandbox maps, dynamic weather, procedural music that changes with every theater, 12 medals with 3-star theater ratings, a photo mode, adjustable graphics quality, and full gamepad and touch support. Playable in English and Chinese.
+Every ship has a marked flight deck: taxi an aircraft to the runway, take off, fly the mission, then land back on your own deck and watch it park itself. Helicopters lift straight off the helipad. New players can start in the Training Ground, a level that walks you through all of it — sailing, mounting cannons, flying, tanks, going ashore — with nobody shooting at you.
+
+Also includes quick battles, sandbox maps, dynamic weather, procedural music that changes with every theater, 100 medals with 3-star theater ratings, a photo mode, adjustable graphics quality, and full gamepad and touch support. Playable in English and Chinese.
 ```
 
 ### 3.2 操作说明(Controls 字段)
