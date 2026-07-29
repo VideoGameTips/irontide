@@ -1238,8 +1238,11 @@ function updateWeather(dt){
   // opposite of dramatic: the reference art is dark AND legible.
   if(cine){ sky.lerp(_cineTint, 0.34).multiplyScalar(0.78); }
   scene.background.copy(sky); scene.fog.color.copy(sky);
-  scene.fog.far = W.far*(0.45+0.55*day) * (cine?0.80:1);        // distance haze so the fleet recedes instead of
-  scene.fog.near = Math.min(800, scene.fog.far*0.25) * (cine?0.55:1);   // sitting equally crisp on a flat plane
+  // The grade must not shorten the horizon — being able to SEE is worth more than atmosphere, and
+  // pulling the far plane in was working directly against the sight range. Depth now comes from
+  // starting the haze sooner (so near ships read as near) while the far plane stays untouched.
+  scene.fog.far = W.far*(0.45+0.55*day);
+  scene.fog.near = Math.min(800, scene.fog.far*0.25) * (cine?0.70:1);
   // lights
   const bright=day*W.dark;
   if(sun){ sun.intensity=(0.2+0.7*bright)*(cine?0.72:1); sun.color.setRGB(0.95, 0.86-dusk*0.22, 0.74-dusk*0.35); }
@@ -3683,10 +3686,12 @@ let cameraShake=0,cameraShakePhase=0,hitFlashT=0;
 let settingsOpen=false;
 // pauseInArmory defaults OFF: the war keeps running while you shop. Captains who want the
 // old breathing room can turn it back on in the K panel.
-const gameSettings={combatFeedback:true,damageNumbers:true,cameraShake:true,pauseInArmory:false,hideActions:false,autoTakeoff:false,cinematic:false};
+const gameSettings={combatFeedback:true,damageNumbers:true,cameraShake:true,pauseInArmory:false,hideActions:false,autoTakeoff:false,cinematic:true};
 const damageNumbers=[];
 const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool',hideActions:'bool',autoTakeoff:'bool',cinematic:'bool'};
 function loadGameSettings(){ applySettingsBlob(gameSettings, readSettingsBlob(), GAMESETTINGS_SPEC);
+  // ...and again once the renderer exists: this runs at boot, before it does, so the grade
+  // silently never applied on a fresh load — it only took effect if you toggled it by hand.
   if(typeof applyCinematic==='function') applyCinematic(); }   // same validated read as SETTINGS
 function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({sv:SETTINGS_VER,...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
 function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory'],['hideActions','Hide the \u201cwhat can I do\u201d list'],['autoTakeoff','Auto takeoff (taxi for me)'],['cinematic','Cinematic look (darker, hazier)']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();if(key==='cinematic')applyCinematic();};list.appendChild(d);});}
@@ -5309,6 +5314,7 @@ function deployLandCampaignStart(skipEscort){   // skipEscort: resuming a save w
 function startGame(shipId){
   lastShipId=shipId; try{localStorage.setItem('ironTideLastShip',shipId);}catch(e){}
   shipsLostThisWar=0; warStartT2=t2; armoryT=0;
+  applyCinematic();   // loadGameSettings runs before the renderer exists, so the grade lands here
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
   sfxResume();   // browsers need a user gesture (this ship-card click) to start audio
@@ -6174,12 +6180,21 @@ function activePlayerWorldPos(){
   const c=activePlayerCombatant();if(c)return c.pos;
   return player.pos;
 }
+const BASE_SIGHT=1550;                                 // was 620
 function enemyDetectedAt(pos,stealth=1){
   if(!player||!pos)return false;
   const d=pos.distanceTo(activePlayerWorldPos());
   if(sonarPulse>0&&d<1100)return true;
   const airborneRecon=piloting?(piloting.plane.def.uav?(piloting.plane.def.reconMul||4.4):2.4):1; // UAV optics have the widest scouting horizon (varies per drone type)
-  const range=(620+fleetRange())*weatherVis()*stealth*airborneRecon;
+  // BASE_SIGHT was 620 m, and at level one with no radar upgrades that is all you get — enemy
+  // ships simply are not drawn past it, which does not read as fog of war, it reads as being
+  // blind. 2.5x that. Radar upgrades and sonar still stack on top exactly as before, and weather
+  // still cuts it hard, so the sensor systems keep mattering — you just start able to see.
+  // Weather used to gut this — a storm cut the multiplier to ~0.38 and put you back to being
+  // blind, which is the problem this was meant to solve. It now costs you a little and no more:
+  // radar sees through rain. Stealth (submarines) and sonar are untouched, so the sensor game is
+  // still a game; it just is not "you cannot see anything" every time it rains.
+  const range=(BASE_SIGHT+fleetRange())*Math.max(0.82, weatherVis())*stealth*airborneRecon;
   return d<range;
 }
 function enemyDetected(e){
@@ -6198,7 +6213,7 @@ function sonarPing(){
   flashPrompt('◉ SONAR PING — contacts revealed for 4 seconds');
 }
 // Beyond this the model is a couple of pixels, so its marker would float over empty ground.
-const MARKER_FAR=620;
+const MARKER_FAR=BASE_SIGHT;   // markers travel as far as the eye now, or they vanish off visible ships
 function updateFogOfWar(dt){
   sonarCooldown=Math.max(0,sonarCooldown-dt);sonarPulse=Math.max(0,sonarPulse-dt);
   enemies.forEach(e=>{if(e.build)e.build.group.visible=enemyDetected(e);});
