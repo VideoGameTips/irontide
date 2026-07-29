@@ -364,3 +364,31 @@ test('helicopters live on the helipad and land straight down', async ({ page }) 
   expect(r.seen).not.toContain('rollout');   // and no ground roll on the way back down
   expect(r.backOnPad).toBe(true);
 });
+
+// v50 shipped a whiteout: smoke columns were bright, opaque, huge and long-lived, so a dozen
+// burning ships stacked them into a wall you could not see your own deck through. Per-sprite
+// opacity has to be LOW (a column IS overlapping puffs) and the total has to be capped.
+test('a fleet fully ablaze does not white out the screen', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof smokeColumn === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    try { localStorage.setItem('ironTideTutorialDone','1'); } catch(e) {}
+    career.mapsUnlocked = 30; currentSandboxIdx = -1; currentMapIdx = 8;
+    startGame('carrier'); skipBanner();
+    for (let i = 0; i < 300; i++) { t2 += 0.05; update(0.05, t2); }
+    // worst case anyone can reach: every hull on the map alight, held there
+    const all = [...enemies, ...allies, player].filter(x => x && x.def && (x.sinkT || 0) === 0);
+    for (let i = 0; i < 600; i++) { t2 += 0.05; update(0.05, t2);
+      all.forEach(x => { if (critOf(x)) critOf(x).fire = 4; if (x.hp < x.maxhp * 0.4) x.hp = x.maxhp * 0.6; }); }
+    let columns = 0, maxOp = 0;
+    fx.forEach(f => { if (f.column) { columns++; maxOp = Math.max(maxOp, f.op || 0); } });
+    return { burning: all.length, columns, maxOp, total: fx.length, cap: MAX_FX };
+  });
+  expect(r.burning).toBeGreaterThan(5);
+  expect(r.columns).toBeLessThanOrEqual(54);   // hard cap, however many ships are alight
+  expect(r.maxOp).toBeLessThanOrEqual(0.35);   // faint per sprite, because they overlap by design
+  expect(r.total).toBeLessThanOrEqual(r.cap);
+});
