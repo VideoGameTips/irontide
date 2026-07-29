@@ -14,8 +14,12 @@ test('deck layout keeps runway, parking and helipad separate', async ({ page }) 
       spots: planeSpots.length,
       // ranged on a slant: neither nose-forward down the deck nor square across the beam
       parkAngles: planes.map(p => p.group.rotation.y),
-      parkingClear: planeSpots.every(sp => clearOfRunway(sp.pos.x)),
-      parkingToPort: planeSpots.every(sp => sp.pos.x < deckPlan.runX),
+      // the helipad is a parking spot too now, but it is a STARBOARD one — these two are about
+      // the aeroplane apron, so ask only about the aeroplane boxes
+      parkingClear: planeSpots.filter(sp => !sp.heli).every(sp => clearOfRunway(sp.pos.x)),
+      parkingToPort: planeSpots.filter(sp => !sp.heli).every(sp => sp.pos.x < deckPlan.runX),
+      heliSpotOnPad: planeSpots.some(sp => sp.heli &&
+        Math.hypot(sp.pos.x - deckPlan.padPos.x, sp.pos.z - deckPlan.padPos.z) < 0.1),
       carrierHasNoSponson: !player.build.ext,
       padClear: clearOfRunway(deckPlan.padPos.x),
       padAft: deckPlan.padPos.z < 0,                 // helipad in the aft corner
@@ -41,6 +45,7 @@ test('deck layout keeps runway, parking and helipad separate', async ({ page }) 
   expect(r.padClear).toBe(true);
   expect(r.padAft).toBe(true);
   expect(r.padStarboard).toBe(true);
+  expect(r.heliSpotOnPad).toBe(true);   // the pad is somewhere a helicopter actually parks
   expect(r.runwayLen).toBeGreaterThan(40);
   expect(r.mountsOnFlightDeck).toBe(0);
 });
@@ -319,4 +324,43 @@ test('deck markings sit on top of the deck, not inside it', async ({ page }) => 
     return bad;
   });
   expect(r).toEqual([]);
+});
+
+// A helicopter needs no runway and no rollout — and on a hull with a single aircraft box, one
+// parked helo used to leave an aeroplane with nowhere to go at all.
+test('helicopters live on the helipad and land straight down', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof freeSpotForDef === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    try { localStorage.setItem('ironTideTutorialDone','1'); } catch(e) {}
+    currentSandboxIdx = -1; currentMapIdx = 10; career.mapsUnlocked = 20;
+    startGame('destroyer'); skipBanner(); money = 999999;   // one aircraft box on this hull
+    buyPlane('apache'); buyPlane('fighter');
+    const heli = planes.find(x => x.def.heli), jet = planes.find(x => !x.def.heli);
+    const bothFit = !!(heli && jet);
+    const onPad = heli ? Math.hypot(heli.spot.pos.x - deckPlan.padPos.x,
+                                    heli.spot.pos.z - deckPlan.padPos.z) < 0.1 : false;
+    const jetOffPad = jet ? !jet.spot.heli : false;
+
+    // fly it and bring it back: no taxi on the way out, no rollout on the way in
+    flyPlane(heli);
+    const launchPhase = piloting && piloting.phase;
+    for (let i = 0; i < 80 && piloting && piloting.phase !== 'fly'; i++) { t2 += 0.05; update(0.05, t2); }
+    const h = player.heading || 0;
+    piloting.pos.set(player.pos.x, player.def.deckY + 16, player.pos.z);
+    camYaw.v = h; piloting.lastYaw = h; startLanding();
+    const seen = [];
+    for (let i = 0; i < 300 && piloting; i++) { t2 += 0.05; update(0.05, t2);
+      if (piloting && !seen.includes(piloting.phase)) seen.push(piloting.phase); }
+    return { bothFit, onPad, jetOffPad, launchPhase, seen,
+             backOnPad: !!(heli.parked && heli.spot && heli.spot.heli) };
+  });
+  expect(r.bothFit).toBe(true);          // a helo no longer squats in the only aeroplane box
+  expect(r.onPad).toBe(true);
+  expect(r.jetOffPad).toBe(true);
+  expect(r.launchPhase).toBe('takeoff'); // straight up, never a taxi
+  expect(r.seen).not.toContain('rollout');   // and no ground roll on the way back down
+  expect(r.backOnPad).toBe(true);
 });

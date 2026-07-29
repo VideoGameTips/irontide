@@ -5150,6 +5150,9 @@ function makePlayerShip(shipId){
     const z = ns>1 ? z0 + (z1-z0)*(i/(ns-1)) : 0;
     planeSpots.push({ pos:new THREE.Vector3(parkX, dy, z), taken:false, park:!sub, yaw:PARK_YAW });
   }
+  // The helipad is a parking spot, not just paint. Helicopters belong on it — and on a hull with
+  // a single aircraft box, a helo squatting in that box left nowhere for an aeroplane to go.
+  if(deckPlan) planeSpots.push({ pos:deckPlan.padPos.clone(), taken:false, park:true, yaw:0, heli:true });
   if(deckPlan) paintFlightDeck(build, def, deckPlan, planeSpots, PARK_YAW);
   for(let i=0;i<6;i++){ const s=buildSailor('crew'); const lx=(Math.random()-0.5)*build.halfBeam*1.2, lz=(Math.random()-0.5)*build.halfLen*1.4;
     s.position.set(lx, def.deckY+(def.kind==='carrier'?0.5:0), lz); build.group.add(s);
@@ -7012,8 +7015,8 @@ function buyPlane(id){
   if(marketBlocked('plane',id,p))return;
   if(p.uav&&planes.filter(q=>q.def.uav).length>=MAX_PLAYER_UAVS){flashPrompt('Drone bay limit reached ('+MAX_PLAYER_UAVS+')');return;}
   if(money<cost){ flashPrompt('Not enough funds'); return; }
-  const spot=planeSpots.find(s=>!s.taken);
-  if(!spot){ flashPrompt('No free flight spot on deck'); return; }
+  const spot=freeSpotForDef(p);
+  if(!spot){ flashPrompt(p.heli?T('No free helipad','直升机坪已占用'):T('No free flight spot on deck','甲板停机位已满')); return; }
   money-=cost;
   const g=buildPlane(p); g.position.copy(spot.pos); g.rotation.y=parkYaw(spot); player.build.group.add(g);
   planes.push({def:p,group:g,spot,parked:true,bombsLeft:p.bombs||0,gunAmmo:p.gunAmmo==null?null:p.gunAmmo});
@@ -7179,9 +7182,15 @@ function applyPlaneDamageVisual(P){
 }
 // Where will this aircraft go when it stops? Her own box if it is still hers, otherwise any
 // free one. Null means the deck is full — and then there is no point starting an approach.
+// Helicopters take the pad, everything else takes an aircraft box. Matching by type is what
+// stops one helo from occupying a destroyer's only aeroplane spot.
+function freeSpotForDef(def){
+  return planeSpots.find(sp=>!sp.taken && !!sp.heli===!!(def&&def.heli))
+      || (def&&def.heli ? null : planeSpots.find(sp=>!sp.taken && !sp.heli)) || null;
+}
 function freeSpotFor(pa){
   if(pa && pa.spot && !pa.spot.adhoc && !pa.spot.taken) return pa.spot;   // her own box, if nobody took it
-  return planeSpots.find(sp=>!sp.taken) || null;
+  return freeSpotForDef(pa&&pa.def) || null;
 }
 function startLanding(){
   if(piloting && piloting.phase==='fly' && !freeSpotFor(piloting.plane)){
@@ -7539,9 +7548,13 @@ function updatePilot(dt){
     const overShip = overDeck(local);
     if(P.pos.y<=deckY+1.3 && overShip){
       // touchdown → roll out under your own momentum, in deck-local space
-      P.phase='rollout'; P.deckLocal=local.clone(); P.deckLocal.y=(deckPlan?deckPlan.y:0)+1.0;
+      P.deckLocal=local.clone(); P.deckLocal.y=(deckPlan?deckPlan.y:0)+1.0;
       P.taxiYaw=yaw-(player.heading||0);
       setPlaneGearVisual(pa,true);
+      // A helicopter does not roll out. It has already come down vertically, so the moment the
+      // wheels touch it is simply down — hand it straight to the taxi-home crew.
+      if(def.heli){ P.speed=0; parkWhereItStopped(P, pa); return; }
+      P.phase='rollout';
       // Arrestor wires: catching one is what makes a deck landing survivable at all. Touch down
       // in the wire zone (the aft third of the runway) and the hook takes most of your speed;
       // land long, past the wires, and you are relying on brakes alone — usually not enough.
@@ -10129,7 +10142,7 @@ function startTutorial(){
 let _tSunk=0,_tPlaced=0,_tCam=0,_tPlanes=0,_tTanks=0,_tBuilt=0,_tGun=0,_tBomb=0;
 function trainingIssue(id){                            // put an aircraft on the deck for free
   const d=PLANES[id]; if(!d) return null;
-  const spot=planeSpots.find(sp=>!sp.taken); if(!spot) return null;
+  const spot=freeSpotForDef(d); if(!spot) return null;
   const g=buildPlane(d); g.position.copy(spot.pos); g.rotation.y=parkYaw(spot);
   player.build.group.add(g); spot.taken=true;
   const pa={def:d,group:g,spot,parked:true,bombsLeft:d.bombs||0};
@@ -10162,13 +10175,17 @@ function startTrainingCourse(){
                  '你船上的大炮会自己开火。朝红色的那条船开过去，让它们打就行。'), done:()=>sunk>_tSunk },
     { key:'Tab', text:()=>T('You sank it — and got paid for it! Press Tab to open the shop.',
                  '打沉了，还拿到钱了！按 Tab 打开商店。'), done:()=>shopOpen },
+    { key:'E', mode:'foot',
+      text:()=>T('Buy a cannon, then press E to LET GO of the wheel. Until you do, WASD steers the ship instead of walking you around.',
+                 '先买一门大炮，然后按 E 松开方向盘。不松开的话，WASD 一直是在开船，你走不动。'),
+      done:()=>!driving },
     { key:'F', enter:()=>_tPlaced=placed.length,
-      text:()=>T('Click a cannon to buy it · Tab closes the shop · then walk around with WASD and press F to put it on your ship.',
-                 '点一门大炮买下来 · 按 Tab 关掉商店 · 然后用 WASD 走一走，找个空位按 F 把它装上去。'), done:()=>placed.length>_tPlaced },
+      text:()=>T('Now WASD walks you around the deck. Find an empty spot and press F to bolt the cannon down.',
+                 '现在 WASD 就是在甲板上走路了。找个空位按 F 把大炮装上去。'), done:()=>placed.length>_tPlaced },
     { key:'E', text:()=>T('Walk right up to a cannon and press E to shoot it yourself.',
                  '走到大炮旁边，按 E 就能自己开炮。'), done:()=>manning },
-    { key:'E', text:()=>T('Now YOU are aiming — move the mouse, click to shoot. Press E when you have had enough.',
-                 '现在是你在瞄准了——动鼠标、点击开炮。玩够了按 E 下来。'), done:()=>!manning },
+    { key:'E', mode:'foot', text:()=>T('Now YOU are aiming — move the mouse, click to shoot. Press E to let go of the gun and walk again.',
+                 '现在是你在瞄准了——动鼠标、点击开炮。按 E 松开炮、回到走路状态。'), done:()=>!manning },
 
     // ---- helicopter: no runway needed, so it is the gentlest thing to fly first ----
     { key:'E', text:()=>T('There is a helicopter waiting on your deck. Walk to it and press E.',
@@ -10222,6 +10239,9 @@ function startTrainingCourse(){
                  '走回自己的船边，按 G 就能爬回船上。'), done:()=>!onFoot },
 
     // ---- the only part where they are allowed to shoot back ----
+    { key:'E', mode:'helm',
+      text:()=>T('Walk back to the ship\'s wheel and press E to take the helm again.',
+                 '走回船的方向盘那儿，按 E 重新掌舵。'), done:()=>driving },
     { enter:()=>{ tutCeasefire=false; },
       text:()=>T('Last lesson — and for this one the enemy IS allowed to shoot. Sail at them and let yourself get hit.',
                  '最后一课——这一课敌人可以开火了。朝他们开过去，让自己挨几下。'),

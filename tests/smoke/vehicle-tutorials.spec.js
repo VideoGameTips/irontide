@@ -148,3 +148,38 @@ test('the ceasefire is confined to the Training Ground', async ({ page }) => {
   expect(r.ceasefire).toBe(false);   // a real battle is a real battle
   expect(r.enemyFired).toBe(1);
 });
+
+// You start the course AT THE HELM, where WASD steers the ship. Any step that asks you to walk
+// somewhere is impossible until the course has told you to press E and let go of the wheel — and
+// for a long time it never did, so "walk around and press F" was a dead stop for a beginner.
+// Steps that change which thing you are controlling carry a `mode` tag; this walks the course and
+// checks that what each step ASKS FOR is possible in the mode the course has actually left you in.
+test('the training course never asks you to do something the current mode forbids', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof startTrainingCourse === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    try { localStorage.setItem('ironTideTutorialDone','1'); } catch(e) {}
+    currentSandboxIdx = SANDBOX_MAPS.findIndex(m => m.training);
+    startGame('carrier'); skipBanner();
+
+    // what the course has guaranteed about the player's mode by the time each step is shown
+    let mode = 'helm';                       // startGame puts you at the wheel
+    const problems = [];
+    tutSteps.forEach((st, i) => {
+      const src = '' + (st.done || '');
+      // steps that can only be completed on foot: walking to a mount, a plane, a tank, a gun
+      const needsFoot = /placed\.length|manning|piloting|drivingTank|playerTanks\.length/.test(src);
+      // steps that can only be completed while steering the ship
+      const needsHelm = /player\.throttle|player&&player\.hp|camYaw/.test(src);
+      if (needsFoot && mode === 'helm') problems.push(i + ':asks-to-walk-while-at-helm');
+      if (needsHelm && mode !== 'helm')  problems.push(i + ':asks-to-sail-while-not-at-helm');
+      if (st.mode) mode = st.mode;           // this step is the one that changes it
+    });
+    const tags = tutSteps.map((st,i) => st.mode ? i+':'+st.mode : null).filter(Boolean);
+    return { problems, tags, total: tutSteps.length };
+  });
+  expect(r.tags.length).toBeGreaterThan(1);   // the course does hand control back and forth
+  expect(r.problems).toEqual([]);
+});
