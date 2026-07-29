@@ -3819,7 +3819,11 @@ const mines=[];
 const MAX_MINES_PER_TEAM=5;
 let mineDeployCooldown=0,mineLayTimers=[18,18];
 const MAX_SHELLS=360;       // late-game safety limits: prevent burst fire from overwhelming the GPU
-const FX_FULL=260, FX_LEAN=140;
+// 260 was the ceiling before ships burned properly, and four fires alone now fill 204 of it —
+// past that the pool, not the effect, is what limits how a battle looks. Measured cost of the
+// larger budget is ~0.8 ms/frame on this machine, and the adaptive quality ladder still drops
+// straight back to FX_LEAN on anything that struggles, so slow devices are no worse off.
+const FX_FULL=520, FX_LEAN=140;
 let MAX_FX=FX_FULL;   // adaptive: the last rung of the quality ladder trims the effect budget itself
 const _disposedGeometries=new WeakSet(),_disposedMaterials=new WeakSet();
 function destroyObject3D(obj){
@@ -7957,7 +7961,7 @@ function critHurt(s,d){ // DoT from fire/flood — straight HP loss, never re-ro
 function tickCrit(s,dt){
   repairCompartments(s,dt);const c=s.crit; if(!c) return;
   // fire — hurts and can spread, but always burns down on its own
-  if(c.fire>0){ critHurt(s, c.fire*Math.max(7, s.maxhp*0.017)*dt); if(!s.proxy)fireFx(s,dt);   // devastating: ~1.7%/level of max hull per second
+  if(c.fire>0){ critHurt(s, c.fire*Math.max(7, s.maxhp*0.017)*dt); if(!s.proxy)fireFx(s,dt); else fireFxDistant(s,dt);   // devastating: ~1.7%/level of max hull per second
     if(Math.random()<dt*0.22*c.fire){ const r=Math.random();                                   // and it spreads readily
       if(r<0.38){ c.engine=Math.min(2,c.engine+1); critMsg(s,'🔥 fire reached the engine!'); }
       else if(r<0.66){ c.guns=Math.min(2,c.guns+1); koTurret(s); critMsg(s,'🔥 fire reached a magazine!'); }
@@ -7981,7 +7985,7 @@ function engineFactor(s){ const c=s.crit; return !c?1 : c.engine>=2?0.2 : c.engi
 function radarFactor(s){ return ((s.crit&&s.crit.radar)?0.6:1) * weatherVis(); }   // radar damage + fog/storm/night all shorten engagement range
 // ===== FIRE — one devastating, easily-spread blaze system shared by ships, tanks, planes & buildings =====
 function fireParticle(pos,scale){
-  if(fx.length>MAX_FX-80) return;   // fires never starve muzzle/impact/splash feedback of pool slots
+  if(fx.length>MAX_FX-110) return;   // fires never starve muzzle/impact/splash feedback of pool slots
   const r=Math.random();
   if(r<0.52){ // flame tongue: white-hot base cooling to deep red, licking upward and shrinking as it rises
     const f=_spr(fireTex(),true); f.scale.setScalar((0.8+Math.random()*1.2)*scale);
@@ -7994,8 +7998,8 @@ function fireParticle(pos,scale){
     const sm=_spr(smokeTex(),false); sm.scale.setScalar((1.5+Math.random()*1.8)*scale);
     sm.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5)*scale,scale*(0.7+Math.random()),(Math.random()-0.5)*scale));
     scene.add(sm);
-    fx.push({mesh:sm,life:1.5+Math.random()*1.5,max:3,op:0.52,fade:true,grow:true,growRate:1.4,srot:(Math.random()-0.5)*0.8,
-      vel:new THREE.Vector3((Math.random()-0.5)*1.3,3.2+Math.random()*2.6,(Math.random()-0.5)*1.3),drag:0.4,
+    fx.push({mesh:sm,life:3.4+Math.random()*3,max:6.4,op:0.6,fade:true,grow:true,growRate:2.4,srot:(Math.random()-0.5)*0.8,
+      vel:new THREE.Vector3((Math.random()-0.5)*1.6,6.5+Math.random()*5,(Math.random()-0.5)*1.6),drag:0.22,
       c0:new THREE.Color(0x0c0c0c),c1:new THREE.Color(0x565656)});
   } else { // popping ember arcing out under gravity
     const e=_spr(emberTex(),true); e.scale.setScalar((0.22+Math.random()*0.4)*scale);
@@ -8006,9 +8010,28 @@ function fireParticle(pos,scale){
 }
 let _liveFireLights=0;
 let _introStage=-1,_introStageT=0;   // staged opening chatter (see startGame)
+// A burning ship should be visible from the other side of the map. Flame tongues are small and
+// short-lived by nature, so what actually reads at distance is the COLUMN: a few very large, very
+// slow, very long-lived smoke sprites climbing far above the hull. In the reference art that a
+// dozen ships are each throwing one of these is most of what makes the picture feel like a war.
+function smokeColumn(pos, dt, intensity, scale){
+  if(fx.length>MAX_FX-40) return;
+  if(Math.random() > dt*(1.4+intensity*0.9)) return;
+  const sm=_spr(smokeTex(),false);
+  sm.scale.setScalar((5+Math.random()*5)*scale);
+  sm.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5)*scale*1.6, scale*1.2, (Math.random()-0.5)*scale*1.6));
+  scene.add(sm);
+  // Mid-grey, not near-black: this sits against an overcast sky and a dark sea, and a black
+  // column against a dark background is a column nobody can see. Contrast beats realism here.
+  fx.push({mesh:sm, life:7+Math.random()*5, max:12, op:0.85, fade:true, grow:true, growRate:3.4,
+    srot:(Math.random()-0.5)*0.25,
+    vel:new THREE.Vector3((Math.random()-0.5)*2.2, 9+Math.random()*7, (Math.random()-0.5)*2.2), drag:0.12,
+    c0:new THREE.Color(0x3a3a3a), c1:new THREE.Color(0xa8a8a8)});
+}
 function burnFx(pos,scale,dt,intensity){   // a sustained blaze: flames + smoke + a flickering warm glow
-  const rate=6+intensity*7; let n=0;
-  while(Math.random()<dt*rate && n<3){ fireParticle(pos,scale); n++; }
+  const rate=14+intensity*16; let n=0;
+  while(Math.random()<dt*rate && n<6){ fireParticle(pos,scale); n++; }
+  smokeColumn(pos, dt, intensity, scale);
   if(Math.random()<dt*(1.1+intensity*0.5) && fx.length<MAX_FX-3 && _liveFireLights<6){   // PointLights are the most expensive thing here — hard cap them
     const l=new THREE.PointLight(0xff7326, 2+scale*0.8, 14+scale*8); l.position.copy(pos).setY(pos.y+1.4); scene.add(l);
     _liveFireLights++; fx.push({mesh:l,life:0.11+Math.random()*0.08,li:16,light:true,fireLight:true}); }
@@ -8070,11 +8093,29 @@ function igniteBlast(pos,rad,hot){
   landUnits.forEach(u=>tryIg(u,u.kind==='tank'?'tank':'unit',Math.max(2,(u.footprint||4)*0.35),!u.dead));
   [enemyHarbor,friendlyHarbor].forEach(h=>{ if(h&&h.hp>0) tryIg(h,'harbor',h.r*0.4,true); });
 }
+// A ship far enough away to be swapped for a point-cloud proxy used to render NO fire at all —
+// which is exactly backwards, because distance is where fire matters most. Every burning ship in
+// a dramatic naval painting is on the horizon. Flames, embers and the flickering light are all
+// invisible at that range anyway, so a proxy gets the one thing that does read: the smoke column.
+function fireFxDistant(s,dt){
+  const c=s.crit; if(!c||c.fire<=0||!s.pos) return;
+  const scale=Math.min(6.5, 1.1+s.def.beam*0.17);
+  smokeColumn(s.pos.clone().setY((s.def.deckY||3)+1.5), dt*0.75, c.fire, scale);
+}
 function fireFx(s,dt){   // ship blaze — scales with hull size and fire intensity
   const c=s.crit; if(!c||c.fire<=0) return;
-  const base=(s===player?player.pos:s.pos), scale=Math.min(2.6,0.85+s.def.beam*0.14);
-  const p=base.clone().setY((s.def.deckY||3)+0.8).add(new THREE.Vector3((Math.random()-0.5)*s.def.beam*0.8,0,(Math.random()-0.5)*s.def.len*0.6));
-  burnFx(p,scale,dt,c.fire);
+  const base=(s===player?player.pos:s.pos);
+  // The old cap of 2.6 was tuned for a 56 m destroyer. Hulls are 2.25x larger now, so that same
+  // destroyer is 126 m and was still burning with a 56 m ship's flame — a candle on a warehouse.
+  const scale=Math.min(6.5, 1.1+s.def.beam*0.17);
+  // ...and a long hull burns in several places at once. One emission point wandering randomly
+  // down 300 m of deck reads as a flicker; three fixed seats read as a ship that is on fire.
+  const seats=Math.min(4, 1+Math.floor((s.def.len||80)/95));
+  for(let i=0;i<seats;i++){
+    const p=base.clone().setY((s.def.deckY||3)+0.8)
+      .add(new THREE.Vector3((Math.random()-0.5)*s.def.beam*0.7, 0, (Math.random()-0.5)*s.def.len*0.62));
+    burnFx(p, scale, dt/seats, c.fire);
+  }
 }
 // CALLED SHOTS — where you hit matters: a hit near a section can knock out that section's
 // system directly (stern→engines/steering, midships→a turret or magazine, bow/waterline→flooding).
