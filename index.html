@@ -1232,12 +1232,32 @@ function updateWeather(dt){
   else if(weather.type==='volcano') sky.lerp(new THREE.Color(0x2f221c),0.68);
   else if(weather.type==='storm') sky.lerp(_gray,0.55); else if(weather.type==='fog') sky.lerp(_foggy,0.5); else if(weather.type==='overcast') sky.lerp(_gray,0.3);
   sky.multiplyScalar(0.9);
+  const cine=!!(typeof gameSettings!=='undefined'&&gameSettings.cinematic);
+  // Enough to sit the base palette in the dark end — but the point is to make fire and tracers the
+  // brightest things in frame, NOT to hide the fleet. Overcooked, this reads as murk, which is the
+  // opposite of dramatic: the reference art is dark AND legible.
+  if(cine){ sky.lerp(_cineTint, 0.34).multiplyScalar(0.78); }
   scene.background.copy(sky); scene.fog.color.copy(sky);
-  scene.fog.far = W.far*(0.45+0.55*day); scene.fog.near = Math.min(800, scene.fog.far*0.25);
+  scene.fog.far = W.far*(0.45+0.55*day) * (cine?0.80:1);        // distance haze so the fleet recedes instead of
+  scene.fog.near = Math.min(800, scene.fog.far*0.25) * (cine?0.55:1);   // sitting equally crisp on a flat plane
   // lights
   const bright=day*W.dark;
-  if(sun){ sun.intensity=0.2+0.7*bright; sun.color.setRGB(0.95, 0.86-dusk*0.22, 0.74-dusk*0.35); }
-  if(hemi) hemi.intensity=0.24+0.42*Math.max(bright,day*0.35);   // keep night moody but still playable
+  if(sun){ sun.intensity=(0.2+0.7*bright)*(cine?0.72:1); sun.color.setRGB(0.95, 0.86-dusk*0.22, 0.74-dusk*0.35); }
+  if(hemi) hemi.intensity=(0.24+0.42*Math.max(bright,day*0.35))*(cine?0.55:1);   // keep night moody but still playable
+}
+// ===== CINEMATIC LOOK =========================================================================
+// What separates a dramatic naval painting from a bright afternoon screenshot is almost never
+// texture resolution — it is VALUE. In the reference art nearly the whole frame sits in the dark
+// end, so fire and tracers are the only bright saturated things and they punch. Everything below
+// is that one idea: pull the base palette down and toward blue-grey, haze the distance so the
+// fleet recedes, and let the emissive stuff (which is untouched) do the shouting.
+// Off by default. Nothing about gameplay changes — this is exposure, fog and colour only.
+const _cineTint=new THREE.Color(0x4a5a68);
+function applyCinematic(){
+  const c=!!gameSettings.cinematic;
+  if(typeof renderer!=='undefined'&&renderer) renderer.toneMappingExposure = c ? 0.70 : 0.82;
+  if(typeof water!=='undefined'&&water&&water.material) water.material.color.setHex(c?0x071c2a:0x092637);
+  if(typeof bloomPass!=='undefined'&&bloomPass) bloomPass.strength = c ? 0.46 : 0.22;   // fire blooms against the dark
 }
 // ===== LIGHTNING — storms occasionally hurl a bolt; tall metal ships are the tallest thing on the sea =====
 let lightningT=10;
@@ -3663,12 +3683,13 @@ let cameraShake=0,cameraShakePhase=0,hitFlashT=0;
 let settingsOpen=false;
 // pauseInArmory defaults OFF: the war keeps running while you shop. Captains who want the
 // old breathing room can turn it back on in the K panel.
-const gameSettings={combatFeedback:true,damageNumbers:true,cameraShake:true,pauseInArmory:false,hideActions:false,autoTakeoff:false};
+const gameSettings={combatFeedback:true,damageNumbers:true,cameraShake:true,pauseInArmory:false,hideActions:false,autoTakeoff:false,cinematic:false};
 const damageNumbers=[];
-const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool',hideActions:'bool',autoTakeoff:'bool'};
-function loadGameSettings(){ applySettingsBlob(gameSettings, readSettingsBlob(), GAMESETTINGS_SPEC); }   // same validated read as SETTINGS
+const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool',hideActions:'bool',autoTakeoff:'bool',cinematic:'bool'};
+function loadGameSettings(){ applySettingsBlob(gameSettings, readSettingsBlob(), GAMESETTINGS_SPEC);
+  if(typeof applyCinematic==='function') applyCinematic(); }   // same validated read as SETTINGS
 function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({sv:SETTINGS_VER,...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
-function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory'],['hideActions','Hide the \u201cwhat can I do\u201d list'],['autoTakeoff','Auto takeoff (taxi for me)']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();};list.appendChild(d);});}
+function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory'],['hideActions','Hide the \u201cwhat can I do\u201d list'],['autoTakeoff','Auto takeoff (taxi for me)'],['cinematic','Cinematic look (darker, hazier)']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();if(key==='cinematic')applyCinematic();};list.appendChild(d);});}
 function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;if(typeof renderActions==='function')setTimeout(renderActions,0);const sp=document.getElementById('settings');sp.style.display=settingsOpen?'block':'none';if(settingsOpen){
   sp.querySelector('h2').textContent=trText('⚙ SETTINGS'); sp.querySelector('p').innerHTML=isZh()?'战斗画面提示都可以自由开关。按 <b>K</b> 关闭。':'Visual combat feedback is optional. Press <b>K</b> to close.';mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
 function clearDamageNumbers(){while(damageNumbers.length){const d=damageNumbers.pop();d.el.remove();}}
@@ -10798,6 +10819,7 @@ const ZH_EXACT_KID = {
   'Camera shake': '镜头震动',
   'Hide the \u201cwhat can I do\u201d list': '\u9690\u85cf\u300c\u73b0\u5728\u80fd\u505a\u4ec0\u4e48\u300d\u5217\u8868',
   'Auto takeoff (taxi for me)': '\u81ea\u52a8\u8d77\u98de\uff08\u66ff\u6211\u6ed1\u884c\uff09',
+  'Cinematic look (darker, hazier)': '\u7535\u5f71\u611f\u753b\u9762\uff08\u66f4\u6697\u3001\u6709\u96fe\uff09',
   'Pause the war in the armory': '进军械库时暂停战斗',
 
   // ---- 联机(MP)状态 ----
