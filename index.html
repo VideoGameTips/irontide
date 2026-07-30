@@ -3377,7 +3377,35 @@ function marketBlocked(cat,id,def){return !buyMarketLicense(cat,id,def);}
 // theatres, so the strategic arsenal (def.nuke / strategicBomb / nukesilo) is unavailable when a
 // theatre fields two or fewer enemy ships — covers The Landing, Island Hopping, Training Bay, etc.
 function theaterEnemies(){ return ((typeof quickMode!=='undefined'&&quickMode)?QUICK_BATTLE:(currentSandboxIdx>=0?(SANDBOX_MAPS[currentSandboxIdx]||{}):(CAMPAIGN[currentMapIdx]||{}))).enemies||0; }
-function nukesBannedHere(){ return landCampaignMode || theaterEnemies()<=2; }
+// Strategic weapons stay locked for the first five operations — levels 1-5 are where you're
+// still learning to steer, bolt guns on and read the map, and a 9,999-damage warhead on tap
+// skips all of it.
+//
+// Level 6 is the game's own number, not a new one: marketLevel() puts nuclear gear at 24-31 and
+// unlockLevel() caps every tier at UNLOCK_CAP=6, so BUYING it has always needed campaign level 6.
+// The island build menu just never checked, so a silo could go up on Operation 1 with in-battle
+// cash. This closes that path to match.
+//
+// Gated on the operation you're PLAYING, not on how far you've got (which is what the market
+// uses): coming back to Training Bay at level 10 and nuking it is the same trivialising move.
+// Sandbox maps are picked on purpose and stay exempt (Hiroshima is a nuclear theater by design),
+// as does multiplayer.
+const NUKE_UNLOCK_LEVEL=6;
+// MP is declared further down the file, so reach it defensively — this runs from shop and build
+// paths, and a TDZ error here would take the whole frame with it
+function nukesLockedByLevel(){
+  const mp = typeof MP!=='undefined' && MP && MP.active;
+  return currentSandboxIdx<0 && !mp && currentMapIdx<NUKE_UNLOCK_LEVEL-1;
+}
+function nukesBannedHere(){ return nukesLockedByLevel() || landCampaignMode || theaterEnemies()<=2; }
+// two different reasons, two different explanations — "not on this theater" is baffling when the
+// real answer is "not yet"
+function nukeBanMessage(){
+  return nukesLockedByLevel()
+    ? T('Strategic weapons unlock at Operation '+NUKE_UNLOCK_LEVEL+' — you\'re on '+(currentMapIdx+1)+'.',
+        '战略武器要到第 '+NUKE_UNLOCK_LEVEL+' 号作战才解锁——你现在是第 '+(currentMapIdx+1)+' 号。')
+    : T('No strategic weapons on this theater','本战区禁用战略武器');
+}
 function isNuclear(def){ return !!(def&&(def.nuke||def.strategicBomb||def.nukesilo)); }
 const MARKET_CATALOG=[
   {cat:'ship',id:'fletcher',cost:4500,level:5,tag:'SHIP',desc:'USS Fletcher — quick historic destroyer with practical gun space.'},
@@ -6852,7 +6880,7 @@ function toggleBuild(){
 }
 function buildStructure(k){
   if(contentFilterOn()&&k==='nukesilo') return;   // kid-safe mode
-  if(nukesBannedHere()&&isNuclear(STRUCTS[k])){ flashPrompt(T('No strategic weapons on this theater','本战区禁用战略武器')); return; }   // small / land theatres
+  if(nukesBannedHere()&&isNuclear(STRUCTS[k])){ flashPrompt(nukeBanMessage()); return; }   // locked by level, or small / land theatres
   if(!onFoot){ flashPrompt(keyPrompt('Go ashore on an island (G) to emplace '+STRUCTS[k].name,'Go ashore first — tap Ashore alongside an island to emplace '+STRUCTS[k].name,'先靠岛点「登岸」上岛，才能架设'+trName(STRUCTS[k].name))); return; }
   if(!footLand){ flashPrompt('Swim to dry land before building '+STRUCTS[k].name); return; }
   if((footLand.capRing&&footLand.owner!==0)||footLand.team===1){ flashPrompt('This position is not under friendly control'); return; }
@@ -9967,7 +9995,7 @@ function toggleTacticalMap(force){
   // list would otherwise sit there showing helm keys that do nothing while the war is paused
   if(typeof renderActions==='function') setTimeout(renderActions,0);
   if(contentFilterOn()&&!tacticalOpen){ flashPrompt('Strategic weapons are disabled in kid-safe mode'); return; }
-  if(nukesBannedHere()&&!tacticalOpen){ flashPrompt(T('No strategic weapons on this theater','本战区禁用战略武器')); return; }
+  if(nukesBannedHere()&&!tacticalOpen){ flashPrompt(nukeBanMessage()); return; }
   tacticalOpen=force==null?!tacticalOpen:!!force;
   const panel=document.getElementById('tactical');panel.style.display=tacticalOpen?'flex':'none';
   if(tacticalOpen){

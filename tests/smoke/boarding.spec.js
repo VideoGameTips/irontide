@@ -58,9 +58,12 @@ test('boarding a friendly hull takes command of it, and your old ship joins the 
     const ok = takeCommandOf(target);
     const nowMine = player === target;
     const oldHanded = allies.some(a => a.build === oldHull);
+    // count the swap where the swap happens: three more seconds of war is long enough for a
+    // reinforcement to turn up on its own, which made "one out, one in" fail about one run in six
+    const afterAllies = allies.length;
     // and the swap has to survive actually being played
     for (let i = 0; i < 60; i++) { t2 += 0.05; update(0.05, t2); }
-    return { ok, oldName, nowMine, oldHanded, beforeAllies, afterAllies: allies.length,
+    return { ok, oldName, nowMine, oldHanded, beforeAllies, afterAllies,
              newName: player.def.name, alive: phase, hp: Math.round(player.hp),
              notDoubleCounted: allies.indexOf(player) < 0 };
   });
