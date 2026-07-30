@@ -10225,6 +10225,17 @@ function startTutorial(){
 // no step advances on a timer unless there is genuinely nothing to check.
 // Deliberately NOT taught: the money cheat. If you know it you know it.
 let _tSunk=0,_tPlaced=0,_tCam=0,_tPlanes=0,_tTanks=0,_tBuilt=0,_tGun=0,_tBomb=0;
+// How far is the ship from the nearest island's shoreline? The tank lesson is impossible until
+// this is small: an amphibious tank floats, but it does not swim across an ocean, and the course
+// never told anyone to bring the SHIP over first — it just said "drive up onto the sand" from
+// wherever you happened to be sitting.
+function shipToShore(){
+  if(!player||!islands.length) return 1e9;
+  let best=1e9;
+  islands.forEach(i=>{ const rr=Math.max(i.rx||i.r, i.rz||i.r);
+    best=Math.min(best, player.pos.distanceTo(i.pos)-rr); });
+  return best;
+}
 function trainingIssue(id){                            // put an aircraft on the deck for free
   const d=PLANES[id]; if(!d) return null;
   const spot=freeSpotForDef(d); if(!spot) return null;
@@ -10305,21 +10316,31 @@ function startTrainingCourse(){
                  '按 E 回家。瞄准自己的船落上去——停稳后她会自己滑回停机位。'), done:()=>!piloting },
 
     // ---- land ----
+    // The missing prerequisite. Everything after this asks you to drive a tank onto a beach, and
+    // a tank that floats still cannot cross open sea — you have to bring the ship over first.
+    { key:'E', mode:'helm', minShow:5,
+      text:()=>T('Land next — but first take the wheel (E) and sail CLOSE to an island. A tank floats, but it cannot cross open sea. (N shows a map.)',
+                 '接下来是陆地。先按 E 回到方向盘，把船开到离某座岛很近的地方——坦克能浮水，但过不了大海。（按 N 看地图。）'),
+      done:()=>driving && shipToShore()<170 },
     { key:'Tab', enter:()=>_tTanks=playerTanks.length,
-      text:()=>T('Land next. Open the shop and buy a TANK — it parks at the back of the ship.',
-                 '接下来是陆地。打开商店买一辆坦克，它会停在船的后半截。'), done:()=>playerTanks.length>_tTanks },
-    { key:'E', text:()=>T('Walk to the tank and press E to climb in · W/S drive · A/D turn · mouse aims the gun.',
-                 '走到坦克旁按 E 爬进去 · W/S 前进后退 · A/D 转弯 · 鼠标控制炮口。'), done:()=>!!drivingTank },
+      text:()=>T('Close enough. Open the shop and buy a TANK — it parks at the back of the ship.',
+                 '够近了。打开商店买一辆坦克，它会停在船的后半截。'), done:()=>playerTanks.length>_tTanks },
+    { key:'E', mode:'foot',
+      text:()=>T('Press E to let go of the wheel, then walk to the tank and press E again to climb in · W/S drive · A/D turn · mouse aims.',
+                 '按 E 松开方向盘，走到坦克旁再按一次 E 爬进去 · W/S 前进后退 · A/D 转弯 · 鼠标瞄准。'), done:()=>!!drivingTank },
     // `!drivingTank` used to satisfy this, so hopping out of the tank anywhere — mid-ocean, still
     // on the deck — counted as "made it ashore", and the next step congratulated you for a beach
     // you had never reached. Now it only clears when the tank is genuinely on an island, and
     // getting out early tells you what to do instead of silently marching the lesson on.
     { key:'G', mode:'foot',
-      text:()=>drivingTank
-        ? T('Press G and the tank can float. Then drive off the ship and up onto the sand.',
-            '按一下 G，坦克就能浮在水上了。然后开下船，冲上沙滩。')
-        : T('Get back in the tank (press E) — it still has to reach the beach.',
-            '先回到坦克里（按 E）——它还没开上岸呢。'),
+      text:()=>!drivingTank
+        ? T('Get back in the tank (press E) — it still has to reach the beach.',
+            '先回到坦克里（按 E）——它还没开上岸呢。')
+        : shipToShore()>260
+        ? T('The shore drifted away. Get out (E), take the wheel and bring the ship back in close.',
+            '岸边跑远了。先按 E 下车、回到方向盘，把船再开近一点。')
+        : T('Press G and the tank can float. Then drive off the ship and up onto the sand.',
+            '按一下 G，坦克就能浮在水上了。然后开下船，冲上沙滩。'),
       done:()=>!!(drivingTank && drivingTank.island && !drivingTank.onDeck) },
     { key:'E', text:()=>T('Ashore! Click to fire the big gun · R fixes the tank if it gets hurt · E to get out and walk.',
                  '上岸了！点击开炮 · 坦克被打坏了按 R 修 · 按 E 下车走路。'),
@@ -10435,8 +10456,12 @@ function updateTutorial(dt){
   const advance=()=>{ tutIdx++; tutHold=0;
     if(tutIdx>=tutSteps.length){ skipTutorial(); return; }
     if(tutSteps[tutIdx].enter) tutSteps[tutIdx].enter(); };
-  if(s.hold!=null){ tutHold+=dt; if(tutHold>=s.hold){ advance(); if(tutIdx<0) return; } }
-  else if(s.done&&s.done()){ advance(); if(tutIdx<0) return; }
+  tutHold+=dt;
+  if(s.hold!=null){ if(tutHold>=s.hold){ advance(); if(tutIdx<0) return; } }
+  // minShow: a step whose condition is ALREADY true still has to stay on screen long enough to
+  // read. The training theatre starts you 40 m from an island, so "sail close to one" was
+  // satisfied on the very first frame and vanished before anybody could see it had been said.
+  else if(s.done&&s.done()&&(s.minShow==null||tutHold>=s.minShow)){ advance(); if(tutIdx<0) return; }
   tutShow();
 }
 

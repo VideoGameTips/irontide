@@ -169,13 +169,18 @@ test('the training course never asks you to do something the current mode forbid
     const problems = [];
     tutSteps.forEach((st, i) => {
       const src = '' + (st.done || '');
-      // steps that can only be completed on foot: walking to a mount, a plane, a tank, a gun
-      const needsFoot = /placed\.length|manning|piloting|drivingTank|playerTanks\.length/.test(src);
+      // Steps that can only be completed ON FOOT. Buying is deliberately NOT in here: Tab opens
+      // the shop from anywhere, including the helm, so playerTanks.length says nothing about mode.
+      const needsFoot = /placed\.length|manning|piloting|drivingTank/.test(src);
       // steps that can only be completed while steering the ship
       const needsHelm = /player\.throttle|player&&player\.hp|camYaw/.test(src);
-      if (needsFoot && mode === 'helm') problems.push(i + ':asks-to-walk-while-at-helm');
-      if (needsHelm && mode !== 'helm')  problems.push(i + ':asks-to-sail-while-not-at-helm');
-      if (st.mode) mode = st.mode;           // this step is the one that changes it
+      // A step carrying a `mode` tag IS the transition — judging it against the mode it is about
+      // to leave would flag every hand-over in the course.
+      if (!st.mode) {
+        if (needsFoot && mode === 'helm') problems.push(i + ':asks-to-walk-while-at-helm');
+        if (needsHelm && mode !== 'helm')  problems.push(i + ':asks-to-sail-while-not-at-helm');
+      }
+      if (st.mode) mode = st.mode;
     });
     const tags = tutSteps.map((st,i) => st.mode ? i+':'+st.mode : null).filter(Boolean);
     return { problems, tags, total: tutSteps.length };
@@ -215,4 +220,46 @@ test('the course cannot be satisfied by giving up, and never asks you to build o
   expect(r.iGate).toBeGreaterThan(0);               // capture the island...
   expect(r.iBuild).toBe(r.iGate + 1);               // ...immediately before being told to build on it
   expect(r.agrees).toBe(true);                      // and the gate matches the game's own rule
+});
+
+// Everything from the tank onwards asks you to drive onto a beach, and an amphibious tank floats
+// but cannot cross open sea — yet nothing ever told you to bring the SHIP over first.
+test('the course tells you to sail to an island before it asks you to drive onto one', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof shipToShore === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    try { localStorage.setItem('ironTideTutorialDone','1'); } catch(e) {}
+    currentSandboxIdx = SANDBOX_MAPS.findIndex(m => m.training);
+    startGame('carrier'); skipBanner();
+    const at = f => tutSteps.findIndex(st => ('' + st.text()).indexOf(f) >= 0);
+    const iSail = at('sail CLOSE'), iBuy = at('buy a TANK'), iBoard = at('walk to the tank');
+    // far from land the step must NOT be satisfied, even standing at the helm
+    // far from EVERY island — shipToShore takes the minimum, so moving away from one of them
+    // just puts you next to another
+    let far = null, best = -1;
+    for (let x = -4000; x <= 4000; x += 500) for (let z = -4000; z <= 4000; z += 500) {
+      const q = new THREE.Vector3(x, player.pos.y, z);
+      let d = 1e9; islands.forEach(i => { d = Math.min(d, q.distanceTo(i.pos) - Math.max(i.rx||i.r, i.rz||i.r)); });
+      if (d > best) { best = d; far = q; }
+    }
+    player.pos.copy(far);
+    const farDone = tutSteps[iSail].done(), farDist = Math.round(shipToShore());
+    const isl = islands[0], rr = Math.max(isl.rx || isl.r, isl.rz || isl.r);
+    player.pos.set(isl.pos.x + rr + 90, player.pos.y, isl.pos.z);
+    const nearDone = tutSteps[iSail].done();
+    // ...and it has to stay on screen long enough to read even when already true
+    tutIdx = iSail; tutHold = 0; tutShow();
+    let frames = 0;
+    while (tutIdx === iSail && frames < 300) { updateTutorial(0.05); frames++; }
+    return { iSail, iBuy, iBoard, farDone, farDist, nearDone, shown: +(frames * 0.05).toFixed(1) };
+  });
+  expect(r.iSail).toBeGreaterThan(0);
+  expect(r.iSail).toBeLessThan(r.iBuy);      // brought alongside BEFORE you own a tank...
+  expect(r.iBuy).toBeLessThan(r.iBoard);     // ...and before you are sitting in it
+  expect(r.farDist).toBeGreaterThan(400);   // comfortably past the 170 m threshold
+  expect(r.farDone).toBe(false);             // a thousand metres out is not "close"
+  expect(r.nearDone).toBe(true);
+  expect(r.shown).toBeGreaterThanOrEqual(4.9);   // readable even where the map starts you close
 });
