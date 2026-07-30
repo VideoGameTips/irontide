@@ -3885,7 +3885,6 @@ function removeShellAt(i){
 }
 function removeFxAt(i){
   const f=fx[i]; if(!f) return;
-  if(f.fireLight) _liveFireLights=Math.max(0,_liveFireLights-1);
   if(f.column) _columnPuffs=Math.max(0,_columnPuffs-1);
   destroyObject3D(f.mesh); fx.splice(i,1);
 }
@@ -6287,12 +6286,16 @@ function clearBattle(){
   if(enemyHarbor)    destroyObject3D(enemyHarbor.group);
   friendlyHarbor=null; enemyHarbor=null;
   // in-flight ordnance and effects, through their own removers so the FX budget counters
-  // (_liveFireLights, _columnPuffs) come back to zero with them
+  // (_columnPuffs) comes back to zero with them
   for(let i=shells.length-1;i>=0;i--)  removeShellAt(i);
   for(let i=fx.length-1;i>=0;i--)      removeFxAt(i);
   for(let i=salvage.length-1;i>=0;i--) removeSalvageAt(i);
   for(let i=mines.length-1;i>=0;i--)   removeMineAt(i);
   deckRolls.length=0;
+  // the persistent fire lights are pooled, not fx entries — release them by hand or the last
+  // battle's blaze is still glowing over the new one
+  for(const e of _fireLights) destroyObject3D(e.light);
+  _fireLights.length=0; _fireSources.length=0;
 }
 function activePlayerWorldPos(){
   const c=activePlayerCombatant();if(c)return c.pos;
@@ -8239,7 +8242,6 @@ function fireParticle(pos,scale){
       vel:new THREE.Vector3((Math.random()-0.5)*8*scale,(4+Math.random()*8)*scale,(Math.random()-0.5)*8*scale),
       c0:new THREE.Color(0xffe09a),c1:new THREE.Color(0xd8360a)}); }
 }
-let _liveFireLights=0;
 let _introStage=-1,_introStageT=0;   // staged opening chatter (see startGame)
 // A burning ship should be visible from the other side of the map. Flame tongues are small and
 // short-lived by nature, so what actually reads at distance is the COLUMN: a few very large, very
@@ -8273,9 +8275,62 @@ function burnFx(pos,scale,dt,intensity){   // a sustained blaze: flames + smoke 
   const rate=14+intensity*16; let n=0;
   while(Math.random()<dt*rate && n<6){ fireParticle(pos,scale); n++; }
   smokeColumn(pos, dt, intensity, scale);
-  if(Math.random()<dt*(1.1+intensity*0.5) && fx.length<MAX_FX-3 && _liveFireLights<6){   // PointLights are the most expensive thing here — hard cap them
-    const l=new THREE.PointLight(0xff7326, 2+scale*0.8, 14+scale*8); l.position.copy(pos).setY(pos.y+1.4); scene.add(l);
-    _liveFireLights++; fx.push({mesh:l,life:0.11+Math.random()*0.08,li:16,light:true,fireLight:true}); }
+  // register the blaze; updateFireLights decides which ones actually get a lamp this frame.
+  // w is normalised to roughly 0..1.5 — a raw scale*intensity ran to 20 on a burning capital
+  // ship, which drove the lamp to intensity 40 and washed the whole scene white instead of amber.
+  if(_fireSources.length<64)
+    _fireSources.push({pos:pos.clone(), w:Math.min(1.5, (scale/6.5)*(0.45+(intensity||1)*0.35))});
+}
+// ===== FIRE LIGHTING =====
+// A burning ship used to light nothing. Each blaze rolled its own PointLight at intensity 2 with
+// a life of 0.11 s, capped at six across the whole battle and reaching maybe 20 m — so most
+// frames there was no light at all, and when there was it was a blink too dim to reach the water.
+//
+// Lights are genuinely the expensive part, so the fix isn't more of them: it's to stop throwing
+// them away. Keep a small pool of PERSISTENT lights and hand them each frame to the biggest fires
+// you can actually see. Same budget, but the glow is continuous, reaches the sea, and flickers
+// instead of strobing. Creating no lights per frame is a garbage win on top.
+const _fireSources=[];
+let _fireLights=[];
+function fireLightBudget(){ return (typeof MAX_FX!=='undefined' && MAX_FX>FX_LEAN) ? 4 : 2; }
+function updateFireLights(dt){
+  const want = phase==='play' ? fireLightBudget() : 0;
+  // The pool stays in the scene at a CONSTANT count, dark when idle rather than hidden. Toggling
+  // light.visible changes the renderer's light count, and three.js recompiles every material when
+  // that happens — a fire flickering on and off would rebuild shaders mid-battle.
+  while(_fireLights.length<want){
+    const l=new THREE.PointLight(0xff7a2e, 0, 90, 2); scene.add(l);
+    _fireLights.push({light:l, cur:0});
+  }
+  while(_fireLights.length>want){ const e=_fireLights.pop(); destroyObject3D(e.light); }
+  // rank by size, discounted by distance from the eye — a fire behind you doesn't need a lamp
+  const eye=camera?camera.position:null;
+  if(eye) _fireSources.sort((a,b)=> b.w/(1+b.pos.distanceTo(eye)*0.005) - a.w/(1+a.pos.distanceTo(eye)*0.005));
+  // ...then take only spatially distinct blazes. fireFx() emits from up to four seats along a
+  // long hull every frame, so a straight top-N would hand every lamp to one ship and leave the
+  // next one burning in the dark.
+  const picked=[];
+  for(const src of _fireSources){
+    if(picked.length>=_fireLights.length) break;
+    if(picked.some(p=>p.pos.distanceToSquared(src.pos)<70*70)) continue;
+    picked.push(src);
+  }
+  for(let i=0;i<_fireLights.length;i++){
+    const e=_fireLights[i], src=picked[i];
+    if(!src){ e.cur=Math.max(0, e.cur-dt*7); e.light.intensity=e.cur; continue; }   // fade out, stay in the scene
+    // ease the position too: the emission point is resampled at random along the hull each
+    // frame, and a lamp teleporting between seats reads as a strobe, not a fire
+    const want=src.pos.clone(); want.y+=2.2;
+    if(e.light.intensity<0.05) e.light.position.copy(want);   // newly lit: no slide in from the last owner
+    else e.light.position.lerp(want, Math.min(1, dt*6));
+    // two out-of-phase sines: one alone reads as a mechanical pulse, crossed they read as flame
+    const flick=0.70+0.30*Math.sin(t2*16.5+i*2.1)*Math.sin(t2*6.1+i*0.7);
+    const target=(2.2+src.w*5.5)*flick;                  // peaks ~10 on a blazing capital ship
+    e.cur += (target-e.cur)*Math.min(1, dt*10);          // ease so a light changing owner doesn't pop
+    e.light.intensity=e.cur;
+    e.light.distance=70+src.w*32;                        // far enough to pool on the water, not just the hull
+  }
+  _fireSources.length=0;
 }
 // ===== BATTLE DAMAGE — models buckle, scorch and shed parts as they get wrecked =====
 function crippleParts(ent, allowDetach){
@@ -8552,6 +8607,7 @@ function update(dt,t){
     if(_introStageT<=0){ if(_introStage===0){ rivalSpeak(career.rivalPhase); _introStage=1; _introStageT=6; }
       else { deployNemesis(); _introStage=-1; } } }
   updateAircraftAimAssist(dt);
+  updateFireLights(dt);   // last: every burnFx() this frame has registered by now, so they rank together
 }
 
 function deckEyeY(){ return player.def.deckY + (player.def.kind==='carrier'?0.5:0) + EYE; }
