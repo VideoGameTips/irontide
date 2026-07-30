@@ -10310,15 +10310,31 @@ function startTrainingCourse(){
                  '接下来是陆地。打开商店买一辆坦克，它会停在船的后半截。'), done:()=>playerTanks.length>_tTanks },
     { key:'E', text:()=>T('Walk to the tank and press E to climb in · W/S drive · A/D turn · mouse aims the gun.',
                  '走到坦克旁按 E 爬进去 · W/S 前进后退 · A/D 转弯 · 鼠标控制炮口。'), done:()=>!!drivingTank },
-    { key:'G', text:()=>T('Press G and the tank can float. Then drive off the ship and up onto the sand.',
-                 '按一下 G，坦克就能浮在水上了。然后开下船，冲上沙滩。'), done:()=>!drivingTank||(drivingTank.island&&!drivingTank.onDeck) },
+    // `!drivingTank` used to satisfy this, so hopping out of the tank anywhere — mid-ocean, still
+    // on the deck — counted as "made it ashore", and the next step congratulated you for a beach
+    // you had never reached. Now it only clears when the tank is genuinely on an island, and
+    // getting out early tells you what to do instead of silently marching the lesson on.
+    { key:'G', mode:'foot',
+      text:()=>drivingTank
+        ? T('Press G and the tank can float. Then drive off the ship and up onto the sand.',
+            '按一下 G，坦克就能浮在水上了。然后开下船，冲上沙滩。')
+        : T('Get back in the tank (press E) — it still has to reach the beach.',
+            '先回到坦克里（按 E）——它还没开上岸呢。'),
+      done:()=>!!(drivingTank && drivingTank.island && !drivingTank.onDeck) },
     { key:'E', text:()=>T('Ashore! Click to fire the big gun · R fixes the tank if it gets hurt · E to get out and walk.',
-                 '上岸了！点击开炮 · 坦克被打坏了按 R 修 · 按 E 下车走路。'), done:()=>onFoot },
+                 '上岸了！点击开炮 · 坦克被打坏了按 R 修 · 按 E 下车走路。'),
+      done:()=>onFoot && !!footLand },
     { key:'W A S D', text:()=>T('On foot: WASD to walk · click to shoot · Q swaps to a different weapon.',
                  '现在你自己在走路了：WASD 移动 · 点击开枪 · Q 换一把武器。'), hold:9 },
+    // You cannot build on ground you do not hold, and the tank almost always puts you on ground
+    // you do not hold — so the build lesson was flatly unreachable. Take the island first.
+    { mode:'foot',
+      text:()=>T('This island is not yours yet. Stay on it — the ring around it fills with your colour — and clear any red defenders.',
+                 '这座岛还不是你的。待在岛上别走开——岛周围那圈会慢慢变成你的颜色——顺手把红色的守军清掉。'),
+      done:()=>!!(footLand && !((footLand.capRing&&footLand.owner!==0)||footLand.team===1)) },
     { key:'B', enter:()=>_tBuilt=landUnits.filter(u=>u.team===0&&!u.dead).length,
-      text:()=>T('Standing on your own island, press B to build something — a gun tower, a wall, whatever you like.',
-                 '站在自己的岛上按 B，就能盖东西——炮塔、围墙，随你。'),
+      text:()=>T('It is yours now. Press B to build something on it — a gun tower, a wall, whatever you like.',
+                 '这座岛归你了。按 B 在上面盖点东西——炮塔、围墙，随你。'),
       done:()=>landUnits.filter(u=>u.team===0&&!u.dead).length>_tBuilt },
     { key:'G', text:()=>T('Walk back to your ship and press G to climb aboard again.',
                  '走回自己的船边，按 G 就能爬回船上。'), done:()=>!onFoot },

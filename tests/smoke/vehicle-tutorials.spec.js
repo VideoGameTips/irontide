@@ -183,3 +183,36 @@ test('the training course never asks you to do something the current mode forbid
   expect(r.tags.length).toBeGreaterThan(1);   // the course does hand control back and forth
   expect(r.problems).toEqual([]);
 });
+
+// Two ways the course used to lie to you: it congratulated you for reaching a beach you never
+// reached (getting OUT of the tank satisfied the "drive ashore" step), and it then told you to
+// press B on ground the game refuses to let you build on.
+test('the course cannot be satisfied by giving up, and never asks you to build on enemy soil', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof startTrainingCourse === 'function');
+  const r = await page.evaluate(() => {
+    const b=document.getElementById('storyBtn'), s=document.getElementById('story');
+    if(b&&s&&s.style.display==='flex') b.click();
+    try { localStorage.setItem('ironTideTutorialDone','1'); } catch(e) {}
+    currentSandboxIdx = SANDBOX_MAPS.findIndex(m => m.training);
+    startGame('carrier'); skipBanner();
+    const at = frag => tutSteps.findIndex(st => ('' + st.text()).indexOf(frag) >= 0);
+    const iAshore = at('Get back in the tank');   // its text while you are NOT in the tank
+    const iGate   = at('not yours yet');
+    const iBuild  = at('Press B to build');
+    // not in a tank at all, nowhere near a beach: the ashore step must NOT be satisfied
+    const ashoreDoneWhileOutOfTank = tutSteps[iAshore].done();
+    // the capture gate has to agree exactly with what toggleBuild will refuse
+    const gate = fl => !!(fl && !((fl.capRing && fl.owner !== 0) || fl.team === 1));
+    const refuses = fl => !!((fl.capRing && fl.owner !== 0) || fl.team === 1);
+    const cases = [ {capRing:{},owner:null,team:null}, {capRing:{},owner:1,team:null},
+                    {capRing:null,owner:0,team:1},     {capRing:{},owner:0,team:0} ];
+    const agrees = cases.every(fl => gate(fl) === !refuses(fl));
+    return { iAshore, iGate, iBuild, ashoreDoneWhileOutOfTank, agrees };
+  });
+  expect(r.iAshore).toBeGreaterThan(0);
+  expect(r.ashoreDoneWhileOutOfTank).toBe(false);   // giving up is not arriving
+  expect(r.iGate).toBeGreaterThan(0);               // capture the island...
+  expect(r.iBuild).toBe(r.iGate + 1);               // ...immediately before being told to build on it
+  expect(r.agrees).toBe(true);                      // and the gate matches the game's own rule
+});
