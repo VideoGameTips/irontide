@@ -3246,9 +3246,13 @@ function saveCareer(){ try{ career.cv=CAREER_VER; localStorage.setItem('ironTide
 // ===== CAMPAIGN — conquer a theater to unlock the next =====
 const CAMPAIGN=[
   // ---- warm-up theaters: short maps, gentle, no boss ----
-  {name:'Training Bay',       theme:'A quick shakedown in the shallows. Barely any resistance.',enemies:2, allies:4, isles:2, reinforce:0.4, weather:'clear',  tod:0.4, boss:false, hqZ:1500, bigIsles:false},
+  // hqHp scales the enemy HQ, the only thing that ends a campaign war. It used to be a flat
+  // 2600 on every map — and free to fortify itself to 5600 inside two minutes — so "barely any
+  // resistance" had exactly the same win condition as the last map of the campaign, and neither
+  // could be finished. hqFortify:false keeps the warm-up theaters from growing the goal at all.
+  {name:'Training Bay',       theme:'A quick shakedown in the shallows. Barely any resistance.',enemies:2, allies:4, isles:2, reinforce:0.4, weather:'clear',  tod:0.4, boss:false, hqZ:1500, bigIsles:false, hqHp:0.35, hqFortify:false},
   {name:'The Landing',        theme:'Pure land assault — no enemy fleet. Beach your tanks and take every island.', enemies:0, allies:3, isles:6, reinforce:0, weather:'clear', tod:0.42, boss:false, hqZ:1400, bigIsles:false, ground:true},
-  {name:'Coastal Skirmish',   theme:'A short, sharp fight in tight waters.',                 enemies:3, allies:4, isles:3, reinforce:0.6, weather:'clear',    tod:0.38, boss:false, hqZ:2400, bigIsles:false},
+  {name:'Coastal Skirmish',   theme:'A short, sharp fight in tight waters.',                 enemies:3, allies:4, isles:3, reinforce:0.6, weather:'clear',    tod:0.38, boss:false, hqZ:2400, bigIsles:false, hqHp:0.55, hqFortify:false},
   // ---- the main campaign ----
   {name:'Southhaven Shoals',  theme:'Home waters — calm seas, a green fleet to blood.',      enemies:5, allies:5, isles:5, reinforce:0.8, weather:'clear',    tod:0.35, boss:false, hqZ:4400, bigIsles:true},
   {name:'The Broken Reef',    theme:'A dense archipelago. Brutal island-by-island fighting.',enemies:6, allies:5, isles:7, reinforce:1.0, weather:'clear',    tod:0.4,  boss:false, hqZ:4400, bigIsles:true},
@@ -3532,9 +3536,15 @@ function fleetOrderCmd(){
   if(phase!=='play'){ return; }
   const combat=allies.filter(a=>a.sinkT===0&&!a.def.support); if(!combat.length){ flashPrompt('No warships to command.'); return; }
   fleetOrder=(fleetOrder+1)%3;
-  if(fleetOrder===0){ combat.forEach(a=>{a.role='attack';a.assist=null;}); comms('FLAGSHIP','All ships — press the attack!','#ffd060'); flashPrompt('📻 ORDER: ALL SHIPS ATTACK'); }
-  else if(fleetOrder===1){ combat.forEach(a=>assignAllyRole(a,'capture')); comms('FLAGSHIP','All ships — take the islands!','#ffd060'); flashPrompt('📻 ORDER: CAPTURE ISLANDS'); }
-  else { combat.forEach(a=>{a.role='regroup';a.assist=null;}); comms('FLAGSHIP','All ships — form on me!','#ffd060'); flashPrompt('📻 ORDER: REGROUP ON FLAGSHIP'); }
+  // "ALL SHIPS ATTACK" used to set role='attack', which is already what every ally falls back
+  // to — the order changed nothing. Meanwhile an ally only sails for the enemy HQ when no enemy
+  // ship is within ~340 m, and there always is one, so in a 20-minute battle a 17-ship fleet
+  // never once touched the only thing that ends the war. Now the order sends them at the HQ,
+  // and the captain is the one who decides when the fleet commits.
+  if(fleetOrder===0){ combat.forEach(a=>{a.role='strike';a.assist=null;});
+    comms('FLAGSHIP','All ships — strike the enemy HQ!','#ffd060'); flashPrompt('📻 '+T('ORDER: STRIKE THE ENEMY HQ','命令：全舰队打敌方总部')); }
+  else if(fleetOrder===1){ combat.forEach(a=>assignAllyRole(a,'capture')); comms('FLAGSHIP','All ships — take the islands!','#ffd060'); flashPrompt('📻 '+T('ORDER: CAPTURE ISLANDS','命令：去占岛')); }
+  else { combat.forEach(a=>{a.role='regroup';a.assist=null;}); comms('FLAGSHIP','All ships — form on me!','#ffd060'); flashPrompt('📻 '+T('ORDER: REGROUP ON FLAGSHIP','命令：都到我这儿集合')); }
   sfxClick();
 }
 function careerScore(){ return career.sunk*2 + career.planes + career.islands*5 + career.wins*40 + career.bosses*25; }
@@ -5320,6 +5330,14 @@ function deployLandCampaignStart(skipEscort){   // skipEscort: resuming a save w
 function startGame(shipId){
   lastShipId=shipId; try{localStorage.setItem('ironTideLastShip',shipId);}catch(e){}
   shipsLostThisWar=0; warStartT2=t2; armoryT=0;
+  // Per-war tallies. These used to be set only where they were declared, i.e. once per page
+  // load, so every count carried into the next battle — and since a quick battle ends at
+  // `sunk >= QUICK_KILL_GOAL`, starting one after any other battle declared victory within
+  // three seconds, medal and all. Side objectives baselined off the same stale numbers.
+  sunk=0; sessPlanes=0; sideOb=null; sideObT=25;
+  offensiveT=160+Math.random()*80; offensiveN=0;   // war pacing starts over, not mid-escalation
+  fleetOrder=-1; _callsignN=0;                     // orders and callsigns start from the top
+  _yardsPinned=false;                              // else a fresh battle opens by announcing the pressure came off
   applyCinematic();   // loadGameSettings runs before the renderer exists, so the grade lands here
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
@@ -5395,10 +5413,38 @@ function chooseShip(shipId){
   }
   if(phase==='respawn') respawnPlayer(shipId); else startGame(shipId);
 }
+// The island you hold that sits furthest toward the enemy HQ — your forward base. Null if you
+// hold nothing ahead of your own harbor, in which case you sail from home as before.
+function forwardBaseIsland(){
+  if(!enemyHarbor||landCampaignMode) return null;
+  const sign=Math.sign(enemyHarbor.pos.z)||-1;
+  let best=null,bestZ=friendlyHarbor?friendlyHarbor.pos.z*sign:0;
+  for(const i of islands){ if(i.owner!==0) continue;
+    const z=i.pos.z*sign;                         // bigger = further toward the enemy
+    if(z>bestZ){ bestZ=z; best=i; } }
+  return best;
+}
 function respawnPlayer(shipId){
   document.getElementById('menu').style.display='none';
   phase='play';
   makePlayerShip(shipId);           // money carries over; replacement ships get the free starter guns too
+  // Replacements used to always sail from home, and on the full-size theaters home is 4.4 km
+  // from the enemy HQ — measured, a player who kept pressing the objective spent seventeen of
+  // twenty minutes commuting and never landed a shot on it. Islands you hold are forward bases
+  // now: your new hull puts to sea from the one nearest the front. Taking islands finally buys
+  // you something beyond a number in the corner.
+  const fwd=forwardBaseIsland();
+  if(fwd){
+    // put to sea on the sheltered (home-facing) side of the island, then come about onto the
+    // enemy. Deriving the heading from the offset only worked for islands on one side of the
+    // map; take the bearing from the enemy HQ itself and it is right wherever the island is.
+    const away=friendlyHarbor?friendlyHarbor.pos.clone().sub(fwd.pos):enemyHarbor.pos.clone().sub(fwd.pos).negate();
+    away.y=0; if(away.lengthSq()<1) away.set(0,0,1);
+    player.pos.copy(fwd.pos).add(away.normalize().multiplyScalar((fwd.r||120)+70)).setY(0);
+    keepOffIslands(player.pos, shipRadius(player.def)+10);
+    const toFoe=enemyHarbor.pos.clone().sub(player.pos);
+    player.heading=Math.atan2(toFoe.x,toFoe.z);
+    flashPrompt('⚓ '+T('Redeployed from '+(fwd.name||'your island')+' — closer to the front.','从'+(fwd.name||'你的岛')+'重新出发——离前线更近了。')); }
   if(window._MAP&&window._MAP.ground) deployLandCampaignStart();
   else startDrive();
   buildShopUI(); refreshShop(); updateHUD(); updateMode();
@@ -5531,6 +5577,12 @@ function buildTheater(){
   const M=window._MAP||{}, hq=M.hqZ||HQ_Z, big=M.bigIsles!==false;
   friendlyHarbor=buildHarbor(0, new THREE.Vector3(0,0,hq));
   enemyHarbor   =buildHarbor(1, new THREE.Vector3(0,0,-hq));
+  // The enemy HQ is the whole win condition, so it scales with the theater instead of being a
+  // flat 2600 everywhere. Maps that don't set hqHp derive it from `reinforce` — the dial each
+  // theater already uses to say how hard it pushes — so the campaign ramps instead of being
+  // gentle on paper and identical in practice.
+  const hqHp = M.hqHp!=null ? M.hqHp : Math.max(0.45, Math.min(1, 0.45+0.4*(M.reinforce==null?1:M.reinforce)));
+  if(hqHp!==1){ enemyHarbor.maxhp=Math.round(enemyHarbor.maxhp*hqHp); enemyHarbor.hp=enemyHarbor.maxhp; }
   const enemyBaseIsland=buildIsland(new THREE.Vector3(0,0,-hq-120),260,'Northwatch');
   const friendlyBaseIsland=buildIsland(new THREE.Vector3(0,0,hq+120),250,'Southhaven');
   enemyBaseIsland.capturable=false; friendlyBaseIsland.capturable=false;
@@ -6054,7 +6106,9 @@ function spawnAlly(near){
     loadout:[], upgT:7+Math.random()*7, planeT:12+Math.random()*16 };
   def.support?a.loadout.push(AI_WEAPS[3]):growLoadout(a);
   a.callsign=def.support?'Medic-'+(_callsignN+1):nextCallsign();
-  a.role=def.support?'support':(Math.random()<0.35?'capture':'attack');
+  // reinforcements join the standing order — a fleet you sent at the HQ shouldn't quietly
+  // dissolve back into patrol duty as fresh hulls arrive
+  a.role=def.support?'support':(fleetOrder===0?'strike':fleetOrder===1?'capture':(Math.random()<0.35?'capture':'attack'));
   a._sos=0; a.commsT=8+Math.random()*22;
   if(typeof comms==='function'&&!def.support&&Math.random()<0.6) comms(a.callsign,a.role==='capture'?'On station — moving to take an island.':'Reporting for duty — weapons hot.','#a8d4f0');
   allies.push(a);
@@ -6427,6 +6481,10 @@ function updateAlly(a,dt){
     objective=a.assist.pos; stand=100;
     if((a.assist===player?player.hp:a.assist.hp) > (a.assist.maxhp||player.maxhp)*0.6){ commsShip(a,'Threat clear — resuming patrol.','#a8d4f0',6); a.role='attack'; a.assist=null; } }
   else if(a.role==='regroup' && player && player.hp>0){ objective=player.pos; stand=110; }
+  // strike: sail for the enemy HQ and hold a bombardment line inside gun range (360 m) but
+  // outside its pier. Escorts still get shot at on the way — aiShipFire picks its own targets
+  // by rank — they just stop being a reason to break off and chase.
+  else if(a.role==='strike'){ if(enemyHarbor&&enemyHarbor.hp>0){ objective=enemyHarbor.pos; stand=enemyHarbor.r+150; } else a.role='attack'; }
   else if(a.role==='capture'){ if(!a.capIsland||a.capIsland.owner===0||!a.capIsland.capturable) a.capIsland=nearestCaptureIsland(a.pos);
     if(a.capIsland){ objective=a.capIsland.pos; stand=a.capIsland.r+45; } else a.role='attack'; }
   else if(a.role==='convoy'&&a.convoyTarget){
@@ -8408,7 +8466,7 @@ function update(dt,t){
   for(let i=enemies.length-1;i>=0;i--){ if(enemies[i].dead){ destroyShipVisual(enemies[i]); enemies.splice(i,1); } }
   const enemyReinforceRate=(0.18/2.25/SPAWN_SLOW)*(1+hU(1,'fastBuild')*0.6+hU(1,'slots')*0.35)*((window._MAP&&window._MAP.reinforce!=null)?window._MAP.reinforce:1)*DIFF().reinforce; // scaled by theater intensity and difficulty
   const enemyFleetCap=Math.round(18*((window._MAP&&window._MAP.reinforce!=null)?Math.min(2,window._MAP.reinforce):1));   // hard ceiling — long battles no longer snowball into unbounded fleets
-  if(!(window._MAP&&window._MAP.ground) && !(window._MAP&&window._MAP.training) && t2>DIFF().grace && enemies.length<enemyFleetCap && Math.random()<dt*enemyReinforceRate) spawnEnemy();   // grace: no reinforcements in the first minutes
+  if(!(window._MAP&&window._MAP.ground) && !(window._MAP&&window._MAP.training) && t2>DIFF().grace && enemies.length<enemyFleetCap && !enemyYardsPinned(dt) && Math.random()<dt*enemyReinforceRate) spawnEnemy();   // grace: no reinforcements in the first minutes
   updateWarPacing(dt);   // escalating enemy offensives + rotating bonus objectives + parked-plane rearm
   // --- friendly fleet — identical NPC reinforcement and destruction rules ---
   allies.forEach(a=>updateAlly(a,dt));
@@ -9548,6 +9606,7 @@ function updateHarbors(dt){
 // the enemy harbor fortifies itself over time — free escalating upgrades (it can't spend money)
 function aiHarborTick(dt){
   if(!enemyHarbor || enemyHarbor.hp<=0) return;
+  if(window._MAP && window._MAP.hqFortify===false) return;   // warm-up theaters: the goal doesn't grow
   enemyHarbor.aiUpT=(enemyHarbor.aiUpT==null?22+Math.random()*14:enemyHarbor.aiUpT)-dt;
   if(enemyHarbor.aiUpT>0) return;
   enemyHarbor.aiUpT=20+Math.random()*16;
@@ -9557,11 +9616,39 @@ function aiHarborTick(dt){
   // free walls put the win condition out of reach: measured 2600 -> 8600 hp in eight
   // minutes, which outruns what a player can deal. Cap the free ones at half the table
   // maximum. A player who pays for walls still gets all four levels.
-  const AI_FREE_CAP={walls:2};
+  // walls compound (+1500 max hp AND -12% damage taken each), so how many the enemy gets for
+  // free is really "how far can the goal run away from the player". Only the hardest theaters
+  // get the full two.
+  const AI_FREE_CAP={walls:(window._MAP&&window._MAP.reinforce>=1.1)?2:1};
   const opts=pool.filter(k=>enemyHarbor.up[k] < Math.min(HARBOR_UP[k].max, AI_FREE_CAP[k]||99));
   if(!opts.length) return;
   const k=opts[Math.floor(Math.random()*opts.length)];
   enemyHarbor.up[k]++; applyUpgrade(k, enemyHarbor);
+}
+// Pressing the enemy HQ used to be a charge into their spawn point: spawnEnemy() puts new hulls
+// 90-250 m in front of their own harbor, so the assault fed on itself and the objective never
+// fell. Measured on easy, map 1: a player who ordered the fleet in, sailed to the HQ and aimed
+// every gun at it still left it at 94% after twenty minutes and twelve lost hulls, because
+// something new was always waiting where it had just docked.
+// Get a warship in close and their yards stop turning out ships. Holding the line off their
+// harbor is now the thing that makes the war winnable — which is the whole point of going.
+// Only the silent trickle is gated: the announced surges (ENEMY OFFENSIVE, Dominion
+// reinforcements) still come, because a telegraphed counter-attack while you're sitting on
+// their doorstep is the good kind of pressure — you can see it coming and decide to hold.
+const YARD_PIN_R=650;
+let _yardsPinned=false;
+function enemyYardsPinned(dt){
+  if(!enemyHarbor||enemyHarbor.hp<=0) return false;
+  const close=p=>p.distanceTo(enemyHarbor.pos)<YARD_PIN_R;
+  const pinned = (player && !playerShipLost && player.hp>0 && !landCampaignMode && close(player.pos))
+    || allies.some(a=>a.sinkT===0 && !a.def.support && close(a.pos));
+  if(pinned!==_yardsPinned){                       // tell the player their pressure is doing something
+    _yardsPinned=pinned;
+    if(pinned){ flashPrompt('⚓ '+T('Enemy shipyards pinned — no new enemy ships while you hold this close!','敌方船厂被压住了——你顶在这儿，他们就造不出新船！'));
+      if(typeof comms==='function') comms('FLAGSHIP','We\'re on top of their yards — nothing new is coming out!','#ffd060'); }
+    else flashPrompt('⚓ '+T('Pressure off — enemy shipyards are building again.','压力一松，敌方船厂又开工了。'));
+  }
+  return pinned;
 }
 function damageHarbor(h,dmg){
   if(h.hp<=0) return;
@@ -9970,7 +10057,7 @@ function actionPlan(){
   const always = [
     R('Tab','armory (buy things)','军械库（买东西）'),
     R('H','upgrades for your whole fleet','给整支舰队买升级'),
-    R('O','tell your side what to do','指挥友军'), R('Enter','radio the fleet','和舰队喊话'),
+    R('O','order your fleet (hit the enemy HQ / take islands / follow me)','指挥舰队（打敌方总部／占岛／跟着我）'), R('Enter','radio the fleet','和舰队喊话'),
     R('K', 'settings', '设置'), R('L','photo mode','拍照模式'),
     R('M', 'sound on/off', '音效开关'), R('J','music on/off','音乐开关'),
   ];
