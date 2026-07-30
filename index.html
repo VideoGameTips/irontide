@@ -5328,6 +5328,7 @@ function startGame(shipId){
   money=Math.round(8000*(1+careerRank().perk)*DIFF().funds);   // easy mode ships out with a fatter war chest
   const M=applyMap();                 // configure the chosen campaign theater
   musicPlay('ambient');   // subtle background bed for the selected theater
+  clearBattle();          // strike the previous battle before laying out this one
   buildTheater();
   makePlayerShip(shipId);
   applyShipWear(shipId);        // a ship that limped home battered still shows it next mission, until you win one healthy
@@ -6183,6 +6184,33 @@ function destroyShipVisual(s){
   // the white flag hangs off the hull model, so it dies with it — drop the reference or the
   // ship can never fly one again after sailing out of range and back
   if(s){ s.build=null; s.proxy=false; s._whiteFlag=null; }
+}
+// Starting a battle used to build a new world without taking the old one down, so the second
+// sortie still had the first one's fleets sailing, its islands standing and its garrisons being
+// simulated underneath: 89 land units became 225, then 408, and the scene put on ~3,300 meshes
+// every restart until the frame rate gave out. Everything the WORLD owns is released here.
+// (Everything the PLAYER'S SHIP owns — turrets, deck aircraft, crew — is already cleared by
+// makePlayerShip, so it deliberately stays out of this.)
+function clearBattle(){
+  for(const s of enemies) destroyShipVisual(s);
+  for(const s of allies)  destroyShipVisual(s);
+  enemies.length=0; allies.length=0;
+  for(const p of aiPlanes){ destroyObject3D(p.group); destroyObject3D(p.marker); }
+  aiPlanes.length=0;
+  for(const u of landUnits) destroyObject3D(u.group);
+  landUnits.length=0; _radar[0]=0; _radar[1]=0;
+  for(const isl of islands) destroyObject3D(isl.group);
+  islands.length=0; islandNameIndex=0;
+  if(friendlyHarbor) destroyObject3D(friendlyHarbor.group);
+  if(enemyHarbor)    destroyObject3D(enemyHarbor.group);
+  friendlyHarbor=null; enemyHarbor=null;
+  // in-flight ordnance and effects, through their own removers so the FX budget counters
+  // (_liveFireLights, _columnPuffs) come back to zero with them
+  for(let i=shells.length-1;i>=0;i--)  removeShellAt(i);
+  for(let i=fx.length-1;i>=0;i--)      removeFxAt(i);
+  for(let i=salvage.length-1;i>=0;i--) removeSalvageAt(i);
+  for(let i=mines.length-1;i>=0;i--)   removeMineAt(i);
+  deckRolls.length=0;
 }
 function activePlayerWorldPos(){
   const c=activePlayerCombatant();if(c)return c.pos;
@@ -10250,8 +10278,8 @@ function resumeWar(){
   // world state comes from the snapshot, not the generator — no garrison/theater rolls here.
   // Clear first: resuming is normally reached from the menu with an empty field, but resuming
   // while a battle is already up used to ADD the snapshot on top of it, doubling every unit.
-  for(const u of landUnits){ if(u.group) destroyObject3D(u.group); }
-  landUnits.length=0; _radar[0]=0; _radar[1]=0;
+  // This used to clear the garrisons only, which left the old islands, harbors and fleets behind.
+  clearBattle();
   friendlyHarbor=buildHarbor(0,new THREE.Vector3(s.fh.x,0,s.fh.z));
   enemyHarbor  =buildHarbor(1,new THREE.Vector3(s.eh.x,0,s.eh.z));
   Object.assign(friendlyHarbor.up,s.fh.up||{}); friendlyHarbor.hp=s.fh.hp; friendlyHarbor.maxhp=s.fh.maxhp;
