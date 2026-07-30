@@ -6180,7 +6180,9 @@ function loadShipModel(s){
 }
 function destroyShipVisual(s){
   if(s&&s.build) destroyObject3D(s.build.group);
-  if(s){ s.build=null; s.proxy=false; }
+  // the white flag hangs off the hull model, so it dies with it — drop the reference or the
+  // ship can never fly one again after sailing out of range and back
+  if(s){ s.build=null; s.proxy=false; s._whiteFlag=null; }
 }
 function activePlayerWorldPos(){
   const c=activePlayerCombatant();if(c)return c.pos;
@@ -6985,10 +6987,46 @@ function updateAITaxi(pa, dt){
     flashPrompt(T('🤖 Airborne — she fights for you','🤖 已升空——她为你而战'),'ok');
   }
 }
+// ===== STRIKING THE COLOURS =========================================================
+// A crippled enemy has always been boardable below 28% hull, but the only sign was a line of
+// text you had to be standing next to her to see. Now she runs up a white flag you can read
+// from across the water: keep shooting until it appears, then go and take her.
+const SURRENDER_FRAC=0.28;
+function hasStruckColours(s){ return !!(s && s.team===1 && (s.sinkT||0)===0 && s.hp>0 && s.hp<=s.maxhp*SURRENDER_FRAC); }
+function updateSurrenderFlags(){
+  enemies.forEach(e=>{
+    if(!e.build||!e.build.group) return;
+    const want=hasStruckColours(e);
+    if(e._whiteFlag && e._whiteFlag.parent!==e.build.group) e._whiteFlag=null;   // model was rebuilt under us
+    if(want && !e._whiteFlag){
+      const g=new THREE.Group();
+      const mast=mkCyl(0.16,0.16,7,SILVER(0xd8d8d8),6); mast.position.y=3.5; g.add(mast);
+      const cloth=mkBox(0.12,2.4,4.2,new THREE.MeshStandardMaterial({color:0xffffff,emissive:0xdddddd,emissiveIntensity:0.55,roughness:0.85}));
+      cloth.position.set(0,5.9,2.2); g.add(cloth);
+      g.position.set(0,(e.def.deckY||4)+2,-(e.build.halfLen||10)*0.15);
+      g.scale.setScalar(Math.max(1,(e.def.beam||10)/14));
+      e.build.group.add(g); e._whiteFlag=g;
+      if(typeof comms==='function') comms(e.callsign||'ENEMY','We strike our colours! Hold your fire!','#e8e8e8');
+      flashPrompt(T('🏳 '+e.def.name.toUpperCase()+' HAS STRUCK HER COLOURS — board her before she sinks',
+                    '🏳 '+trName(e.def.name)+' 升起白旗投降了——趁它没沉过去接收'),'ok');
+    } else if(!want && e._whiteFlag){ destroyObject3D(e._whiteFlag); e._whiteFlag=null; }
+    if(e._whiteFlag) e._whiteFlag.rotation.y=Math.sin(t2*1.7+e.pos.x*0.1)*0.25;   // luffing in the wind
+  });
+}
+// A friendly hull within reach while you are on foot — swimming out to one and climbing aboard
+// is how you change ships now, no harbour trip required.
+function boardableFriendlyShip(){
+  if(!onFoot||!player) return null;
+  let best=null,bd=1e9;
+  allies.forEach(a=>{ if((a.sinkT||0)>0||a.hp<=0||!a.build) return;
+    const d=footPos.distanceTo(a.pos), reach=(a.def.halfLen||a.def.len*0.5);
+    if(d<reach+16&&d<bd){ bd=d; best=a; } });
+  return best;
+}
 function boardableEnemyShip(){
   if(!onFoot||!player||!player.def)return null;
   let best=null,bd=1e9;
-  enemies.forEach(e=>{if(e.sinkT>0||e.hp>e.maxhp*.28)return;const d=footPos.distanceTo(e.pos),reach=e.def.halfLen||e.def.len*.5;
+  enemies.forEach(e=>{if(!hasStruckColours(e))return;const d=footPos.distanceTo(e.pos),reach=e.def.halfLen||e.def.len*.5;
     if(d<reach+14&&d<bd){bd=d;best=e;}});
   return best;
 }
@@ -7013,6 +7051,78 @@ function updateBoardingAction(dt){
   }
   if(onFoot && footHP>0 && b.t>=b.dur){ boarding=null; captureEnemyShip(b.target); }
 }
+// ===== TAKING COMMAND ===============================================================
+// Step aboard any friendly hull and she is yours. Your old ship does not vanish — she keeps her
+// model, her damage and her position and simply passes to the AI, exactly the way bailing out
+// already hands her over. This is a swap, not a respawn.
+// Where else can this aircraft put down? Any friendly deck, any enemy that has struck her
+// colours, and any airstrip or helipad on an island you hold. Landing on your OWN ship keeps the
+// full approach-and-rollout; these are set-downs — you arrive, you get out, and the hull or the
+// island is yours to use.
+function foreignLandingSite(){
+  if(!piloting||!piloting.pos) return null;
+  const p=piloting.pos; let best=null,bd=1e9;
+  const consider=(ref,kind,reach,y)=>{ if(!ref||!ref.pos) return;
+    const d=Math.hypot(ref.pos.x-p.x, ref.pos.z-p.z);
+    if(d<reach && d<bd){ bd=d; best={ref,kind,y}; } };
+  allies.forEach(a=>{ if((a.sinkT||0)===0&&a.hp>0&&a.build) consider(a,'ally',(a.def.beam||10)/2+22,(a.def.deckY||4)+1.2); });
+  enemies.forEach(e=>{ if(hasStruckColours(e)&&e.build) consider(e,'prize',(e.def.beam||10)/2+22,(e.def.deckY||4)+1.2); });
+  islands.forEach(i=>{ if(i.owner!==0) return;
+    ['airstrip','helipad'].forEach(k=>islandStructures(i,0,k).forEach(st=>{ if(!st.dead) consider(st,'shore',30,(st.pos.y||2)+0.4); })); });
+  return best;
+}
+function setDownAt(site){
+  const P=piloting, pa=P&&P.plane; if(!site||!P||!pa) return false;
+  if(P.pos.y > site.y+95){ flashPrompt(T('Too high — come down closer before you set her down','太高了——再降低一点再落'),'bad'); return false; }
+  // the airframe stays where it lands; you climb out of it
+  const i=planes.indexOf(pa); if(i>=0) planes.splice(i,1);
+  if(pa.spot) pa.spot.taken=false;
+  destroyObject3D(pa.group); pa.group=null; pa.removed=true;
+  piloting=null; fpv=false; mouseDownFire=false; camPitch.v=0.04;
+  if(site.kind==='shore'){
+    onFoot=true; driving=false; manning=null;
+    footPos.set(site.ref.pos.x, (site.ref.pos.y||2)+EYE, site.ref.pos.z+6);
+    footLand=site.ref.island||footLand;
+    resetFootHealth(); updateMode();
+    flashPrompt(T('🛬 Down on the airstrip — you are on foot','🛬 降落在跑道上——你现在是徒步状态'),'ok');
+    return true;
+  }
+  if(site.kind==='prize'){ captureEnemyShip(site.ref); const a=allies[allies.length-1]; if(a) takeCommandOf(a); return true; }
+  return takeCommandOf(site.ref);
+}
+function takeCommandOf(a){
+  if(!a||!a.build||!a.build.group||allies.indexOf(a)<0) return false;
+  const old=player;
+  // hand the old hull to the fleet, unless it is already gone
+  if(old && old.build && old.build.group && !playerShipLost && !old._convertedToAlly && old.hp>0){
+    const keep={build:old.build,hp:old.hp,maxhp:old.maxhp,def:old.def,pos:old.pos.clone(),team:0,
+      heading:old.heading,vel:new THREE.Vector3(),fireT:1.5,sinkT:0,turnT:0,
+      standoff:old.def.boss?300:170,orbitDir:Math.random()<.5?1:-1,
+      loadout:[AI_WEAPS[2],AI_WEAPS[5]],upgT:12,planeT:15,
+      callsign:'CAPTAIN-'+(_callsignN+1),role:'attack',_sos:0,commsT:10};
+    const mk=teamMarker(0,old.def.boss?24:13);
+    mk.position.set(0,old.def.deckY+(old.def.boss?22:13),0); keep.build.group.add(mk);
+    allies.push(keep); old._convertedToAlly=true;
+  }
+  // ...and step onto the new one. Strip her ally-only furniture: the chevron marker belongs to
+  // ships you are looking AT, not the one you are standing on.
+  const idx=allies.indexOf(a); if(idx>=0) allies.splice(idx,1);
+  const marks=[]; a.build.group.traverse(o=>{ if(o.isSprite&&o.renderOrder===999) marks.push(o); });
+  marks.forEach(m=>destroyObject3D(m));
+  if(a._whiteFlag){ destroyObject3D(a._whiteFlag); a._whiteFlag=null; }
+  player=a; player.shipId=player.shipId||null; player.throttle=0; player.speed=0;
+  player.crit=player.crit||critOf(player);
+  playerShipLost=false; player._convertedToAlly=false;
+  placed.length=0; planes.length=0; planeSpots.length=0; playerTanks.length=0; tankSpots.length=0; crew.length=0;
+  deckPlan=null;
+  manning=null; piloting=null; drivingTank=null; boarding=null;
+  onFoot=false; driving=false; footLand=null;
+  walkPos.set(0, deckEyeY(), (player.build.halfLen||20)*0.4);
+  camPitch.v=0.04; mouseDownFire=false;
+  updateHUD(); refreshShop(); updateMode(); sfxClick();
+  flashPrompt(T('⚓ You now command the '+a.def.name.toUpperCase(),'⚓ 你现在指挥这条 '+trName(a.def.name)),'ok');
+  return true;
+}
 function captureEnemyShip(e){
   if(!e)return false;
   // Replace the red contact marker without rebuilding the hull: the seized ship is
@@ -7034,10 +7144,15 @@ function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot 
 function toggleMan(){
   if(phase!=='play'||panelOpen()) return;   // no state changes while a panel has the screen
   if(drivingTank){ dismountTank(); return; }
-  if(onFoot){ const prize=boardableEnemyShip();if(prize){startBoarding(prize);return;} const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
+  if(onFoot){ const prize=boardableEnemyShip();if(prize){startBoarding(prize);return;}
+    const friend=boardableFriendlyShip(); if(friend){ takeCommandOf(friend); return; }
+    const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
     flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
   if(piloting){ if(piloting.plane.def.uav){returnFromUAV(false,'UAV recovered');return;} if(playerShipLost&&piloting.phase==='fly'){ flashPrompt('No deck left to land on — press P to parachute, then reach harbor.'); return; }
-    if(piloting.phase==='fly') startLanding(); else if(piloting.phase==='landing'){ piloting.phase='fly'; flashPrompt('Landing aborted — climb away.'); updateMode(); } return; }
+    if(piloting.phase==='fly'){ const site=foreignLandingSite();
+      if(site && setDownAt(site)) return;                 // another deck, or an airstrip ashore
+      startLanding(); }
+    else if(piloting.phase==='landing'){ piloting.phase='fly'; flashPrompt('Landing aborted — climb away.'); updateMode(); } return; }
   if(driving){ stopDrive(); return; }
   if(manning){ manning=null; updateMode(); return; }
   if(nearestHelm()){ startDrive(); return; }
@@ -8285,6 +8400,7 @@ function update(dt,t){
   updateSupportShips(dt);
   updateFogOfWar(dt);
   tickActions(dt);                                         // keep the what-can-I-do list honest
+  updateSurrenderFlags();                                  // white flags on hulls that have given up
   updateProxyPointCloud();
   // --- land units + harbors ---
   landUnits.forEach(u=>updateLandUnit(u,dt));
