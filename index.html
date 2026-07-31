@@ -612,6 +612,14 @@ const SHIPS = {
                 desc:'Flagship of the Beiyang Fleet and the most powerful ironclad in Asia in her day. She soaked hundreds of hits at the Yalu and kept fighting — an armored brick of a hull built to outlast anything thrown at her.' },
   liaoning:   { name:'Liaoning', cls:'Legendary Carrier', len:122, beam:21, depth:5.4, deckY:5.0, hp:720, kind:'carrier', mounts:8,
                 desc:"China's first aircraft carrier — a rebuilt Soviet hull that put Chinese naval air power on the map. The longest flight deck in the fleet." },
+  pt109:      { name:'PT-109 Torpedo Boat', cls:'Market Motor Torpedo Boat', len:24, beam:5.4, depth:2.4, deckY:2.0, hp:110, kind:'surface', mounts:3, marketOnly:true,
+                desc:'Marketplace ship. Plywood, two engines and a lot of nerve — the fastest thing in the market and the easiest to sink.' },
+  visby:      { name:'HSwMS Visby', cls:'Market Stealth Corvette', len:44, beam:7.4, depth:3.2, deckY:2.8, hp:260, kind:'surface', mounts:6, marketOnly:true,
+                desc:'Marketplace ship. Faceted carbon-fibre corvette — small, quick, and hard to pick out until it is already shooting.' },
+  typhoon:    { name:'Typhoon-class', cls:'Market Ballistic Submarine', len:90, beam:14, depth:6.4, deckY:2.4, hp:620, kind:'sub', mounts:6, marketOnly:true,
+                desc:'Marketplace ship. The largest submarine ever built: enormous, slow, and it can take a beating no other boat survives. C to dive.' },
+  qelizabeth: { name:'HMS Queen Elizabeth', cls:'Market Modern Carrier', len:130, beam:22, depth:6.0, deckY:5.2, hp:900, kind:'carrier', mounts:9, marketOnly:true,
+                desc:'Marketplace ship. Twin-island supercarrier with a ski-jump bow — the roomiest flight deck on the water.' },
   burke:      { name:'USS Arleigh Burke', cls:'Market Guided-Missile Destroyer', len:64, beam:9.8, depth:4.3, deckY:3.3, hp:520, kind:'surface', mounts:10, marketOnly:true,
                 desc:'Marketplace ship. The workhorse missile destroyer: quick, tough for its size, and studded with mounts.' },
   grafzeppelin:{name:'Graf Zeppelin', cls:'Market Fleet Carrier', len:118, beam:20, depth:5.8, deckY:5.0, hp:820, kind:'carrier', mounts:8, marketOnly:true,
@@ -677,6 +685,8 @@ const WEAPONS = {
   sixteen: { name:'16" Mk 7 Battery',cost:1900,dmg:135,cd:3.4,  spd:92,  kind:'cannon', col:0xccd0d6, size:2.0, barrels:3, splash:13, lob:13 }, // capital main battery
   quadtorp:{ name:'Quint Torpedo',   cost:1300,dmg:105,cd:3.0,  spd:58,  kind:'torpedo', col:0x9aa2aa, size:1.3, splash:8 },
   // ---- marketplace mounts ----
+  mortar:  { name:'Deck Mortar',     cost:620, dmg:52, cd:1.9,  spd:78,  kind:'cannon', col:0x8d9298, size:0.9, splash:11, lob:20, marketOnly:true },   // cheap, steep, lands behind cover
+  beamcannon:{name:'Mk 12 Beam Cannon',cost:2900,dmg:22,cd:0.16, spd:400, kind:'gun',   col:0x7fe8ff, size:1.4, marketOnly:true },                       // continuous energy beam, no lead needed
   flak88:  { name:'88mm Flak 36',    cost:1150,dmg:44, cd:1.05, spd:190, kind:'gun',    col:0xb7bcc4, size:1.1, aa:true, marketOnly:true },   // the famous dual-purpose gun: aircraft AND ships
   harpoon: { name:'Harpoon SSM',     cost:2400,dmg:120,cd:3.2,  spd:150, kind:'missile',col:0xd0d4da, size:1.2, splash:9, homing:true, range:620, marketOnly:true },  // stand-off anti-ship missile
 
@@ -721,6 +731,14 @@ const PLANES = {
            guns:{dmg:8,spd:200,cd:0.05,kind:'gun',col:0xffd040}, bomb:{dmg:42,splash:5,kind:'missile',homing:true,spd:135,col:0x3a4036,range:240}, bombs:10, desc:'Attack helo — hover, chain gun + homing rockets.' },
   cobra: { name:'AH-1 Cobra',   cost:1300, hp:80,  speed:0, maxSpeed:74, turn:2.7, climb:22, col:0x44503a, shape:'heli', heli:true,
            guns:{dmg:6,spd:195,cd:0.045,kind:'gun',col:0xffd040}, bomb:{dmg:32,splash:5,kind:'bomb',col:0x4a4e3a}, bombs:7, desc:'Light fast gunship. Nimble in the hover.' },
+  sr71:{ name:'SR-71 Blackbird', cost:2800, hp:70, speed:150, maxSpeed:260, turn:0.85, col:0x2b2e33, shape:'heavyjet', jet:true, scale:1.5, engineCount:2, fuel:260, uav:true, reconMul:5.2, marketOnly:true,
+          desc:'Marketplace blueprint. Unarmed, and faster than anything that will ever be sent after it. Flies the whole theatre and shows you all of it.' },
+  phantom:{ name:'F-4 Phantom II', cost:1950, hp:110, speed:80, maxSpeed:146, turn:1.85, col:0x5a6470, shape:'jet', jet:true, aimAssist:.6, marketOnly:true,
+          guns:{dmg:10,spd:225,cd:0.06,kind:'gun',col:0xffe070}, bomb:{dmg:70,splash:9,kind:'bomb',col:0x50596a}, bombs:10,
+          desc:'Marketplace blueprint. Heavy, loud and built to carry everything at once — turns like a brick, hits like a truck.' },
+  mosquito:{ name:'DH.98 Mosquito', cost:1250, hp:88, speed:64, maxSpeed:118, turn:2.1, col:0x6b6f5e, shape:'prop', scale:1.1, engineCount:2, marketOnly:true,
+          guns:{dmg:9,spd:200,cd:0.06,kind:'gun',col:0xffd040}, bomb:{dmg:58,splash:8,kind:'bomb',col:0x5f6354}, bombs:8,
+          desc:'Marketplace blueprint. A bomber made of wood that outruns the fighters chasing it. Cheap, fast, and carries a real load.' },
   mig29:{ name:'MiG-29 Fulcrum', cost:1750, hp:82, speed:78, maxSpeed:150, turn:2.7, col:0x7d8794, shape:'jet', jet:true, aimAssist:.6, marketOnly:true,
           guns:{dmg:8,spd:235,cd:0.05,kind:'gun',col:0xffe070}, bomb:{dmg:50,splash:6,kind:'missile',homing:true,spd:148,col:0x6f7884,range:280}, bombs:6,
           desc:'Marketplace blueprint. Small, vicious dogfighter — the tightest turn of any jet on the deck.' },
@@ -876,6 +894,7 @@ const HANDHELD = {
   shotgun: { name:'Combat Shotgun', cost:600,  dmg:9,  cd:0.7,  spd:165, spread:0.13, pellets:8, gfx:'shotgun', col:0xffd040, desc:'8-pellet spread — devastating up close.' },
   sniper:  { name:'Sniper Rifle',   cost:950,  dmg:95, cd:1.3,  spd:320, spread:0.0,  gfx:'sniper',  col:0xfff0a0, desc:'One-shot precision at long range.' },
   lmg:     { name:'M249 LMG',       cost:1100, dmg:14, cd:0.06, spd:200, spread:0.07, gfx:'lmg',     col:0xffd040, desc:'Belt-fed suppressive fire.' },
+  m79:     { name:'M79 Grenade Launcher',cost:900,dmg:70,cd:1.5, spd:95, splash:7, gfx:'rpg', col:0xffc060, marketOnly:true, desc:'Marketplace blueprint. Lob a grenade over the wall instead of walking around it.' },
   at4:     { name:'AT4 Launcher',   cost:1250, dmg:150,cd:2.4,  spd:150, splash:5, gfx:'rpg', col:0xff9040, marketOnly:true, desc:'Marketplace blueprint. Disposable rocket — made for armour, and it does not care what the armour is bolted to.' },
   autoshot:{ name:'AA-12 Auto Shotgun',cost:1150,dmg:13,cd:0.18, spd:150, spread:0.11, gfx:'shotgun', col:0xffa060, marketOnly:true, desc:'Marketplace blueprint. Fully automatic shotgun. Nothing gets close to you twice.' },
   barrett: { name:'M82 Barrett',    cost:1400, dmg:120,cd:1.55, spd:265, gfx:'sniper',  col:0xffe8a0, marketOnly:true, desc:'Marketplace blueprint. Anti-materiel rifle — one shot, and it goes through what it hits.' },
@@ -2349,6 +2368,12 @@ const TANKS = {
              desc:'Marketplace blueprint. Heavy survivability-focused MBT with thick frontal armor and steady fire.' },
   maus:    { name:'Panzer VIII Maus',  cost:2400, hp:760, dmg:92, fireRate:2.4,  speed:8,  turn:.62, range:235, col:0x5f5c50, hullW:3.8, hullL:6.1, hullH:1.55,turW:3.2, turL:3.4, barL:4.6, barR:0.24, marketOnly:true,
              desc:'Marketplace blueprint. Ridiculous super-heavy tank: huge armor and gun, painfully slow.' },
+  jagdpanther:{name:'Jagdpanther',   cost:1300, hp:330, dmg:72, fireRate:1.7,  speed:18, turn:1.1, range:215, col:0x5a6147, hullW:2.9, hullL:4.9, hullH:0.9, turW:1.2, turL:1.3, barL:4.4, barR:0.19, sloped:true, marketOnly:true,
+             desc:'Marketplace blueprint. Turretless tank destroyer with the longest gun ashore — point the hull, and almost nothing survives the hit.' },
+  amx13:   {name:'AMX-13',           cost:980,  hp:175, dmg:38, fireRate:.55, speed:33, turn:2.2, range:180, col:0x505b40, hullW:2.5, hullL:4.0, hullH:0.85,turW:2.1, turL:2.3, barL:3.4, barR:0.15, marketOnly:true,
+             desc:'Marketplace blueprint. Autoloader light tank — fires a burst faster than anything else, then needs a long moment to reload.' },
+  pzh2000: {name:'PzH 2000',         cost:1650, hp:250, dmg:105,fireRate:3.1,  speed:20, turn:1.2, range:280, col:0x565f4a, hullW:3.0, hullL:5.0, hullH:1.0, turW:2.7, turL:2.9, barL:5.2, barR:0.2, marketOnly:true,
+             desc:'Marketplace blueprint. Modern self-propelled howitzer — outranges every gun on the island and drops shells on things it cannot see.' },
   leclerc: {name:'Leclerc',           cost:1350, hp:315, dmg:56, fireRate:1.05, speed:27, turn:1.7, range:195, col:0x59634a, hullW:2.85,hullL:4.6, hullH:0.98,turW:2.4, turL:2.5, barL:3.7, barR:0.17, sloped:true, marketOnly:true,
              desc:'Marketplace blueprint. Autoloader main battle tank — nearly as fast as a scout car and hits like a heavy.' },
   bmpt:    {name:'BMP-T Terminator',  cost:1200, hp:290, dmg:15, fireRate:.22, speed:24, turn:1.9, range:170, col:0x4d5643, hullW:2.9, hullL:4.5, hullH:1.0, turW:2.1, turL:2.0, barL:2.6, barR:0.11, marketOnly:true,
@@ -2490,13 +2515,13 @@ function buildLand(kind,team,pos,type){
     const elev=new THREE.Group(); elev.position.y=0.6; tur.add(elev); elev.rotation.x=-0.5;
     for(const sx of [-0.25,0.25]){ const br=mkCyl(0.08,0.1,2.6,SILVER(0x9aa0a8)); br.rotation.x=Math.PI/2; br.position.set(sx,0,1.2); elev.add(br); }
     range=kind==='flaktower'?520:270; dmg=kind==='flaktower'?15:8; hp=kind==='flaktower'?620:180; fireRate=kind==='flaktower'?0.38:0.5; g.userData.barrelLen=2.6; g.userData.aa=true;
-  } else if(kind==='artillery'){ // long-range shore artillery — arcs heavy shells at ships
+  } else if(kind==='artillery'||kind==='longtom'){ // long-range shore artillery — arcs heavy shells at ships
     const conc=new THREE.MeshStandardMaterial({color:0x7a7e72,roughness:0.95});
     const base=mkBox(5,2.4,5,conc); base.position.y=1.2; g.add(base);
     const tur=new THREE.Group(); tur.position.y=2.7; g.add(tur); g.userData.turret=tur;
     const house=mkBox(2.6,1.6,3.0,SILVER(0x9aa0a8)); tur.add(house);
     const barrel=mkCyl(0.22,0.26,5.0,SILVER(0x9aa0a8)); barrel.rotation.x=Math.PI/2.4; barrel.position.set(0,0.4,2.2); tur.add(barrel);
-    range=340; dmg=55; hp=340; fireRate=3.0; g.userData.barrelLen=5.0; g.userData.artillery=true;
+    range=kind==='longtom'?1400:340; dmg=kind==='longtom'?90:55; hp=kind==='longtom'?520:340; fireRate=kind==='longtom'?4.2:3.0; g.userData.barrelLen=5.0; g.userData.artillery=true;
   } else if(kind==='nukesilo'){ // Soviet R-36M / SS-18 strategic missile complex
     const conc=new THREE.MeshStandardMaterial({color:0x666b62,roughness:.96}),steel=SILVER(0x3b4448),olive=SILVER(0x596246);
     const base=mkBox(18,2.4,18,conc);base.position.y=1.2;g.add(base);
@@ -2551,7 +2576,7 @@ function buildLand(kind,team,pos,type){
     const glow=new THREE.Mesh(new THREE.SphereGeometry(.65,10,8),new THREE.MeshBasicMaterial({color:0xfff1bc,transparent:true,opacity:.9}));
     glow.position.z=1;head.add(glow);g.userData.light=glow;
     range=850;hp=300;fireRate=99;g.userData.searchlight=true;
-  } else if(kind==='supergun'||kind==='railgun'||kind==='fortress'||kind==='rocket'||kind==='bunker'){
+  } else if(kind==='supergun'||kind==='railgun'||kind==='fortress'||kind==='rocket'||kind==='bunker'||kind==='redoubt'){
     const conc=new THREE.MeshStandardMaterial({color:0x73786e,roughness:.95}),steel=SILVER(0x59616a);
     const big=kind==='supergun'||kind==='railgun',fort=kind==='fortress';
     const base=mkBox(big?18:fort?13:10,big?4:3,big?30:fort?13:10,conc);base.position.y=(big?2:1.5);g.add(base);
@@ -2567,8 +2592,8 @@ function buildLand(kind,team,pos,type){
       const barrels=fort?3:1;
       for(let i=0;i<barrels;i++){const b=mkCyl(big?.65:.42,big?.85:.52,big?24:13,SILVER(0x737c86),14);b.rotation.x=Math.PI/2.18;b.position.set((i-(barrels-1)/2)*1.8,1,big?10:7);tur.add(b);}
     }
-    range=big?6500:fort?1800:kind==='rocket'?2400:220;dmg=kind==='railgun'?310:big?260:fort?105:kind==='rocket'?70:13;
-    hp=big?2400:fort?1700:kind==='rocket'?850:1500;fireRate=kind==='railgun'?26:big?32:fort?9:kind==='rocket'?18:.45;
+    range=big?6500:fort?1800:kind==='rocket'?2400:kind==='redoubt'?420:220;dmg=kind==='railgun'?310:big?260:fort?105:kind==='rocket'?70:kind==='redoubt'?34:13;
+    hp=big?2400:fort?1700:kind==='rocket'?850:kind==='redoubt'?3200:1500;fireRate=kind==='railgun'?26:big?32:fort?9:kind==='rocket'?18:kind==='redoubt'?1.2:.45;
     g.userData.barrelLen=big?24:fort?13:6;g.userData.supergun=big;g.userData.fortress=fort;g.userData.rocket=kind==='rocket';g.userData.bunker=kind==='bunker';
   } else if(['command','barracks','tankdepot','hospital','ammo','workshop','airstrip','helipad','dock','fuel','power','bridge'].includes(kind)){
     const conc=new THREE.MeshStandardMaterial({color:0x777b70,roughness:.95}),roof=SILVER(team===0?0x416486:0x794545),dark=SILVER(0x343b3f);
@@ -3368,6 +3393,10 @@ const MARKET_LEVELS={
   'weapon:missile':9,'weapon:m777':11,'weapon:eightin':13,'weapon:ciws':14,'weapon:sam':15,'weapon:patriot':17,
   'weapon:tomahawk':20,'weapon:sixteen':22,
   'weapon:katyusha':9,'weapon:railmount':19,'gun:barrett':7,'gun:minigun':12,
+  'ship:pt109':5,'ship:visby':11,'ship:typhoon':21,'ship:qelizabeth':23,
+  'plane:mosquito':7,'plane:phantom':12,'plane:sr71':16,
+  'tank:amx13':7,'tank:jagdpanther':12,'tank:pzh2000':15,
+  'weapon:mortar':5,'weapon:beamcannon':20,'gun:m79':7,'struct:redoubt':12,'struct:longtom':16,
   'ship:burke':15,'ship:grafzeppelin':19,'ship:seawolf':16,'plane:mig29':10,'plane:blackhawk':8,'plane:spectre':17,
   'tank:scorpion':6,'tank:bmpt':11,'tank:leclerc':14,'weapon:flak88':8,'weapon:harpoon':18,
   'gun:autoshot':6,'gun:at4':9,'struct:flaktower':10,'struct:bastion':13,
@@ -3474,6 +3503,21 @@ const MARKET_CATALOG=[
   {cat:'tank',id:'bmp2',cost:1900,level:5,tag:'IFV',desc:'BMP-2 — fast light armored vehicle with rapid autocannon fire.'},
   {cat:'tank',id:'merkava',cost:3800,level:12,tag:'TANK',desc:'Merkava IV — slow heavy MBT with excellent survivability.'},
   {cat:'tank',id:'maus',cost:6400,level:16,tag:'SUPER-HEAVY',desc:'Panzer VIII Maus — absurd armor, huge gun, terrible speed.'},
+  {cat:'ship',id:'pt109',cost:2400,level:5,tag:'FAST ATTACK',desc:'PT-109 — plywood, two engines and a lot of nerve. The fastest hull in the market, and the flimsiest.'},
+  {cat:'ship',id:'visby',cost:6200,level:11,tag:'SHIP',desc:'HSwMS Visby — faceted stealth corvette: small, quick, hard to see until it is already shooting.'},
+  {cat:'ship',id:'typhoon',cost:15000,level:21,tag:'SUBMARINE',desc:'Typhoon-class — the largest submarine ever built. Slow, enormous, and it survives what sinks other boats.'},
+  {cat:'ship',id:'qelizabeth',cost:17000,level:23,tag:'SHIP',desc:'HMS Queen Elizabeth — twin-island supercarrier with a ski-jump bow and the roomiest deck afloat.'},
+  {cat:'plane',id:'mosquito',cost:2600,level:7,tag:'BOMBER',desc:'DH.98 Mosquito — a wooden bomber that outruns the fighters chasing it. Cheap, fast, real payload.'},
+  {cat:'plane',id:'phantom',cost:4800,level:12,tag:'JET',desc:'F-4 Phantom II — heavy and loud, carries everything at once. Turns like a brick, hits like a truck.'},
+  {cat:'plane',id:'sr71',cost:7000,level:16,tag:'RECON',desc:'SR-71 Blackbird — unarmed and faster than anything sent after it. Flies the theatre and shows you all of it.'},
+  {cat:'tank',id:'amx13',cost:2200,level:7,tag:'LIGHT TANK',desc:'AMX-13 — autoloader light tank: fires a burst faster than anything, then reloads for a long moment.'},
+  {cat:'tank',id:'jagdpanther',cost:3400,level:12,tag:'TANK DESTROYER',desc:'Jagdpanther — turretless, with the longest gun ashore. Point the hull; little survives the hit.'},
+  {cat:'tank',id:'pzh2000',cost:4600,level:15,tag:'ARTILLERY',desc:'PzH 2000 — self-propelled howitzer that outranges every gun on the island and shells what it cannot see.'},
+  {cat:'weapon',id:'mortar',cost:1400,level:5,tag:'DECK GUN',desc:'Deck Mortar — cheap and very steep. Drops shells behind cover a flat gun cannot touch.'},
+  {cat:'weapon',id:'beamcannon',cost:7500,level:20,tag:'DECK GUN',desc:'Mk 12 Beam Cannon — a continuous energy beam at 400 m/s. No leading, no arc, just point it.'},
+  {cat:'gun',id:'m79',cost:1700,level:7,tag:'SIDEARM',desc:'M79 Grenade Launcher — lob a grenade over the wall instead of walking around it.'},
+  {cat:'struct',id:'redoubt',cost:4200,level:12,tag:'BUILD',desc:'Armoured Redoubt — hardened strongpoint. Enormously tough, and it shoots anything that lands.'},
+  {cat:'struct',id:'longtom',cost:5200,level:16,tag:'BUILD',desc:'Long Tom Battery — extreme-range shore artillery reaching most of the way across a theater.'},
   {cat:'ship',id:'burke',cost:9800,level:15,tag:'SHIP',desc:'USS Arleigh Burke — the workhorse missile destroyer: quick, tough, and studded with mounts.'},
   {cat:'ship',id:'grafzeppelin',cost:13500,level:19,tag:'SHIP',desc:'Graf Zeppelin — the carrier that was never finished: a full flight deck with guns still on the beam.'},
   {cat:'ship',id:'seawolf',cost:11000,level:16,tag:'SUBMARINE',desc:'USS Seawolf — the only submarine in the market. Dives deeper, hits far harder than the standard boat.'},
@@ -4085,6 +4129,8 @@ const STRUCTS = {
   fortress:  {name:'Naval Fortress Turret',cost:2400,footprint:34,scale:2.05,power:true,desc:'Battleship turret embedded in concrete'},
   supergun:  {name:'Super-Heavy Railway Gun',cost:4200,footprint:48,scale:1.85,power:true,desc:'Map-spanning gun; limited shells, 32-second reload and warning'},
   railgun:   {name:'Experimental Railgun',cost:5200,footprint:44,scale:1.8,power:true,marketOnly:true,desc:'Marketplace blueprint. Supergun-class direct-energy artillery with tiny ammunition reserve'},
+  longtom:   {name:'Long Tom Battery',cost:1700,footprint:32,scale:1.8,marketOnly:true,desc:'Marketplace blueprint. Extreme-range shore artillery — reaches most of the way across a theater'},
+  redoubt:   {name:'Armoured Redoubt',cost:1500,footprint:28,scale:1.8,marketOnly:true,desc:'Marketplace blueprint. Hardened strongpoint — enormously tough, and it shoots back at anything that lands'},
   flaktower: {name:'Flak Tower',cost:1400,footprint:24,scale:1.7,marketOnly:true,desc:'Marketplace blueprint. Concrete anti-air tower — reaches twice as far as a flak pit and takes far more killing'},
   bastion:   {name:'Bastion Gun',cost:1900,footprint:30,scale:1.75,marketOnly:true,desc:'Marketplace blueprint. Armoured coastal battery — heavier shells and a longer reach than a standard shore gun'},
   vls:       {name:'Aegis VLS Battery',cost:2600,footprint:30,scale:1.75,power:true,marketOnly:true,desc:'Marketplace blueprint. Boxy missile-cell battery; stronger island air and ship defense'},
@@ -11051,6 +11097,10 @@ const SHIPS_ZH = {
   battlecruiser: { name:'战列巡洋舰', cls:'快速主力舰', desc:'把战列舰的巨炮装在又瘦又快的船体上——火力赶得上主力舰,但装甲带很薄。打不过的就跑给它看。' },
   monitor: { name:'近岸浅水重炮舰', cls:'炮台舰', desc:'又矮又平、几乎不会动——但装甲厚得像碉堡,还扛着几门超大口径的炮。一座专打岸轰的浮动堡垒。' },
   akagi: { name:'赤城号', cls:'舰队航母', desc:'偷袭珍珠港的机动部队旗舰,传奇航母。三层飞行甲板和庞大的舰载机队——远程打击毁天灭地,但装甲薄,记得让僚舰护好她。' },
+  pt109: { name:'PT-109 鱼雷艇', cls:'集市鱼雷快艇', desc:'集市舰船。胶合板、两台发动机和一股狠劲——最快也最脆。' },
+  visby: { name:'维斯比级', cls:'集市隐身护卫舰', desc:'集市舰船。棱角分明的碳纤维护卫舰：小、快、难被发现。' },
+  typhoon: { name:'台风级', cls:'集市弹道导弹潜艇', desc:'集市舰船。史上最大的潜艇：又慢又巨大，但特别能扛。按 C 下潜。' },
+  qelizabeth: { name:'伊丽莎白女王号', cls:'集市现代航母', desc:'集市舰船。双舰岛超级航母，滑跃甲板，飞行甲板最宽敞。' },
   burke: { name:'伯克级', cls:'集市导弹驱逐舰', desc:'集市舰船。最能干的导弹驱逐舰：快、结实、炮位多。' },
   grafzeppelin: { name:'齐柏林伯爵号', cls:'集市舰队航母', desc:'集市舰船。永远没造完的那条航母——整条飞行甲板，舷侧还留着真炮。' },
   seawolf: { name:'海狼号', cls:'集市攻击潜艇', desc:'集市舰船。集市里唯一的潜艇：下潜更深，打得更狠。按 C 下潜。' },
@@ -11088,6 +11138,8 @@ const FLEET_TENDER_ZH = { name:'舰队补给舰', cls:'支援舰', desc:'' };
 
 // ---------- 甲板武器（desc 留空，数据行由代码生成） ----------
 const WEAPONS_ZH = {
+  mortar:  { name:'甲板迫击炮', desc:'便宜、弹道陡，能扔到掩体后面。' },
+  beamcannon:{ name:'Mk 12 光束炮', desc:'连续能量束，不用提前量。' },
   flak88:  { name:'88 毫米 Flak 36', desc:'有名的两用炮：打飞机，也打船。' },
   harpoon: { name:'鱼叉反舰导弹', desc:'射程远超甲板上任何一门炮。' },
   katyusha:{ name:'BM-13 火箭炮架', desc:'六联齐射：不讲瞄准，讲把那一片全覆盖。' },
@@ -11117,6 +11169,9 @@ const WEAPONS_ZH = {
 
 // ---------- 飞机 ----------
 const PLANES_ZH = {
+  sr71: { name:'SR-71 黑鸟', desc:'集市蓝图。没有武器，但比追它的一切都快——飞遍战区，把地图照出来。' },
+  phantom: { name:'F-4 鬼怪 II', desc:'集市蓝图。又重又吵，什么都能挂。转弯像块砖，打人像卡车。' },
+  mosquito: { name:'DH.98 蚊式', desc:'集市蓝图。木头做的轰炸机，比追它的战斗机还快。' },
   mig29: { name:'米格-29 支点', desc:'集市蓝图。个头小、脾气凶的格斗机——甲板上转弯最快的喷气机。' },
   blackhawk: { name:'UH-60 黑鹰', desc:'集市蓝图。又快又灵的通用直升机，舱门架机枪。' },
   spectre: { name:'AC-130 幽灵炮艇', desc:'集市蓝图。一侧装满火炮的运输机——绕着目标转圈，把它拆了。' },
@@ -11188,6 +11243,9 @@ const PLANES_ZH = {
 
 // ---------- 坦克（desc 留空，数据行由代码生成） ----------
 const TANKS_ZH = {
+  jagdpanther: { name:'猎豹歼击车', desc:'集市蓝图。没有炮塔，却装着岸上最长的炮。' },
+  amx13: { name:'AMX-13', desc:'集市蓝图。自动装弹轻坦——一梭子最快，然后要愣很久。' },
+  pzh2000: { name:'PzH 2000', desc:'集市蓝图。自行榴弹炮，射程超过岛上任何一门炮。' },
   leclerc: { name:'勒克莱尔', desc:'集市蓝图。自动装弹的主战坦克，快得像侦察车，打起来像重坦。' },
   bmpt: { name:'BMP-T 终结者', desc:'集市蓝图。专门把滩头步兵清干净——一串机炮，不是一发炮弹。' },
   scorpion: { name:'FV101 蝎式', desc:'集市蓝图。能送上岸的最快的车，还特别轻。' },
@@ -11219,6 +11277,7 @@ const TANKS_ZH = {
 
 // ---------- 随身武器 ----------
 const HANDHELD_ZH = {
+  m79:     { name:'M79 榴弹发射器', desc:'与其绕过那堵墙，不如把榴弹扔过去。' },
   at4:     { name:'AT4 火箭筒', desc:'一次性火箭，专治装甲。' },
   autoshot:{ name:'AA-12 全自动霰弹枪', desc:'没人能靠近你第二次。' },
   barrett: { name:'M82 巴雷特', desc:'反器材步枪——一枪一个，挡什么穿什么。' },
@@ -11236,6 +11295,8 @@ const HANDHELD_ZH = {
 
 // ---------- 岛屿建筑 ----------
 const STRUCTS_ZH = {
+  longtom:   { name:'长汤姆炮台', desc:'集市图纸。超远程岸炮，射程覆盖大半个战区。' },
+  redoubt:   { name:'装甲棱堡', desc:'集市图纸。硬化据点，血极厚，谁上岸就打谁。' },
   flaktower: { name:'防空塔', desc:'集市图纸。混凝土高射炮塔——射程是普通高射炮位的两倍，也难打得多。' },
   bastion:   { name:'棱堡炮台', desc:'集市图纸。带装甲的岸防炮——炮弹更重，打得更远。' },
   railgun: { name:'实验电磁炮', desc:'集市图纸。超级炮级别的直射能量火炮,弹药储备极少,但装填更快。' },
@@ -11637,6 +11698,21 @@ const NEMESIS_ZH = {
 
 // ---------- 战役市场(MARKET_CATALOG,键 'cat:id';TAGS 为角标) ----------
 const MARKET_ZH = {
+  'ship:pt109':    {desc:'PT-109——胶合板船体、两台发动机，外加一股狠劲。集市里最快的船，也是最脆的。'},
+  'ship:visby':    {desc:'维斯比级——棱角分明的碳纤维隐身护卫舰：小、快，等你看清它时它已经在开火了。'},
+  'ship:typhoon':  {desc:'台风级——史上最大的潜艇。又慢又巨大，别的艇挨一下就沉，它能扛下来。按 C 下潜。'},
+  'ship:qelizabeth':{desc:'伊丽莎白女王号——双舰岛超级航母，带滑跃甲板，水面上最宽敞的飞行甲板。'},
+  'plane:mosquito':{desc:'DH.98 蚊式——木头做的轰炸机，比追它的战斗机还快。便宜、快，载弹是真的。'},
+  'plane:phantom': {desc:'F-4 鬼怪 II——又重又吵，什么都能挂。转弯像块砖，打人像卡车。'},
+  'plane:sr71':    {desc:'SR-71 黑鸟——没有武器，但比任何追它的东西都快。飞遍整个战区，把地图全给你照出来。'},
+  'tank:amx13':    {desc:'AMX-13——自动装弹的轻坦：一梭子打得比谁都快，然后要愣很久才能再来一轮。'},
+  'tank:jagdpanther':{desc:'猎豹歼击车——没有炮塔，却装着岸上最长的炮。用整辆车瞄准，挨上的基本活不了。'},
+  'tank:pzh2000':  {desc:'PzH 2000 自行榴弹炮——射程超过岛上任何一门炮，能打自己看不见的目标。'},
+  'weapon:mortar': {desc:'甲板迫击炮——便宜、弹道陡，能把炮弹扔到平射炮够不着的掩体后面。'},
+  'weapon:beamcannon':{desc:'Mk 12 光束炮——400 米/秒的连续能量束。不用提前量，不用抛物线，指哪打哪。'},
+  'gun:m79':       {desc:'M79 榴弹发射器——与其绕过那堵墙，不如把榴弹扔过去。'},
+  'struct:redoubt':{desc:'装甲棱堡——硬化据点，血厚得离谱，而且谁上岸它就打谁。'},
+  'struct:longtom':{desc:'长汤姆炮台——超远程岸炮，射程能覆盖大半个战区。'},
   'ship:burke':    {desc:'伯克级——最能干的导弹驱逐舰：快、同尺寸里够结实，全身都是炮位。'},
   'ship:grafzeppelin':{desc:'齐柏林伯爵号——那条永远没造完的航母：一整条飞行甲板，舷侧还架着真炮。'},
   'ship:seawolf':  {desc:'海狼号——集市里唯一的潜艇：下潜更深，打得比普通潜艇狠得多。按 C 下潜。'},
@@ -11681,7 +11757,8 @@ const MARKET_ZH = {
     'SHIP':'战舰', 'HELICOPTER':'直升机', 'DRONE':'无人机', 'JET':'喷气机',
     'TANK':'坦克', 'IFV':'步战车', 'SUPER-HEAVY':'超重型', 'BUILD':'建筑',
     'ROCKET':'火箭炮', 'DECK GUN':'甲板炮', 'SIDEARM':'随身武器',
-    'SUBMARINE':'潜艇', 'GUNSHIP':'炮艇机', 'RECON':'侦察车'
+    'SUBMARINE':'潜艇', 'GUNSHIP':'炮艇机', 'RECON':'侦察',
+    'FAST ATTACK':'快艇', 'BOMBER':'轰炸机', 'LIGHT TANK':'轻坦', 'TANK DESTROYER':'歼击车', 'ARTILLERY':'自行火炮'
   }
 };
 
@@ -11813,6 +11890,12 @@ const LORE_ZH_BEATS=[...LORE_ZH_BEATS_A,...LORE_ZH_BEATS_B];
 const NAME_ZH = {
 
   // 集市物品名(战役选择界面的集市卡片)
+  'PT-109 Torpedo Boat':'PT-109 鱼雷艇', 'HSwMS Visby':'维斯比级', 'Typhoon-class':'台风级', 'HMS Queen Elizabeth':'伊丽莎白女王号',
+  'Market Motor Torpedo Boat':'集市鱼雷快艇', 'Market Stealth Corvette':'集市隐身护卫舰', 'Market Ballistic Submarine':'集市弹道导弹潜艇', 'Market Modern Carrier':'集市现代航母',
+  'SR-71 Blackbird':'SR-71 黑鸟', 'F-4 Phantom II':'F-4 鬼怪 II', 'DH.98 Mosquito':'DH.98 蚊式',
+  'Jagdpanther':'猎豹歼击车', 'AMX-13':'AMX-13', 'PzH 2000':'PzH 2000',
+  'Deck Mortar':'甲板迫击炮', 'Mk 12 Beam Cannon':'Mk 12 光束炮', 'M79 Grenade Launcher':'M79 榴弹发射器',
+  'Long Tom Battery':'长汤姆炮台', 'Armoured Redoubt':'装甲棱堡',
   'USS Arleigh Burke':'伯克级', 'Graf Zeppelin':'齐柏林伯爵号', 'USS Seawolf':'海狼号',
   'Market Guided-Missile Destroyer':'集市导弹驱逐舰', 'Market Fleet Carrier':'集市舰队航母', 'Market Attack Submarine':'集市攻击潜艇',
   'MiG-29 Fulcrum':'米格-29 支点', 'UH-60 Black Hawk':'UH-60 黑鹰', 'AC-130 Spectre':'AC-130 幽灵炮艇',
