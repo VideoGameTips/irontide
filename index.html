@@ -7517,16 +7517,23 @@ function planeMaxSpeed(P,def){
 function consumePlaneGun(pa){if(pa.gunAmmo==null)return true;if(pa.gunAmmo<=0)return false;pa.gunAmmo--;return true;}
 function aircraftGunDir(dir,w){const d=dir.clone(),sp=w.spread||0;if(sp){d.x+=(Math.random()-.5)*sp;d.y+=(Math.random()-.5)*sp;d.z+=(Math.random()-.5)*sp;d.normalize();}return d;}
 // realistic engine: burns fuel, and a fixed-wing flames out if you haul it around too steeply
+const STALL_HOLD_SECS=4;   // how long a steep nose can be held before the engine gives up
 function planeEngine(P, def, dt){
   if(P.engineOn){ const leak=(P.parts&&P.parts.fuel>0)?1+P.parts.fuel*0.6:1;   // a holed tank drains faster
     const burn=((def.shape==='jet'||def.shape==='heavyjet'||def.jet)?1.9:def.heli?1.2:1.3)*(keys['KeyW']?1.5:1)*leak;
     P.fuel=Math.max(0,P.fuel-burn*dt);
     if(P.fuel<=0){ P.engineOn=false; flashPrompt('OUT OF FUEL — engine dead! Glide her down.'); } }
-  if(!def.heli && P.engineOn && P.fuel>0){ // over-stress: a sustained steep/high-G maneuver flames it out
-    const turningHard = (keys['KeyA']||keys['KeyD']) && P.speed>def.maxSpeed*0.6;
-    const load = (Math.abs(camPitch.v)>0.92?1.1:0) + (turningHard?1.1:0) + (Math.abs(P.roll)>0.6?0.4:0);
-    P.gLoad=Math.max(0,(P.gLoad||0)+(load>=1?dt*load:-dt*2));
-    if(P.gLoad>1.3){ P.engineOn=false; P.gLoad=0; P.stallT=0; flashPrompt('ENGINE STALL — too steep! Ease off and level out.'); } }
+  if(!def.heli && P.engineOn && P.fuel>0){
+    // A stall is what you get for HOLDING a punishing attitude, not for passing through one.
+    // The old model reached its limit after about 1.2 s of hard turning, and counted bank angle
+    // as load — so once rolling became a real maneuver, a barrel roll flamed the engine out
+    // before it could finish. Only a sustained steep nose loads the airframe now; rolling is
+    // free, and you get several seconds of it before anything gives.
+    const steep = Math.abs(camPitch.v)>0.95;                       // ~55 degrees nose up or down
+    const wringing = steep && (keys['KeyA']||keys['KeyD']) && P.speed>def.maxSpeed*0.6;  // steep AND hauling it round
+    const load = (steep?1:0) + (wringing?0.5:0);
+    P.gLoad=Math.max(0,(P.gLoad||0)+(load>0?dt*load:-dt*1.6));     // and it bleeds off quickly once you ease
+    if(P.gLoad>STALL_HOLD_SECS){ P.engineOn=false; P.gLoad=0; P.stallT=0; flashPrompt(T('ENGINE STALL — you held that angle too long! Ease off and level out.','发动机失速——这个角度拉太久了！松一点，把机身放平。')); } }
   if(!P.engineOn && P.fuel>0){ // restart once you fly level again
     const level = Math.abs(P.roll)<0.32 && Math.abs(camPitch.v)<0.4;
     P.stallT=Math.max(0,(P.stallT||0)+(level?dt:-dt*0.6));
@@ -7935,10 +7942,15 @@ function updatePilot(dt){
   const advFly=!!gameSettings.advancedFlight;
   if(advFly){
     const rollRate=def.turn*1.7*(0.5+0.5*ailerCtl);                                 // ailerons slow the roll
-    if(keys['KeyA']||keys['ArrowLeft'])  P.roll+=rollRate*dt;
-    if(keys['KeyD']||keys['ArrowRight']) P.roll-=rollRate*dt;
+    const rollL=keys['KeyA']||keys['ArrowLeft'], rollR=keys['KeyD']||keys['ArrowRight'];
+    if(rollL) P.roll+=rollRate*dt;
+    if(rollR) P.roll-=rollRate*dt;
     while(P.roll> Math.PI) P.roll-=Math.PI*2;                                       // wrap, so full 360s are legal
     while(P.roll<-Math.PI) P.roll+=Math.PI*2;
+    // Hands off the stick, she rolls herself level. Holding the key is what carries you round —
+    // the roll accumulates without a clamp for as long as you hold it, so a full barrel roll is
+    // still one held key. What you don't get is being stranded upside down because you let go.
+    if(!rollL && !rollR) P.roll += (0-P.roll)*Math.min(1, dt*2.2);
     P.roll += asym*0.6*dt;                                                          // a damaged wing still drags you over
     // Elevator on the arrows, resolved in the AIRCRAFT's frame rather than the world's. Level,
     // pulling back climbs. Banked ninety degrees, the same pull carves a flat turn. Inverted, it
@@ -10212,9 +10224,9 @@ function actionPlan(){
       R('S','BRAKE','刹车'), R('A/D','keep it straight','把住方向'),
       R('','stop before the bow or you go in the sea','停不住就冲下海了')], more:[]};
     const rows=gameSettings.advancedFlight
-      ? [R('Mouse','aim / fly','鼠标瞄准操纵'), R('A/D','roll — and it STAYS rolled','横滚——松手也不会自己转回来'),
+      ? [R('Mouse','aim / fly','鼠标瞄准操纵'), R('A/D','roll — hold it to go all the way round','横滚——一直按住就翻一整圈'),
          R('↑/↓','pull up / push down','拉起 / 压下'),
-         R('','roll all the way round for a barrel roll','一直滚下去就是一个横滚'),
+         R('','let go and she levels herself out','松手她自己会摆平'),
          R('W/S','throttle','油门'), R('Click','guns','机炮')]
       : [R('Mouse','fly','鼠标操纵'), R('A/D','roll','横滚'), R('W/S','throttle','油门'),
          R('Click','guns','机炮')];
