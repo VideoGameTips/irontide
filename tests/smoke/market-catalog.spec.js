@@ -30,7 +30,7 @@ test('every market entry resolves, is exclusive, and is bilingual', async ({ pag
   });
 
   expect(r.problems).toEqual([]);
-  expect(r.count).toBeGreaterThanOrEqual(25);
+  expect(r.count).toBeGreaterThanOrEqual(40);
   // every category the market can express is actually stocked — 'weapon' and 'gun' sat empty for
   // a long time, and 'gun' didn't even resolve because marketDef had no branch for it
   expect(r.cats).toEqual(['gun', 'plane', 'ship', 'struct', 'tank', 'weapon']);

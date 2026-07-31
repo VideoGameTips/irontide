@@ -48,9 +48,9 @@ const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
   // Left side is what docs/promo/channels/*.md currently claims.
   const claims = [
     ['31 theaters',                     g.theaters === 31,        g.theaters],
-    ['31 playable warships',            g.playableShips === 31,   g.playableShips],
-    ['63 aircraft',                     g.planes === 63,          g.planes],
-    ['24 tanks',                        g.tanks === 24,           g.tanks],
+    ['34 playable warships',            g.playableShips === 34,   g.playableShips],
+    ['66 aircraft',                     g.planes === 66,          g.planes],
+    ['27 tanks',                        g.tanks === 27,           g.tanks],
     ['100 medals',                      g.medals === 100,         g.medals],
     ['8 sandbox maps (7 + training)',   g.sandbox === 8,          g.sandbox],
     ['music profile per theater',       g.musicProfiles === g.theaters + 1, `${g.musicProfiles} profiles / ${g.theaters} theaters`],
