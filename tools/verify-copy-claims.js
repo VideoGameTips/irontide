@@ -48,9 +48,9 @@ const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
   // Left side is what docs/promo/channels/*.md currently claims.
   const claims = [
     ['31 theaters',                     g.theaters === 31,        g.theaters],
-    ['29 playable warships',            g.playableShips === 29,   g.playableShips],
-    ['61 aircraft',                     g.planes === 61,          g.planes],
-    ['22 tanks',                        g.tanks === 22,           g.tanks],
+    ['31 playable warships',            g.playableShips === 31,   g.playableShips],
+    ['63 aircraft',                     g.planes === 63,          g.planes],
+    ['24 tanks',                        g.tanks === 24,           g.tanks],
     ['100 medals',                      g.medals === 100,         g.medals],
     ['8 sandbox maps (7 + training)',   g.sandbox === 8,          g.sandbox],
     ['music profile per theater',       g.musicProfiles === g.theaters + 1, `${g.musicProfiles} profiles / ${g.theaters} theaters`],
@@ -75,6 +75,50 @@ const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
     if (!ok) bad++;
   }
   await browser.close();
+
+  // ---- and now read the copy itself ----
+  // Everything above only proves the GAME has the numbers we think it has. It never opened a
+  // single markdown file, which is how "12 in-game medals" sat in the Newgrounds kit long after
+  // the game shipped 100 of them: the assertion list said 100, the game said 100, and nobody
+  // compared either to the sentence a player would actually read. Scan the copy for numbers
+  // stated next to the thing they count, and flag any that disagree with the live build.
+  const fs = require('fs'), path = require('path');
+  const ROOT = path.join(__dirname, '..');
+  const files = [
+    ...fs.readdirSync(path.join(ROOT, 'docs/promo/channels')).filter(f => f.endsWith('.md'))
+      .map(f => path.join('docs/promo/channels', f)),
+    'README.md', 'docs/promo/README.md',
+  ];
+  // AUDIT-FINDINGS.md and BALANCE-REVIEW.md are dated records of past reviews — their old
+  // numbers are the point, so they are deliberately not scanned.
+  const rules = [
+    [/(\d+)\s+(?:in-game\s+)?medals\b/gi,                 g.medals,        'medals'],
+    [/(\d+)\s+(?:playable\s+)?(?:war)?ships\b/gi,          g.playableShips, 'playable ships'],
+    [/(\d+)\s+aircraft\b/gi,                              g.planes,        'aircraft'],
+    [/(\d+)\s+tanks\b/gi,                                 g.tanks,         'tanks'],
+    [/(\d+)[-\s]theater\b/gi,                              g.theaters,      'theaters'],
+    [/(\d+)\s*艘(?:可选)?(?:战舰|军舰|船)/g,                  g.playableShips, '艘战舰'],
+    [/(\d+)\s*种飞机/g,                                     g.planes,        '种飞机'],
+    [/(\d+)\s*种坦克/g,                                     g.tanks,         '种坦克'],
+    [/(\d+)\s*枚勋章/g,                                     g.medals,        '枚勋章'],
+    [/(\d+)\s*关战役/g,                                     g.theaters,      '关战役'],
+  ];
+  const drift = [];
+  for (const rel of files) {
+    const txt = fs.readFileSync(path.join(ROOT, rel), 'utf8').split('\n');
+    txt.forEach((line, i) => {
+      for (const [re, truth, label] of rules) {
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(line))) {
+          if (Number(m[1]) !== truth) drift.push(`${rel}:${i + 1}  "${m[0].trim()}" → should be ${truth} ${label}`);
+        }
+      }
+    });
+  }
+  console.log(`\nCOPY TEXT (${files.length} files scanned)\n`);
+  if (!drift.length) console.log('  PASS  every number in the copy matches the build');
+  else { drift.forEach(d => console.log('  FAIL  ' + d)); bad += drift.length; }
   console.log(bad
     ? `\n${bad} claim(s) drifted — update docs/promo/channels/*.md and the README before launching.`
     : '\nAll copy claims match the shipped game.');

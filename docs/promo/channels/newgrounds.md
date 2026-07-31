@@ -91,9 +91,12 @@ FEATURES
 - 31-theater world campaign with a story rival
 - Battleship + planes + amphibious tanks + infantry combat
 - Mount extra deck cannons at the port shop
-- 12 in-game medals, a 3-star rating on every theater, and a battle report card you can save as a PNG
+- 100 in-game medals, a 3-star rating on every theater, and a battle report card you can save as a PNG
 - Working flight decks: taxi to the runway, take off, land back aboard, park
 - A Training Ground level that teaches the whole game with the enemy holding fire
+- Optional advanced flying — roll all the way over and fly a barrel roll
+- A campaign market: 25 permanent blueprints (exclusive ships, planes, tanks, deck guns, sidearms) bought with credits earned across the campaign
+- Burning ships light up the sea around them at night
 - Quick battle mode and sandbox maps
 - Dynamic weather, and procedural music with a unique profile for every theater
 - Photo mode (press L)

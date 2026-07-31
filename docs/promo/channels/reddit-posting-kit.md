@@ -109,6 +109,9 @@ What's in it:
 - Buy extra deck guns in the armory (Tab), bolt them on with F, and man one yourself with E
 - Real flight decks — taxi, take off, land back on your own ship, and it taxis itself to its parking box
 - A Training Ground level that teaches every system with the enemy holding fire
+- Optional advanced flight model — the bank is yours, so you can actually fly a barrel roll, and the elevator works in the aircraft's frame (banked, pulling back turns you instead of climbing)
+- A campaign market of 25 permanent blueprints — exclusive ships, aircraft, tanks, deck guns and sidearms bought with credits earned across the whole campaign
+- Burning ships light the water around them, which makes night battles look genuinely different
 - 100 medals, 3-star ratings per theater, quick battle mode, sandbox maps, dynamic weather
 - Procedural music that changes per theater, photo mode (L key), gamepad + touch support, English/Chinese
 - Runs on desktop and mobile; it's a PWA so you can install it if you want (no install needed to play)
