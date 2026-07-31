@@ -5834,14 +5834,28 @@ function dismountTank(){ const tk=drivingTank; drivingTank=null;
 function tankLandToggle(){
   const tk=drivingTank; if(!tk) return;
   if(tk.onDeck){
+    // The tank is amphibious and floats — the tutorial says so in as many words ("a tank floats,
+    // but it cannot cross open sea"). Requiring an island within 80 m before it could leave the
+    // deck contradicted that, and meant the answer to "can I get off here?" was usually no.
+    // Put her over the side wherever you like: alongside a beach she lands on it, otherwise she
+    // goes in the water and you drive her in.
     let best=null,bd=1e9; landSpots().forEach(o=>{ if(!o.island) return; const d=islandEdgeDistance(player.pos,o); if(d<bd){bd=d;best=o;} });
-    if(!best||bd>80){ flashPrompt(keyPrompt('Bring the ship alongside an island, then G to put the tank ashore','Bring the ship alongside an island, then tap Land to put the tank ashore','把船靠到岛边，再点「登陆」把坦克送上岸')); return; }
     const wp=tk.group.getWorldPosition(new THREE.Vector3()); scene.attach(tk.group);   // ship-deck → world, keep transform
-    const isl=best.island; tk.onDeck=false; tk.island=isl;
-    tk.pos=new THREE.Vector3(wp.x,2.1,wp.z); clampToIsland(tk.pos,isl,0.92); tk.pos.y=2.1;
-    tk.heading=Math.atan2(isl.pos.x-tk.pos.x, isl.pos.z-tk.pos.z);                       // face inland
-    tk.group.position.copy(tk.pos); tk.group.rotation.y=tk.heading;
-    flashPrompt('🪖 Tank ashore'+(isl.name?' on '+isl.name:'')+' — clear the garrison to capture · G to re-embark'); updateMode();
+    tk.onDeck=false;
+    if(best && bd<=80){
+      const isl=best.island; tk.island=isl;
+      tk.pos=new THREE.Vector3(wp.x,2.1,wp.z); clampToIsland(tk.pos,isl,0.92); tk.pos.y=2.1;
+      tk.heading=Math.atan2(isl.pos.x-tk.pos.x, isl.pos.z-tk.pos.z);                     // face inland
+      flashPrompt('🪖 Tank ashore'+(isl.name?' on '+isl.name:'')+' — clear the garrison to capture · G to re-embark');
+    } else {
+      tk.island=null;
+      const side=new THREE.Vector3(Math.sin(player.heading+Math.PI/2),0,Math.cos(player.heading+Math.PI/2));
+      tk.pos=player.pos.clone().addScaledVector(side, (player.build.halfLen||30)*0.55+9); tk.pos.y=0.75;   // afloat, clear of the hull
+      tk.heading=player.heading;
+      flashPrompt(T('🪖 Tank in the water — she floats. Drive her to a beach · G to re-embark',
+                    '🪖 坦克下水了——它能浮着开。开去沙滩 · 按 G 回船'));
+    }
+    tk.group.position.copy(tk.pos); tk.group.rotation.y=tk.heading; updateMode();
   } else {
     if(landCampaignMode){ flashPrompt('No extraction ship in this theater — keep the tank ashore and push the assault.'); return; }
     if(playerShipLost){ flashPrompt('Your ship is gone — drive or dismount back to harbor for a replacement.'); return; }
@@ -8777,15 +8791,26 @@ function toggleFoot(){
     return;
   }
   if(player.submerged){ flashPrompt(keyPrompt('Surface first (C), then press G to go ashore.','Surface first (tap Surface), then tap Ashore.','先点「上浮」，再点「登岸」。'),'bad'); return; }
-  // disembark onto the nearest land the ship is alongside
+  // Over the side, wherever you are. Alongside land you step onto it; in open water you swim,
+  // which the game already supports everywhere else — it is exactly what a parachute splashdown
+  // drops you into. Refusing unless an island was within 80 m made "can I get out here?" a
+  // question with a no for an answer most of the time, for no reason the player could see.
   let best=null,bd=1e9;
   landSpots().forEach(o=>{ const d=islandEdgeDistance(player.pos,o); if(d<bd){bd=d;best=o;} });
+  if(driving) stopDrive();   // G at the helm: step off the wheel and go over the side in one press
+  onFoot=true; resetFootHealth(); warRecord('marched');
   if(best && bd<80){
-    if(driving) stopDrive();   // G at the helm: step off the wheel and go ashore in one press
-    onFoot=true; resetFootHealth(); footLand=best.island||best.harbor||best; warRecord('marched');
+    footLand=best.island||best.harbor||best;
     footPos.copy(player.pos); clampToIsland(footPos,footLand,0.82); footPos.y=groundHeightAt(footPos,footLand)+EYE;
-    flashPrompt('Ashore'+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.','ok'); updateMode();
-  } else flashPrompt(keyPrompt('Sail right up alongside an island or harbor, then press G to go ashore.','Sail right up alongside an island or harbor, then tap Ashore.','把船紧靠到岛屿或海港边，再点「登岸」。'),'bad');
+    flashPrompt('Ashore'+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.','ok');
+  } else {
+    footLand=null;                                                   // swimming — no ground under you
+    const side=new THREE.Vector3(Math.sin(player.heading+Math.PI/2),0,Math.cos(player.heading+Math.PI/2));
+    footPos.copy(player.pos).addScaledVector(side,(player.build.halfLen||30)*0.5+5); footPos.y=0.45+EYE;
+    flashPrompt(T('Over the side — you are swimming. WASD to swim · G to climb back aboard near your ship.',
+                  '翻下船了——你正在水里游。WASD 游动 · 靠近自己的船按 G 爬回去。'),'ok');
+  }
+  updateMode();
 }
 const WALKABLE_STRUCTURE_KINDS=new Set(['airstrip','helipad','dock']);
 function harborWalkBlocked(x,z,h){
