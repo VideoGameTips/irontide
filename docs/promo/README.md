@@ -49,8 +49,14 @@ promo/
 | `assets/final/og-1280x720.png` | 1280×720 | 社交卡片 / YouTube 封面底图 |
 | `assets/final/preview.gif` | 600px 宽 7 秒 | Reddit / Discord / README 动图 |
 | `assets/final/iron-tide-hero-45s.mp4` | 1600×900 48 秒 | 所有渠道的视频位 |
-| `builds/irontide-itch.zip` | 0.4 MB | itch.io（保留联机入口，去掉 service worker） |
-| `builds/irontide-portal-singleplayer.zip` | 0.4 MB | CrazyGames / Newgrounds（额外隐藏联机入口） |
+| `builds/irontide-itch.zip` | 0.5 MB | itch.io（去掉 service worker，**联机入口也隐藏**） |
+| `builds/irontide-portal-singleplayer.zip` | 0.5 MB | CrazyGames / Newgrounds（同上） |
+| `builds/irontide-crazygames.zip` | 0.5 MB | CrazyGames（额外去掉安装提示） |
+
+⚠️ **三个包都是纯单机**。这行以前写的是「itch 保留联机入口」，那是错的：`defaultRelayUrl()`
+按 `location.host` 推导中继地址，放到 itch 上按钮会指向 `wss://html-classic.itch.zone/play`
+——那个地址不存在，点一次就是一次「连接失败」。改指回家里的 VPS 又等于在孩子和门户流量之间
+开一条聊天通道，所以**故意关掉**，理由写在 `tools/build-portal.js` 顶部。
 
 **hero 视频的镜头顺序**：舰桥第一人称推进（0–9.5s）→ 追尾视角对轰（9.5–18.5s）→ 环绕运镜（18.5–32.5s）→ 黎明光线（32.5–40.5s）→ 军械库面板（40.5–44.5s）。要剪短版就从环绕段截。
 
