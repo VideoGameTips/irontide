@@ -4274,6 +4274,12 @@ function steerClearOfShips(me,myPos,myDef,desired){   // bend the desired headin
   enemies.forEach(e=>{ if(e.sinkT===0) scan(e,e.pos,e.def); });
   return adj;
 }
+// Spawn protection. You appear in your own harbour with the fleet crowded around you, and a
+// friendly hull drifting into yours before you have even touched the throttle used to take a
+// bite out of the ship you just picked. For the first few seconds a new hull still gets shoved
+// clear of anything it touches — no warping through — it just doesn't trade damage for it.
+const SPAWN_SHIELD_SECS=4;
+function spawnShielded(s){ return (s && s._spawnShield>0); }
 function shipCollisions(dt){
   const list=[];
   if(playerShipTargetable()&&player.pos)list.push({s:player,pos:player.pos,def:player.def,pl:true});
@@ -4288,6 +4294,9 @@ function shipCollisions(dt){
     A.pos.x-=nx*push; A.pos.z-=nz*push; B.pos.x+=nx*push; B.pos.z+=nz*push;
     if((A.s._ramCd||0)>0||(B.s._ramCd||0)>0) continue;           // one bang per second per hull
     if(A.s.proxy||B.s.proxy) continue;                           // far-off simulated ships just get separated
+    // ...and a freshly spawned hull is separated the same way, but nobody takes the hit. Checked
+    // before the ram cooldown is spent, so the shield doesn't quietly eat your next real ram.
+    if(spawnShielded(A.s)||spawnShielded(B.s)) continue;
     A.s._ramCd=1.0; B.s._ramCd=1.0;
     const va=A.s.vel||new THREE.Vector3(), vb=B.s.vel||new THREE.Vector3();
     const rel=va.clone().sub(vb).length();
@@ -5167,7 +5176,9 @@ function makePlayerShip(shipId){
   manning=null; piloting=null; driving=false; onFoot=false; drivingTank=null; mouseDownFire=false; playerShipLost=false; resetFootHealth();
   const build=buildShip(def,false);
   const hpMul=def.boss?1:DIFF().playerHp;   // the one-life Leviathan keeps its authored hp on every difficulty
-  player={ build, hp:def.hp*hpMul, maxhp:def.hp*hpMul, def, shipId, submerged:false, air:100, diveY:0 };
+  // _spawnShield belongs in the literal: makePlayerShip REPLACES player wholesale, so setting it
+  // on the way in would land on the hull being thrown away.
+  player={ build, hp:def.hp*hpMul, maxhp:def.hp*hpMul, def, shipId, submerged:false, air:100, diveY:0, _spawnShield:SPAWN_SHIELD_SECS };
   const spawnZ = friendlyHarbor ? friendlyHarbor.pos.z-240 : 0;
   player.pos=new THREE.Vector3(0,0,spawnZ); player.heading=Math.PI; player.throttle=0; player.speed=0;
   // helm / bridge station
@@ -8555,6 +8566,10 @@ function blastAll(pos,dmg,rad,massive=false,spareHarbors=false,byPlayer=false){
 //  UPDATE
 // =====================================================================
 function update(dt,t){
+  // Tick the spawn shield here rather than inside shipCollisions: that only sees the player when
+  // the hull is targetable, so stepping away to a turret or a plane would freeze the timer and
+  // you'd come back still invulnerable to ramming.
+  if(player && player._spawnShield>0) player._spawnShield-=dt;
   animateWater(t);
   updateWeather(dt);
   updateLightning(dt);

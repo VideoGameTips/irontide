@@ -77,6 +77,13 @@ test('holding a warship on the enemy HQ pins their shipyards', async ({ page }) 
       difficulty = 'hard';           // grace 0: reinforcements from the first second
       quickMode = false; currentSandboxIdx = -1; currentMapIdx = 4;
       startGame('battleship'); skipBanner();
+      // Count SPAWNS, not net fleet size. enemies.length is births minus deaths, and the
+      // immortal probe ship parked in the theater grinds hulls down faster than the yards
+      // replace them — the control run finished with fewer ships than it started and looked
+      // like the yards had stopped when they hadn't.
+      let spawns = 0;
+      const realSpawn = window.spawnEnemy;
+      window.spawnEnemy = (...a) => { spawns++; return realSpawn(...a); };
       const start = enemies.length;
       for (let i = 0; i < 30 * 240; i++) {
         // hold the whole fleet clear so only the player's position decides the outcome
@@ -90,13 +97,14 @@ test('holding a warship on the enemy HQ pins their shipyards', async ({ page }) 
         t2 += dt; update(dt, t2);
         if (phase !== 'play') break;
       }
-      return { start, end: enemies.length };
+      window.spawnEnemy = realSpawn;
+      return { start, end: enemies.length, spawns };
     };
     return { pinned: run(true), free: run(false) };
   }, PRELUDE.toString());
 
-  expect(r.free.end).toBeGreaterThan(r.free.start);        // control: they do build ships
-  expect(r.pinned.end).toBeLessThanOrEqual(r.pinned.start); // pinned: not one new hull
+  expect(r.free.spawns).toBeGreaterThan(3);   // control: the yards really are turning out hulls
+  expect(r.pinned.spawns).toBe(0);            // pinned: not one new hull
 });
 
 // Replacements always sailed from home, and home is 4.4 km from the objective on the full-size
