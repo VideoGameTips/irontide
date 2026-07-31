@@ -3726,13 +3726,13 @@ let settingsOpen=false;
 // old breathing room can turn it back on in the K panel.
 const gameSettings={combatFeedback:true,damageNumbers:true,cameraShake:true,pauseInArmory:false,hideActions:false,autoTakeoff:false,cinematic:true};
 const damageNumbers=[];
-const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool',hideActions:'bool',autoTakeoff:'bool',cinematic:'bool'};
+const GAMESETTINGS_SPEC={combatFeedback:'bool',damageNumbers:'bool',cameraShake:'bool',pauseInArmory:'bool',hideActions:'bool',autoTakeoff:'bool',cinematic:'bool',advancedFlight:'bool'};
 function loadGameSettings(){ applySettingsBlob(gameSettings, readSettingsBlob(), GAMESETTINGS_SPEC);
   // ...and again once the renderer exists: this runs at boot, before it does, so the grade
   // silently never applied on a fresh load — it only took effect if you toggled it by hand.
   if(typeof applyCinematic==='function') applyCinematic(); }   // same validated read as SETTINGS
 function saveGameSettings(){try{localStorage.setItem('ironTideSettings',JSON.stringify({sv:SETTINGS_VER,...SETTINGS,...gameSettings}));}catch(e){}}   // one key, two panels — always persist the union
-function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory'],['hideActions','Hide the \u201cwhat can I do\u201d list'],['autoTakeoff','Auto takeoff (taxi for me)'],['cinematic','Cinematic look (darker, hazier)']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();if(key==='cinematic')applyCinematic();};list.appendChild(d);});}
+function refreshSettings(){const list=document.getElementById('settingsList');if(!list)return;list.innerHTML='';const rows=[['combatFeedback','Hit marker & kill feed'],['damageNumbers','Floating damage numbers'],['cameraShake','Camera shake'],['pauseInArmory','Pause the war in the armory'],['hideActions','Hide the \u201cwhat can I do\u201d list'],['autoTakeoff','Auto takeoff (taxi for me)'],['cinematic','Cinematic look (darker, hazier)'],['advancedFlight','Advanced flying (roll all the way over — barrel rolls)']];rows.forEach(([key,label])=>{const d=document.createElement('button');d.className='setitem'+(gameSettings[key]?'':' off');d.innerHTML='<span>'+trText(label)+'</span><b>'+trText(gameSettings[key]?'ON':'OFF')+'</b>';d.onclick=()=>{gameSettings[key]=!gameSettings[key];saveGameSettings();refreshSettings();if(!gameSettings.damageNumbers)clearDamageNumbers();if(key==='cinematic')applyCinematic();};list.appendChild(d);});}
 function toggleSettings(){if(phase!=='play')return;settingsOpen=!settingsOpen;if(typeof renderActions==='function')setTimeout(renderActions,0);const sp=document.getElementById('settings');sp.style.display=settingsOpen?'block':'none';if(settingsOpen){
   sp.querySelector('h2').textContent=trText('⚙ SETTINGS'); sp.querySelector('p').innerHTML=isZh()?'战斗画面提示都可以自由开关。按 <b>K</b> 关闭。':'Visual combat feedback is optional. Press <b>K</b> to close.';mouseDownFire=false;if(document.pointerLockElement)document.exitPointerLock();refreshSettings();}}
 function clearDamageNumbers(){while(damageNumbers.length){const d=damageNumbers.pop();d.el.remove();}}
@@ -4381,6 +4381,7 @@ addEventListener('keydown',e=>{
     if(tutIdx>=0&&phase==='play') skipTutorial();
   }
   keys[e.code]=1; if(e.code==='Tab'){ e.preventDefault(); toggleShop(); } if(e.code==='Space') e.preventDefault();
+  if(e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='ArrowLeft'||e.code==='ArrowRight') e.preventDefault();   // the elevator/aileron keys must not scroll the page
   if(e.code==='KeyF') tryPlace(); if(e.code==='KeyE') toggleMan(); if(e.code==='KeyG'){ if(drivingTank) tankLandToggle(); else toggleFoot(); }
   if(e.code==='KeyH') toggleHarbor(); if(e.code==='KeyM') sfxToggle(); if(e.code==='KeyC') toggleDive();
   if(e.code==='KeyJ'&&!e.repeat) musicToggle();   // J toggles the background music independently of sound FX
@@ -7926,11 +7927,34 @@ function updatePilot(dt){
   const wingDmg=(pr.wingL+pr.wingR)/6;                                              // 0..1 lift loss
   const asym=((pr.wingL-pr.wingR)+(pr.engR>=0?(pr.engL-pr.engR):0))*0.05;           // pull toward the damaged side
   const wingOff = pr.wingL>=3||pr.wingR>=3;
-  if(keys['KeyA']) camYaw.v+=def.turn*tailCtl*(1-storm*0.18*mass)*dt;               // rudder weakened by tail damage and storm gusts
-  if(keys['KeyD']) camYaw.v-=def.turn*tailCtl*(1-storm*0.18*mass)*dt;
+  const turnAuth=def.turn*tailCtl*(1-storm*0.18*mass);   // rudder weakened by tail damage and storm gusts
+  // ADVANCED FLYING (settings) — the default model can't roll: P.roll is derived from how fast
+  // you're yawing and springs back to level, so it's decoration. Here the bank is a real state
+  // you own. A/D roll and it STAYS rolled until you roll back, which is the whole point: a bank
+  // that self-levels can never come round through 360.
+  const advFly=!!gameSettings.advancedFlight;
+  if(advFly){
+    const rollRate=def.turn*1.7*(0.5+0.5*ailerCtl);                                 // ailerons slow the roll
+    if(keys['KeyA']||keys['ArrowLeft'])  P.roll+=rollRate*dt;
+    if(keys['KeyD']||keys['ArrowRight']) P.roll-=rollRate*dt;
+    while(P.roll> Math.PI) P.roll-=Math.PI*2;                                       // wrap, so full 360s are legal
+    while(P.roll<-Math.PI) P.roll+=Math.PI*2;
+    P.roll += asym*0.6*dt;                                                          // a damaged wing still drags you over
+    // Elevator on the arrows, resolved in the AIRCRAFT's frame rather than the world's. Level,
+    // pulling back climbs. Banked ninety degrees, the same pull carves a flat turn. Inverted, it
+    // pulls you down. That decomposition is what makes a roll fly the way it looks.
+    let el=0; if(keys['ArrowUp'])el+=1; if(keys['ArrowDown'])el-=1;
+    if(el){ camPitch.v += el*Math.cos(P.roll)*def.turn*1.25*elevCtl*dt;
+            camYaw.v   += el*Math.sin(P.roll)*turnAuth*2.0*dt; }
+    camYaw.v += Math.sin(P.roll)*turnAuth*0.9*dt;                                   // a held bank keeps turning, hands off
+  } else {
+    if(keys['KeyA']) camYaw.v+=turnAuth*dt;
+    if(keys['KeyD']) camYaw.v-=turnAuth*dt;
+  }
   camYaw.v += asym*dt;                                                              // asymmetric yaw pull
   if(pr.tail>=2) camYaw.v += Math.sin(t2*11)*0.7*(pr.tail-1)*dt;                    // unstable tail → wobble
-  const pitch=Math.max(-1.1,Math.min(1.1,camPitch.v))*elevCtl, yaw=camYaw.v;        // elevators limit pitch authority
+  const pCap=advFly?1.35:1.1;                                                       // a bit more elevator once you're flying it properly
+  const pitch=Math.max(-pCap,Math.min(pCap,camPitch.v))*elevCtl, yaw=camYaw.v;      // elevators limit pitch authority
   const dir=new THREE.Vector3(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch));
   if(P.engineOn){
     const mx=planeMaxSpeed(P,def)*(0.45+0.55*eH)*(1-storm*0.10*mass);              // payload/fuel, engine health and weather set available thrust
@@ -7945,9 +7969,14 @@ function updatePilot(dt){
   }
   if(storm) P.pos.add(weatherWind((2.25*mass)*(0.45+Math.max(0,1-P.pos.y/120))*dt));
   const yawRate=yaw-P.lastYaw; P.lastYaw=yaw;
-  let rollT=Math.max(-0.9,Math.min(0.9,yawRate*22)) + asym*4;                       // forced roll toward the bad side
-  if(wingOff){ rollT=(pr.wingL>=3?-1:1)*1.5; P.pos.y-=30*dt; }                      // torn wing → violent roll + falling
-  P.roll=THREE.MathUtils.lerp(P.roll, rollT, 0.12*(0.5+0.5*ailerCtl));             // ailerons slow the roll response
+  if(advFly){
+    // the bank is the pilot's, so don't overwrite it — a torn wing still throws you over though
+    if(wingOff){ P.roll+=(pr.wingL>=3?-1:1)*2.4*dt; P.pos.y-=30*dt; }
+  } else {
+    let rollT=Math.max(-0.9,Math.min(0.9,yawRate*22)) + asym*4;                     // forced roll toward the bad side
+    if(wingOff){ rollT=(pr.wingL>=3?-1:1)*1.5; P.pos.y-=30*dt; }                    // torn wing → violent roll + falling
+    P.roll=THREE.MathUtils.lerp(P.roll, rollT, 0.12*(0.5+0.5*ailerCtl));           // ailerons slow the roll response
+  }
   pa.group.position.copy(P.pos);
   pa.group.quaternion.setFromEuler(new THREE.Euler(-pitch, yaw, P.roll, 'YXZ')); // nose up when climbing
   setAircraftControlSurfaces(pa.group,P.roll,pitch);
@@ -10182,8 +10211,13 @@ function actionPlan(){
     if(ph==='rollout') return {t:zh?'着舰滑跑':'ROLLING OUT', rows:[
       R('S','BRAKE','刹车'), R('A/D','keep it straight','把住方向'),
       R('','stop before the bow or you go in the sea','停不住就冲下海了')], more:[]};
-    const rows=[R('Mouse','fly','鼠标操纵'), R('A/D','roll','横滚'), R('W/S','throttle','油门'),
-      R('Click','guns','机炮')];
+    const rows=gameSettings.advancedFlight
+      ? [R('Mouse','aim / fly','鼠标瞄准操纵'), R('A/D','roll — and it STAYS rolled','横滚——松手也不会自己转回来'),
+         R('↑/↓','pull up / push down','拉起 / 压下'),
+         R('','roll all the way round for a barrel roll','一直滚下去就是一个横滚'),
+         R('W/S','throttle','油门'), R('Click','guns','机炮')]
+      : [R('Mouse','fly','鼠标操纵'), R('A/D','roll','横滚'), R('W/S','throttle','油门'),
+         R('Click','guns','机炮')];
     if(piloting.plane&&piloting.plane.def&&piloting.plane.def.bomb) rows.push(R('Space','drop bombs','投弹'));
     rows.push(R('T','change view','切换视角'), R('E','come back down and land','回去降落'), R('P','bail out','跳伞'));
     return {t:zh?'飞行中':'IN FLIGHT', rows, more:always};
@@ -11248,6 +11282,7 @@ const ZH_EXACT_KID = {
   'Camera shake': '镜头震动',
   'Hide the \u201cwhat can I do\u201d list': '\u9690\u85cf\u300c\u73b0\u5728\u80fd\u505a\u4ec0\u4e48\u300d\u5217\u8868',
   'Auto takeoff (taxi for me)': '\u81ea\u52a8\u8d77\u98de\uff08\u66ff\u6211\u6ed1\u884c\uff09',
+  'Advanced flying (roll all the way over — barrel rolls)': '高级飞行（能一直翻过去——做横滚）',
   'Cinematic look (darker, hazier)': '\u7535\u5f71\u611f\u753b\u9762\uff08\u66f4\u6697\u3001\u6709\u96fe\uff09',
   'Pause the war in the armory': '进军械库时暂停战斗',
 
