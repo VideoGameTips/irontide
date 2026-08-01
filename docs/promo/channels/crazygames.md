@@ -160,6 +160,7 @@ longmaolab
 
 | 字段 | 填什么 |
 |---|---|
+| Technology / Engine / Game type（如有这一栏） | `HTML5` —— 游戏就是 HTML5 + WebGL（three.js 跑在浏览器里，没有 Unity、没有插件）。**要选**。别和下面的 Category 搞混：Category 里不选 .io / Multiplayer，是另一回事 |
 | Game name | `Iron Tide` |
 | Slug / URL(如有) | `iron-tide` |
 | Category | `Action`(理由:海战+载具+步战的动作游戏。若下拉有 Shooting 也可作次选。**不要选 .io 或 Multiplayer**——我们以单机身份提交) |
