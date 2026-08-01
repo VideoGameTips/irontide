@@ -104,4 +104,29 @@ for (const v of variants) {
   const mb = (fs.statSync(`${OUT}/${v.name}.zip`).size / 1048576).toFixed(1);
   console.log(`${v.name}.zip  ${mb} MB`);
 }
+// --- CrazyGames: FLAT files, dragged in individually ---
+// Two failures taught this shape. (1) A build with vendor/ and js/ subdirectories lost its
+// folders on the way in: index.html served fine while vendor/three.min.js and js/terrain.js both
+// 404'd. (2) Inlining everything into one file put a 603,352-character line (minified three.js is
+// essentially one line) inside the HTML, and whatever re-serialises the page mangled that block —
+// THREE ended up undefined while the later script blocks still ran and threw.
+// So: every script stays its own file, every file sits at the root, and every src is a bare
+// filename. Nothing to flatten, nothing enormous to re-serialise.
+const CG_DIR = path.join(OUT, 'crazygames-upload');
+reset(CG_DIR);
+const CG_SCRIPTS = ['vendor/three.min.js', 'vendor/postprocessing/EffectComposer.js',
+  'vendor/postprocessing/RenderPass.js', 'vendor/postprocessing/CopyShader.js',
+  'vendor/postprocessing/ShaderPass.js', 'vendor/postprocessing/LuminosityHighPassShader.js',
+  'vendor/postprocessing/UnrealBloomPass.js', 'js/terrain.js'];
+let flat = crazygames;
+for (const rel of CG_SCRIPTS) {
+  const base = path.basename(rel);
+  const before = flat;
+  flat = flat.replace(`<script src="${rel}"></script>`, `<script src="${base}"></script>`);
+  if (flat === before) { console.error(`FAIL: could not flatten script src ${rel}`); process.exit(1); }
+  fs.copyFileSync(path.join(REPO, rel), path.join(CG_DIR, base));
+}
+if (/<script src="[^"]*\//.test(flat)) { console.error('FAIL: a script src still has a path separator'); process.exit(1); }
+fs.writeFileSync(path.join(CG_DIR, 'index.html'), flat);
+console.log(`crazygames-upload/  ${fs.readdirSync(CG_DIR).length} flat files — drag them all in`);
 console.log('builds done');

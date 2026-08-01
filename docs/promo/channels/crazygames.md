@@ -173,7 +173,7 @@ longmaolab
 | Ads / In-app purchases | `No` / `No` |
 | 年龄/内容问卷 | 按 §3.3 的事实回答:风格化军事战斗,无血腥、无脏话、无性内容、无赌博 |
 | SDK integration | Basic Launch 可选——**首次提交先不接**,保持零外部依赖;Full Launch 时再接(§5) |
-| Build | ⚠️ **CrazyGames 不收压缩包**（表单原话："Archive files are not supported, please drag and drop the files directly in the upload zone."）。直接把 `promo/builds/crazygames-upload/index.html` **这一个文件**拖进上传区。整个游戏（three.js、后处理、terrain）都已内联进这一个文件，所以只有一个文件要拖 |
+| Build | ⚠️ **不收压缩包**，也**别用单文件内联版**。把 `promo/builds/crazygames-upload/` 里的 **9 个文件全选，一次性拖进上传区**——它们必须全部落在同一层，`index.html` 里的 `<script src>` 已经改成裸文件名。两次失败换来的结论：带 `vendor/`、`js/` 子目录会丢文件夹（那两个路径线上 404）；把 three.js 内联进 HTML 又会产生一行 60 万字符的超长行，被他们的处理流程弄坏，THREE 就没了 |
 | Covers | 上传 §1.6 的三张图 |
 | Video | 上传两条:`promo/assets/final/cg-preview-landscape-1920x1080.mp4` + `cg-preview-portrait-720x1080.mp4`(均已生成) |
 
