@@ -2514,7 +2514,7 @@ function addIslandBuildingGraphicDetails(g,kind,team){
   if(kind==='dock'){for(const sx of[-1,1]){const crane=mkBox(.4,8,.4,SILVER(0xd0a63c));crane.position.set(sx*6,4,0);g.add(crane);const arm=mkBox(5,.35,.35,SILVER(0xd0a63c));arm.position.set(sx*4,8,0);g.add(arm);}}
   if(kind==='bridge'){for(const z of[-9,9])for(const sx of[-1,1]){const pier=mkBox(1.2,7,1.2,conc);pier.position.set(sx*4,3.5,z);g.add(pier);}}
   if(kind==='supergun'||kind==='railgun'){for(const sx of[-1,1]){const rail=mkBox(.45,.25,34,dark);rail.position.set(sx*4,.3,0);g.add(rail);}}
-  if(kind==='silo'||kind==='vls'||kind==='nukesilo'||kind==='rocket'){for(let i=0;i<8;i++){const a=i/8*Math.PI*2,rad=kind==='nukesilo'?10:kind==='vls'?7:6,post=mkBox(.12,2,.12,dark);post.position.set(Math.sin(a)*rad,1,Math.cos(a)*rad);g.add(post);}}
+  if(kind==='silo'||kind==='vls'||kind==='rocket'){for(let i=0;i<8;i++){const a=i/8*Math.PI*2,rad=kind==='nukesilo'?10:kind==='vls'?7:6,post=mkBox(.12,2,.12,dark);post.position.set(Math.sin(a)*rad,1,Math.cos(a)*rad);g.add(post);}}
   if(kind==='radar'||kind==='sonar'){const hut=mkBox(5,2.8,4,conc);hut.position.set(4,1.4,-3);g.add(hut);const door=mkBox(1.2,2,.15,dark);door.position.set(4,1.2,-5.05);g.add(door);}
 }
 function buildLand(kind,team,pos,type){
@@ -2614,20 +2614,6 @@ function buildLand(kind,team,pos,type){
     const house=mkBox(2.6,1.6,3.0,SILVER(0x9aa0a8)); tur.add(house);
     const barrel=mkCyl(0.22,0.26,5.0,SILVER(0x9aa0a8)); barrel.rotation.x=Math.PI/2.4; barrel.position.set(0,0.4,2.2); tur.add(barrel);
     range=kind==='longtom'?1400:340; dmg=kind==='longtom'?90:55; hp=kind==='longtom'?520:340; fireRate=kind==='longtom'?4.2:3.0; g.userData.barrelLen=5.0; g.userData.artillery=true;
-  } else if(kind==='nukesilo'){ // Soviet R-36M / SS-18 strategic missile complex
-    const conc=new THREE.MeshStandardMaterial({color:0x666b62,roughness:.96}),steel=SILVER(0x3b4448),olive=SILVER(0x596246);
-    const base=mkBox(18,2.4,18,conc);base.position.y=1.2;g.add(base);
-    const collar=mkCyl(5.2,5.8,2.2,steel,20);collar.position.y=2.7;g.add(collar);
-    const shaft=mkCyl(3.7,4.1,3.2,new THREE.MeshStandardMaterial({color:0x171c1e,roughness:.85}),20);shaft.position.y=4;g.add(shaft);
-    const missile=new THREE.Group();missile.position.y=6;g.add(missile);g.userData.siloMissile=missile;
-    const body=mkCyl(1.25,1.45,11,olive,20);body.position.y=5.5;missile.add(body);
-    const nose=new THREE.Mesh(new THREE.ConeGeometry(1.25,3.8,20),olive);nose.position.y=12.9;missile.add(nose);
-    for(let i=0;i<4;i++){const fin=mkBox(.18,2.4,2.3,olive);fin.position.set(Math.sin(i*Math.PI/2)*1.5,1.6,Math.cos(i*Math.PI/2)*1.5);fin.rotation.y=i*Math.PI/2;missile.add(fin);}
-    const hatchL=mkBox(8,.7,4.8,conc);hatchL.position.set(-4.6,5.1,0);hatchL.rotation.z=.08;g.add(hatchL);
-    const hatchR=hatchL.clone();hatchR.position.x=4.6;hatchR.rotation.z=-.08;g.add(hatchR);
-    const warning=new THREE.Mesh(new THREE.RingGeometry(7.2,8,36),new THREE.MeshBasicMaterial({color:0xffd22f,side:THREE.DoubleSide}));
-    warning.rotation.x=-Math.PI/2;warning.position.y=5.2;g.add(warning);
-    range=12000;dmg=9999;hp=3200;fireRate=200;g.userData.nukesilo=true;
   } else if(kind==='silo'||kind==='vls'){ // missile silo — homing missiles vs ships & aircraft
     const conc=new THREE.MeshStandardMaterial({color:0x6a6e64,roughness:0.95});
     const base=mkBox(4.4,1.8,4.4,conc); base.position.y=0.9; g.add(base);
@@ -2722,7 +2708,7 @@ function buildLand(kind,team,pos,type){
     const mk=teamMarker(team,4.8);mk.position.set(0,3.0,0);g.add(mk);g.userData.teamMarker=mk;g.userData.markerScale=4.8;
     range=115; dmg=7; hp=55; fireRate=0.48; g.userData.barrelLen=0.5;
   }
-  if(!g.userData.teamMarker&&range>0&&dmg>0){const ms=kind==='supergun'||kind==='nukesilo'?10:6.2,mk=teamMarker(team,ms);
+  if(!g.userData.teamMarker&&range>0&&dmg>0){const ms=kind==='supergun'?10:6.2,mk=teamMarker(team,ms);
     mk.position.set(0,Math.max(5,(STRUCTS[kind]&&STRUCTS[kind].scale||1)*4),0);g.add(mk);g.userData.teamMarker=mk;g.userData.markerScale=ms;}
   addIslandBuildingGraphicDetails(g,kind,team);
   scene.add(g);
@@ -2732,7 +2718,6 @@ function buildLand(kind,team,pos,type){
     needsPower:!!(STRUCTS[kind]&&STRUCTS[kind].power),footprint:(STRUCTS[kind]&&STRUCTS[kind].footprint)||4,light:g.userData.light,
     marker:g.userData.teamMarker,markerScale:g.userData.markerScale||0,revealT:0,
     ammoLeft:kind==='silo'?6:kind==='vls'?10:kind==='rocket'?10:(kind==='supergun'||kind==='railgun')?3:kind==='fortress'?8:null };
-  if(kind==='nukesilo')u.fireT=200;
   if(!u[kind]) u[kind]=true;   // kind flag — but never clobber a field the builder already filled (u.tank holds the TANKS def)
   return u;
 }
@@ -3504,7 +3489,7 @@ const MARKET_LEVELS={
   'struct:command':1,'struct:barracks':1,'struct:coastal':1,'struct:aa':1,'struct:radar':1,'struct:searchlight':1,'struct:wall':1,
   'struct:hospital':2,'struct:ammo':3,'struct:bunker':3,'struct:workshop':4,'struct:torpbat':5,'struct:sonar':6,'struct:tankdepot':7,
   'struct:dock':8,'struct:silo':10,'struct:helipad':11,'struct:airstrip':12,'struct:fuel':13,'struct:power':14,'struct:artillery':15,
-  'struct:rocket':17,'struct:fortress':19,'struct:supergun':22,'struct:tesla':23,'struct:nukesilo':28
+  'struct:rocket':17,'struct:fortress':19,'struct:supergun':22,'struct:tesla':23
 };
 function ensureCareerMarket(){
   career.credits=Math.max(0,Math.floor(career.credits||0));
@@ -4204,8 +4189,6 @@ const STRUCTS = {
   torpbat:   {name:'Torpedo Bunker',cost:950,footprint:20,scale:1.7,desc:'Launches torpedoes through nearby channels'},
   aa:        {name:'Anti-Air Emplacement',cost:750,footprint:18,scale:1.65,desc:'Rapid flak battery against low aircraft'},
   silo:      {name:'SAM Site',cost:1250,footprint:24,scale:1.75,power:true,desc:'Long-range missiles; needs power and ammunition'},
-  nukesilo:  {name:'R-36M “Satan” Nuclear Silo',cost:30000,footprint:60,scale:1.7,power:true,
-    desc:'One per side · tactical-map launch · 200s reload · interceptable 9,999-damage warhead'},
   radar:     {name:'Radar Station',cost:800,footprint:22,scale:1.8,power:true,desc:'Extends detection and spots for distant artillery'},
   sonar:     {name:'Sonar Station',cost:850,footprint:22,scale:1.7,power:true,desc:'Reveals nearby submarines and naval mines'},
   searchlight:{name:'Searchlight Tower',cost:450,footprint:15,scale:1.75,power:true,desc:'Reveals nearby enemies at night and aids AA'},
@@ -5962,6 +5945,9 @@ function garrisonHarbor(c, team){
 const STRUCT_KINDS=Object.keys(STRUCTS);
 const MAX_LAND_UNITS=90;   // per side; structures excluded
 function buildAndPushLand(kind,team,pos,yOverride,islOverride,typeOverride,force){
+  // The R-36M was removed from the game, but a save written before that still lists one. An
+  // unknown structure kind is skipped rather than built, so old wars load instead of crashing.
+  if(STRUCTS[kind]===undefined && kind!=='soldier' && kind!=='tank') return null;
   const isl=islOverride||islandOfPos(pos);
   const groundY=isl?islandSurfaceY(pos,isl):null;
   // Coastal guns used to be pinned to y=0 (sea level). On an island whose surface sits 1.3-2.1
@@ -7165,7 +7151,7 @@ function aiIslandBuild(dt){
   const enemyIsles=islands.filter(i=>i.r>=70 && i.owner===1);
   if(!enemyIsles.length) return;
   const isl=enemyIsles[Math.floor(Math.random()*enemyIsles.length)];
-  let kinds=['barracks','tankdepot','hospital','ammo','workshop','coastal','torpbat','aa','silo','radar','sonar','searchlight','bunker','airstrip','helipad','dock','fuel','bridge','artillery','rocket','fortress','supergun','nukesilo','tesla','wall'];
+  let kinds=['barracks','tankdepot','hospital','ammo','workshop','coastal','torpbat','aa','silo','radar','sonar','searchlight','bunker','airstrip','helipad','dock','fuel','bridge','artillery','rocket','fortress','supergun','tesla','wall'];
   if(contentFilterOn()||nukesBannedHere()||landUnits.some(u=>!u.dead&&u.team===1&&u.nukesilo))kinds=kinds.filter(k=>k!=='nukesilo');
   // The super-gun is the only enemy weapon that lobs a map-wide 'SUPER-HEAVY ARTILLERY INBOUND'
   // strike with a red warning — as unfair on a warm-up theatre as the nuke above, and the player
@@ -10351,6 +10337,9 @@ function drawMinimap(){
 function tacticalSilos(){return landUnits.filter(u=>!u.dead&&u.team===0&&u.nukesilo);}
 function toggleTacticalMap(force){
   if(phase!=='play')return;
+  // The tactical map was the R-36M's targeting screen and nothing else — with the silo gone it
+  // would open on an empty island chart, which is worse than not opening at all.
+  if(!tacticalOpen){ return; }
   // these panels freeze the sim, so tickActions inside update() stops running — the controls
   // list would otherwise sit there showing helm keys that do nothing while the war is paused
   if(typeof renderActions==='function') setTimeout(renderActions,0);

@@ -48,10 +48,10 @@ test('nukes are locked for operations 1-5 and available from 6', async ({ page }
   expect(r.msgEarly).toMatch(/6|６/);
 });
 
-// The lock has to bind the enemy too, or levels 1-5 just mean "only THEY get nukes". The AI's one
-// nuclear path is the island silo (nuclear aircraft are player-only by AI_PLANE_POOL); it goes
-// through the same nukesBannedHere() gate, and this proves it rather than trusting the read.
-test('the enemy cannot build a nuclear silo on operations 1-5 either', async ({ page }) => {
+// The enemy's ONLY nuclear route was the R-36M silo, and that has been removed from the game
+// outright — nuclear aircraft were always player-only via AI_PLANE_POOL. So the enemy now has no
+// path to a nuclear weapon at any level, which is a stronger guarantee than the old level gate.
+test('the enemy has no nuclear weapon at any level, because the silo is gone', async ({ page }) => {
   await page.goto('http://localhost:3000/');
   await page.waitForFunction(() => typeof aiIslandBuild === 'function');
   const r = await page.evaluate(() => {
@@ -59,27 +59,22 @@ test('the enemy cannot build a nuclear silo on operations 1-5 either', async ({ 
     const b = document.getElementById('storyBtn'), s = document.getElementById('story');
     if (b && s && s.style.display === 'flex') b.click();
     difficulty = 'easy'; quickMode = false;
-
-    const siloCount = () => landUnits.filter(u => !u.dead && u.team === 1 && u.kind === 'nukesilo').length;
     const probe = idx => {
       currentSandboxIdx = -1; currentMapIdx = idx;
       startGame('battleship'); skipBanner();
-      // hand the enemy islands big enough to build on, or the AI has nowhere to put anything
-      let usable = 0;
-      for (const i of islands) { if (i.r >= 70) { setIslandOwner(i, 1, true); usable++; } }
-      let built = 0;
+      for (const i of islands) if (i.r >= 70) setIslandOwner(i, 1, true);
       for (let n = 0; n < 600; n++) { _islandBuildT = 0; aiIslandBuild(0.1); }
-      built = siloCount();
-      return { usable, built, structures: landUnits.filter(u => !u.dead && u.team === 1).length };
+      return { silos: landUnits.filter(u => !u.dead && u.team === 1 && (u.nukesilo || u.kind === 'nukesilo')).length,
+               structures: landUnits.filter(u => !u.dead && u.team === 1).length };
     };
-    // level 5 is the last barred one; level 6 the first allowed. Both have a real fleet.
-    return { lv1: probe(0), lv5: probe(4), lv6: probe(5) };
+    // low, mid and high — the level gate is irrelevant now, but check across it anyway
+    return { lv1: probe(0), lv6: probe(5), lv15: probe(14),
+             nukePlanesInAiPool: AI_PLANE_POOL.filter(k => PLANES[k] && isNuclear(PLANES[k])).length };
   });
 
-  // the AI really was building — otherwise "no silos" proves nothing
-  expect(r.lv1.usable).toBeGreaterThan(0);
-  expect(r.lv6.structures).toBeGreaterThan(10);
-  expect(r.lv1.built).toBe(0);      // operation 1: no enemy silo
-  expect(r.lv5.built).toBe(0);      // operation 5: still none
-  expect(r.lv6.built).toBeGreaterThan(0);   // operation 6: the enemy gets them too
+  expect(r.lv15.structures).toBeGreaterThan(10);   // the AI really was building
+  expect(r.lv1.silos).toBe(0);
+  expect(r.lv6.silos).toBe(0);                     // ...even past the old unlock level
+  expect(r.lv15.silos).toBe(0);
+  expect(r.nukePlanesInAiPool).toBe(0);            // and it never flies a nuclear aircraft either
 });
