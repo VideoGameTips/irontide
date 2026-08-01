@@ -49,7 +49,7 @@ const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
   const claims = [
     ['31 theaters',                     g.theaters === 31,        g.theaters],
     ['38 playable warships',            g.playableShips === 38,   g.playableShips],
-    ['69 aircraft',                     g.planes === 69,          g.planes],
+    ['98 aircraft',                     g.planes === 98,          g.planes],
     ['30 tanks',                        g.tanks === 30,           g.tanks],
     ['100 medals',                      g.medals === 100,         g.medals],
     ['8 sandbox maps (7 + training)',   g.sandbox === 8,          g.sandbox],
