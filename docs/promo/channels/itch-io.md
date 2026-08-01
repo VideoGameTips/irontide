@@ -185,7 +185,7 @@ WHAT'S INSIDE
 - Real flight decks: taxi to the runway, rotate, fly, then land back on your own moving ship — she taxis herself to her parking box afterwards. Helicopters work off the helipad.
 - A Training Ground level that teaches every system, with the enemy holding fire until the lesson about being shot at
 - Optional advanced flying: hold the stick over and your aircraft rolls all the way round into a barrel roll, with the elevator working in the aircraft's own frame — pull while banked and you carve, pull inverted and you dive
-- A campaign market of 25 permanent blueprints — exclusive warships, aircraft, tanks, deck guns and sidearms, bought with credits you earn across the whole campaign and kept forever
+- A campaign market of 55 permanent blueprints — exclusive warships, aircraft, tanks, deck guns and sidearms, bought with credits you earn across the whole campaign and kept forever
 - Order your fleet with one key: send every allied warship at the enemy HQ, or out to take islands
 - Burning ships light the sea around them — a night battle is lit by whatever is on fire
 - Quick battle mode and sandbox maps for when you just want a scrap

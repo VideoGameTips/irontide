@@ -200,7 +200,7 @@ You are never stuck at the helm: walk the deck, man the turrets yourself, take o
 
 Every ship has a marked flight deck: taxi an aircraft to the runway, take off, fly the mission, then land back on your own deck and watch it park itself. Helicopters lift straight off the helipad. New players can start in the Training Ground, a level that walks you through all of it — sailing, mounting cannons, flying, tanks, going ashore — with nobody shooting at you.
 
-Turn on advanced flying in the settings and your aircraft will roll all the way over into a barrel roll, with the controls working in the aircraft's own frame — bank onto your side and pulling back carves a turn instead of climbing. Win battles to earn market credits and spend them in the campaign market: 25 permanent blueprints of exclusive warships, aircraft, tanks, deck guns and sidearms that stay yours for good.
+Turn on advanced flying in the settings and your aircraft will roll all the way over into a barrel roll, with the controls working in the aircraft's own frame — bank onto your side and pulling back carves a turn instead of climbing. Win battles to earn market credits and spend them in the campaign market: 55 permanent blueprints of exclusive warships, aircraft, tanks, deck guns and sidearms that stay yours for good.
 
 Also includes quick battles, sandbox maps, dynamic weather, burning ships that light the sea around them at night, procedural music that changes with every theater, 100 medals with 3-star theater ratings, a photo mode, adjustable graphics quality, and full gamepad and touch support. Playable in English and Chinese.
 ```

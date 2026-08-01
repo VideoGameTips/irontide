@@ -95,7 +95,7 @@ FEATURES
 - Working flight decks: taxi to the runway, take off, land back aboard, park
 - A Training Ground level that teaches the whole game with the enemy holding fire
 - Optional advanced flying — roll all the way over and fly a barrel roll
-- A campaign market: 25 permanent blueprints (exclusive ships, planes, tanks, deck guns, sidearms) bought with credits earned across the campaign
+- A campaign market: 55 permanent blueprints (exclusive ships, planes, tanks, deck guns, sidearms) bought with credits earned across the campaign
 - Burning ships light up the sea around them at night
 - Quick battle mode and sandbox maps
 - Dynamic weather, and procedural music with a unique profile for every theater

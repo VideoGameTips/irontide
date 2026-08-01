@@ -73,7 +73,7 @@ helm — hop into a plane, drive an amphibious tank ashore, or fight on
 foot, and mount extra cannons on your deck between battles. A rival
 admiral, Grand Marshal Varga, taunts you over story radio dialogue as
 you chase 3-star ratings, 100 medals, and a shareable battle report card. A Training Ground level teaches every system before you commit to a campaign.
-A campaign market sells 25 permanent blueprints — exclusive ships, planes,
+A campaign market sells 55 permanent blueprints — exclusive ships, planes,
 tanks, deck guns and sidearms — for credits you earn across the whole war.
 Dynamic weather, burning ships that light the sea at night, optional advanced
 flying with real barrel rolls, procedural music for every theater, photo mode, quick

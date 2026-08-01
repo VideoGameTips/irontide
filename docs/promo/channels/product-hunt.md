@@ -188,7 +188,7 @@ Buy extra cannons in port and mount them on your own deck
 ```
 
 ```text
-Working flight decks (taxi, take off, land back aboard), optional advanced flying with real barrel rolls, a campaign market of 25 permanent blueprints, a Training Ground level that teaches all of it, 100 medals, 3-star theater ratings, and a shareable battle report card
+Working flight decks (taxi, take off, land back aboard), optional advanced flying with real barrel rolls, a campaign market of 55 permanent blueprints, a Training Ground level that teaches all of it, 100 medals, 3-star theater ratings, and a shareable battle report card
 ```
 
 补充:若能截到 Boss「Grand Marshal Varga」的电台对话画面,可作为第 7 张追加(PH 支持多图),英文条:
