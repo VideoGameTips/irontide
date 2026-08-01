@@ -173,14 +173,14 @@ longmaolab
 | Ads / In-app purchases | `No` / `No` |
 | 年龄/内容问卷 | 按 §3.3 的事实回答:风格化军事战斗,无血腥、无脏话、无性内容、无赌博 |
 | SDK integration | Basic Launch 可选——**首次提交先不接**,保持零外部依赖;Full Launch 时再接(§5) |
-| Build | 上传 `promo/builds/irontide-crazygames.zip`(已剥离 service worker、隐藏联机入口、去掉站外水印与 manifest;iframe 内 11 项检查全绿) |
+| Build | ⚠️ **CrazyGames 不收压缩包**（表单原话："Archive files are not supported, please drag and drop the files directly in the upload zone."）。直接把 `promo/builds/crazygames-upload/index.html` **这一个文件**拖进上传区。整个游戏（three.js、后处理、terrain）都已内联进这一个文件，所以只有一个文件要拖 |
 | Covers | 上传 §1.6 的三张图 |
 | Video | 上传两条:`promo/assets/final/cg-preview-landscape-1920x1080.mp4` + `cg-preview-portrait-720x1080.mp4`(均已生成) |
 
 ### 2.3 上传与提交
 
 1. Dashboard → **Submit / Add game**,按 §2.2 逐项填写
-2. 上传 zip 后,**先用后台预览工具完整玩一局**(教程 → 第一场战斗 → 进港商店),确认与本地 iframe 测试一致
+2. **拖 `index.html` 进上传区**（不是 zip——他们不收压缩包）。顺带说一句：他们的上传区是按文件收的，这大概率就是早先那次子目录 `vendor/`、`js/` 全部 404 的原因——文件夹结构根本没被保留。现在全部内联成一个文件，这个坑就不存在了。上传后,**先用后台预览工具完整玩一局**(教程 → 第一场战斗 → 进港商店),确认与本地 iframe 测试一致
 3. 检查三张封面显示无裁切
 4. 点 Submit for review
 5. 记录提交日期,之后留意后台消息(QA 反馈都在提交条目的消息线程里)
