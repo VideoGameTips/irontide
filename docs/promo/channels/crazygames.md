@@ -207,6 +207,16 @@ Also includes quick battles, sandbox maps, dynamic weather, burning ships that l
 
 ### 3.2 操作说明(Controls 字段)
 
+**填这一行就够了**——键位全部由游戏内的「训练场」手把手教，表单里再抄一遍是重复劳动：
+
+```
+Mouse + keyboard (gamepad and touch supported)
+```
+
+下面这份完整键位表**不填进表单**，只在 QA 主动要求写清操作时再用：
+
+<details><summary>完整键位（备用）</summary>
+
 ```
 Mouse + keyboard (gamepad and touch supported)
 
@@ -225,6 +235,7 @@ TANKS: W/S drive, A/D steer, Mouse aim, Click fire, E dismount
 ON FOOT: WASD walk/swim, Click rifle, B build defenses, E board a tank
 PHOTO MODE: L
 ```
+</details>
 
 ### 3.3 内容分级/年龄问卷答复(按问卷勾选,如需文字说明用这段)
 
