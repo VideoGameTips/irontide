@@ -145,7 +145,7 @@ promo/assets/final/cover-cg-square-800x800.png        # 1:1   追尾视角对轰
 ### 2.1 注册开发者账号(约 5 分钟)
 
 1. 打开 `https://developer.crazygames.com`,点 Sign up
-2. 用家长邮箱 `etcchainroot@gmail.com` 注册(**家长注册、家长操作**)
+2. 用**家长自己的邮箱**注册（**家长注册、家长操作**）——具体地址见你本机的运维记录，别写进这个仓库
 3. 开发者/工作室名填:
 
 ```
