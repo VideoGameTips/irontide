@@ -58,16 +58,44 @@ for (const [what, before, after] of [
   if (before === after) { console.error(`FAIL: ${what} strip did not match`); process.exit(1); }
 }
 
+// --- inline every local <script src> so the build is ONE file with no sibling fetches.
+// CrazyGames' ingestion kept index.html and dropped the subdirectories: vendor/three.min.js
+// and js/terrain.js both returned 404 from their CDN, so THREE never loaded and the game died
+// on the first top-level `new THREE.Color(...)` with "THREE is not defined". Nothing in the
+// page may depend on a second request, so we paste the sources in and the whole question goes
+// away for every portal, not just this one.
+function inlineScripts(src) {
+  return src.replace(/<script src="([^"]+)"><\/script>/g, (tag, rel) => {
+    if (/^https?:/.test(rel)) return tag;                       // leave any true remote alone
+    const file = path.join(REPO, rel);
+    if (!fs.existsSync(file)) { console.error('FAIL: cannot inline missing ' + rel); process.exit(1); }
+    const code = fs.readFileSync(file, 'utf8');
+    // a source ending in a line comment would swallow the closing tag
+    return `<script>\n/* inlined: ${rel} */\n${code}\n</script>`;
+  });
+}
+for (const [label, src] of [['itch/portal', portal], ['crazygames', crazygames]]) {
+  if (/<script src="(?!https?:)/.test(inlineScripts(src))) {
+    console.error(`FAIL: ${label} still has a local <script src> after inlining`); process.exit(1);
+  }
+}
+
 const variants = [
-  { name: 'irontide-itch', src: portal },
-  { name: 'irontide-portal-singleplayer', src: portal },
-  { name: 'irontide-crazygames', src: crazygames },
+  { name: 'irontide-itch', src: inlineScripts(portal) },
+  { name: 'irontide-portal-singleplayer', src: inlineScripts(portal) },
+  { name: 'irontide-crazygames', src: inlineScripts(crazygames) },
 ];
 for (const v of variants) {
   const dir = path.join(STAGE, v.name);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'index.html'), v.src);
-  for (const asset of ['vendor', 'js', 'icons', 'manifest.json']) copy(path.join(REPO, asset), path.join(dir, asset));
+  // vendor/ and js/ are inlined now, so they are deliberately NOT copied — a portal that
+  // silently drops subdirectories can no longer break the game.
+  for (const asset of ['icons', 'manifest.json']) copy(path.join(REPO, asset), path.join(dir, asset));
+  // zip ADDS to an existing archive rather than replacing it, so without this every rebuild
+  // kept whatever the last one shipped — the vendor/ tree survived three rebuilds after it
+  // stopped being copied, still dated from the build that last wrote it.
+  fs.rmSync(path.join(OUT, `${v.name}.zip`), { force: true });
   execSync(`cd "${dir}" && zip -qr "${OUT}/${v.name}.zip" . -x '.*'`);
   const mb = (fs.statSync(`${OUT}/${v.name}.zip`).size / 1048576).toFixed(1);
   console.log(`${v.name}.zip  ${mb} MB`);
