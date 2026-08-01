@@ -81,9 +81,13 @@ for (const [label, src] of [['itch/portal', portal], ['crazygames', crazygames]]
 }
 
 const variants = [
-  { name: 'irontide-itch', src: inlineScripts(portal) },
-  { name: 'irontide-portal-singleplayer', src: inlineScripts(portal) },
-  { name: 'irontide-crazygames', src: inlineScripts(crazygames) },
+  { name: 'irontide-itch', src: inlineScripts(portal), assets: ['icons', 'manifest.json'] },
+  { name: 'irontide-portal-singleplayer', src: inlineScripts(portal), assets: ['icons', 'manifest.json'] },
+  // The CrazyGames build references neither the icons nor the manifest — the manifest <link> is
+  // stripped for their iframe — so shipping them is dead weight that only makes the archive look
+  // more complicated than it is. This variant is literally one file, which leaves no room for
+  // "we could not find index.html" to be about anything on our side.
+  { name: 'irontide-crazygames', src: inlineScripts(crazygames), assets: [] },
 ];
 for (const v of variants) {
   const dir = path.join(STAGE, v.name);
@@ -91,7 +95,7 @@ for (const v of variants) {
   fs.writeFileSync(path.join(dir, 'index.html'), v.src);
   // vendor/ and js/ are inlined now, so they are deliberately NOT copied — a portal that
   // silently drops subdirectories can no longer break the game.
-  for (const asset of ['icons', 'manifest.json']) copy(path.join(REPO, asset), path.join(dir, asset));
+  for (const asset of v.assets) copy(path.join(REPO, asset), path.join(dir, asset));
   // zip ADDS to an existing archive rather than replacing it, so without this every rebuild
   // kept whatever the last one shipped — the vendor/ tree survived three rebuilds after it
   // stopped being copied, still dated from the build that last wrote it.
