@@ -10037,6 +10037,9 @@ function enemyYardsPinned(dt){
 }
 function damageHarbor(h,dmg){
   if(h.hp<=0) return;
+  // ...and hold it at a sliver during the course, so refusing the win doesn't leave a harbour
+  // sitting at zero that can never be finished off once the lessons are over.
+  if(h===enemyHarbor && trainingCourseRunning() && h.hp-dmg<1) dmg=h.hp-1;
   if(h.up && h.up.walls>0) dmg*=Math.max(0.4, 1-0.12*h.up.walls);   // harbor walls soak damage (either side)
   h.hp-=dmg;
   if(h.hp<=0){ h.hp=0;
@@ -10584,7 +10587,20 @@ function startQuickBattle(){
   quickMode=true; currentSandboxIdx=-1;
   startGame(ship);
 }
+// The Training Ground is a lesson, not a battle to be won. Its enemy HQ sits 900 m off the bow
+// and it is the softest harbour in the game (sandbox maps have reinforce 0, so the theater-scaled
+// hqHp bottoms out), which means a player who shoots straight can flatten it somewhere around the
+// "here is how a deck gun works" step and be shown a victory screen with two thirds of the course
+// unplayed. Winning is refused until the lessons are done.
+function trainingCourseRunning(){
+  return !!(window._MAP && window._MAP.training && typeof tutIdx!=='undefined' && tutIdx>=0);
+}
 function endGame(win,msg){
+  if(win && trainingCourseRunning()){
+    flashPrompt(T('Not yet — finish the training first. There is still more to learn.',
+                  '先别急——训练还没走完，后面还有东西要学。'));
+    return;
+  }
   if(phase==='over')return;
   closePanelsForEnd();
   phase='over';
