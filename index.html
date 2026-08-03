@@ -9200,6 +9200,7 @@ function updateShells(dt){
     if(s.arc) s.vel.y-=22*dt;
     const step=s.vel.length()*dt; s.dist+=step;
     s.mesh.position.addScaledVector(s.vel,dt);
+    s.travel=(s.travel||0)+s.vel.length()*dt;   // for range falloff — machine guns lose bite downrange
     if(s.nuclear&&s.fixedTarget&&s.mesh.position.distanceTo(s.fixedTarget)<18){detonateNuclearShell(s);removeShellAt(i);continue;}
     if(s.maxDist && s.dist>s.maxDist){ boom(s.mesh.position.clone(),0.5); removeShellAt(i); continue; } // out of range — self-destruct
     if(s.mesh.geometry.type==='ConeGeometry'||s.mesh.geometry.type==='CylinderGeometry') s.mesh.quaternion.setFromUnitVectors(_shUp, _shDir.copy(s.vel).normalize());
@@ -9222,7 +9223,7 @@ function updateShells(dt){
       if(!hit) for(const ep of aiPlanes){ if(ep.team!==1||ep.hp<=0)continue; if(s.mesh.position.distanceTo(ep.pos)<3.2){ if(playerCausedShell(s))creditPlayerHit(ep); ep.hp-=s.dmg; impactFx(s,s.mesh.position.clone()); showDamageNumber(s.mesh.position.clone(),s.dmg,true,s.aa||s.dmg>=40); showHit(ep.def&&ep.def.name?ep.def.name:'AIRCRAFT',false,'aa'); if(ep.hp<=0) killAIPlane(ep); hit=true; break; } }
       if(!hit && s.mesh.position.y<20) for(const u of landUnits){ if(u.team!==1||u.dead)continue; if(s.mesh.position.distanceTo(u.pos)<Math.max(3.5,(u.footprint||4)*.38)){
         if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{if(playerCausedShell(s))creditPlayerHit(u);const dealt=s.dmg*wallShield(u);u.hp-=dealt;impactFx(s,s.mesh.position.clone());showDamageNumber(s.mesh.position.clone(),dealt,true,s.dmg>=55);showHit((u.name||u.kind||'GROUND TARGET').toUpperCase(),false,s.dmg>=55?'crit':'');if(s.splash)explodeAt(s.mesh.position.clone(),0,s.dmg,s.splash,s.owner);if(u.hp<=0)killLandUnit(u);}hit=true;break;} }
-      if(!hit && enemyHarbor && enemyHarbor.hp>0 && s.mesh.position.distanceTo(enemyHarbor.pos)<enemyHarbor.r){ if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{damageHarbor(enemyHarbor,shellShipDmg(s));impactFx(s,s.mesh.position.clone());showDamageNumber(s.mesh.position.clone(),s.dmg,true,s.dmg>=55);showHit('ENEMY HARBOR',false,s.dmg>=55?'crit':'');}hit=true; }
+      if(!hit && enemyHarbor && enemyHarbor.hp>0 && s.mesh.position.distanceTo(enemyHarbor.pos)<enemyHarbor.r){ if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{damageHarbor(enemyHarbor,shellShipDmg(s,enemyHarbor));impactFx(s,s.mesh.position.clone());showDamageNumber(s.mesh.position.clone(),s.dmg,true,s.dmg>=55);showHit('ENEMY HARBOR',false,s.dmg>=55?'crit':'');}hit=true; }
     }
     else {
       if(onFoot&&footHP>0&&s.mesh.position.distanceTo(footPos)<2.2){ damageFoot(s.dmg,s.mesh.position); hitSpark(s.mesh.position.clone()); hit=true; }
@@ -9232,10 +9233,10 @@ function updateShells(dt){
       if(!hit)for(const tk of playerTanks){if(tk.onDeck||tk.hp<=0)continue;const twp=tankWP(tk);if(s.mesh.position.distanceTo(twp)<3.4){
         hurtPlayerTank(tk,s.dmg,s.mesh.position.clone().sub(s.vel),s.vel.y<-9);hitSpark(s.mesh.position.clone());hit=true;break;}} // driven or uncrewed field tank
       if(!hit) for(const ap of aiPlanes){ if(ap.team!==0||ap.hp<=0)continue; if(s.mesh.position.distanceTo(ap.pos)<3.2){ ap.hp-=s.dmg; hitSpark(s.mesh.position.clone()); if(ap.hp<=0) killAIPlane(ap); hit=true; break; } }
-      if(!hit) for(const a of allies){ if(a.sinkT>0)continue; if(s.mesh.position.distanceTo(a.pos)< a.def.beam/2+2){ damageAlly(a,shellShipDmg(s),s.mesh.position.clone()); hitSpark(s.mesh.position.clone()); hit=true; break; } }
+      if(!hit) for(const a of allies){ if(a.sinkT>0)continue; if(s.mesh.position.distanceTo(a.pos)< a.def.beam/2+2){ damageAlly(a,shellShipDmg(s,a),s.mesh.position.clone()); hitSpark(s.mesh.position.clone()); hit=true; break; } }
       if(!hit && s.mesh.position.y<20) for(const u of landUnits){ if(u.team!==0||u.dead)continue; if(s.mesh.position.distanceTo(u.pos)<Math.max(3.5,(u.footprint||4)*.38)){
         if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{u.hp-=s.dmg*wallShield(u);hitSpark(s.mesh.position.clone());if(u.hp<=0)killLandUnit(u);}hit=true;break;} }
-      if(!hit && friendlyHarbor && friendlyHarbor.hp>0 && s.mesh.position.distanceTo(friendlyHarbor.pos)<friendlyHarbor.r){if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{damageHarbor(friendlyHarbor,shellShipDmg(s));hitSpark(s.mesh.position.clone());}hit=true;}
+      if(!hit && friendlyHarbor && friendlyHarbor.hp>0 && s.mesh.position.distanceTo(friendlyHarbor.pos)<friendlyHarbor.r){if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{damageHarbor(friendlyHarbor,shellShipDmg(s,friendlyHarbor));hitSpark(s.mesh.position.clone());}hit=true;}
     }
     if(!hit&&s.mesh.position.y<4)for(const m of mines){if(m.team===s.team||m.arm>0)continue;
       if(s.mesh.position.distanceTo(m.pos)<3.2){hitSpark(m.pos.clone().setY(1));detonateMine(m);hit=true;break;}}
@@ -9258,14 +9259,54 @@ function updateShells(dt){
 // made every big gun pointless. AA calibres now do 12% against ships and harbours;
 // against aircraft, land units and infantry they are untouched.
 const AA_VS_ARMOUR=0.12;
-function shellShipDmg(s){ return s.aa ? s.dmg*AA_VS_ARMOUR : s.dmg; }
+// A $950 P-51 did 133 dps and a $1,050 Corsair did 180, while the 16-inch capital battery — the
+// biggest gun in the game at $1,900 — did 119. Nothing discounted machine guns against a hull or
+// a harbour, so the fastest way to win any map was to buy a cheap fighter and hose the enemy HQ
+// from the opening minute. Two things fix that without nerfing aircraft into uselessness.
+//
+// ARMOUR uses a penetration curve rather than flat subtraction: dmg^2/(dmg+armour). A single
+// 8-damage bullet against 40 armour lands 1.3 (16%); a 135-damage shell lands 104 (77%). Small
+// fast hits are punished hard, heavy shells barely notice — which is the whole point, and it is
+// how armour actually behaves. Aircraft and infantry carry none, so dogfighting is untouched.
+//
+// ...and armour WEARS. Every hit strips a little, so a determined strafing run does eventually
+// open a hull up. It stops being the optimal opening move without becoming a wall.
+const ARMOUR_WEAR=0.06, GUN_FALLOFF_M=260, GUN_FALLOFF_MIN=0.35;
+const AI_GUN_RANGE=300, AI_GUN_HANDICAP=2.2;   // AI fires at its plane's real cadence, slowed a little
+// The threshold a hit must beat to count in full. Calibrated against the actual catalogue: a
+// machine-gun round is 5-15, a deck gun 26, a 6-inch 50, a 16-inch 135. So a threshold in the
+// 20-35 band stops bullet-spam dead while leaving every real naval gun at full value.
+function armourOf(t){
+  if(!t) return 0;
+  if(t===enemyHarbor||t===friendlyHarbor) return 34;      // concrete: shrugs off strafing
+  if(t.def&&t.def.kind) return t.def.kind==='sub'?16:Math.min(30, Math.round((t.def.beam||8)*0.9));
+  if(t.kind&&!t.def) return 12;                           // shore structures
+  return 0;                                               // aircraft, infantry: unarmoured
+}
+function shellShipDmg(s,target){
+  let d = s.aa ? s.dmg*AA_VS_ARMOUR : s.dmg;
+  // bullets bleed energy downrange; shells, torpedoes and missiles are unaffected
+  if(s.kind==='gun' && s.travel>0)
+    d *= Math.max(GUN_FALLOFF_MIN, 1-(s.travel/GUN_FALLOFF_M)*(1-GUN_FALLOFF_MIN));
+  // PENETRATION THRESHOLD, not a flat tax. A first attempt used dmg^2/(dmg+armour), which taxes
+  // EVERY shell — it cut a deck gun from 26 to 7.5 and gutted ordinary naval gunnery, which was
+  // never the complaint. Armour now only bites BELOW the threshold, and bites harder the further
+  // below you are: anything that can punch through goes through at full value.
+  const t = target ? (target._armour!=null ? target._armour : (target._armour=armourOf(target))) : 0;
+  if(t>0 && d<t){
+    const ratio=d/t;
+    if(target) target._armour=Math.max(0, t - d*ARMOUR_WEAR);   // sustained fire does wear it down
+    d *= ratio*ratio;
+  }
+  return d;
+}
 function onShellHit(s,pos,target){
   const mode=s.aa?'aa':(s.kind==='missile'?'missile':(s.dmg>=115||/rail/i.test(s.weaponName||'')?'rail':(s.dmg>=70?'crit':'')));
   if(playerCausedShell(s))showHit(target&&target.def?target.def.name:'TARGET',false,mode);   // your shell, not merely your side's
   impactFx(s,pos);
   if(s.strategic)blastAll(pos,s.dmg,s.splash,true,s.spareHarbors);
-  else if(s.splash) explodeAt(pos,s.team,shellShipDmg(s),s.splash,s.owner);
-  else { damageTarget(target,shellShipDmg(s),s.owner,pos); boom(pos, 0.7); }
+  else if(s.splash) explodeAt(pos,s.team,shellShipDmg(s,target),s.splash,s.owner);
+  else { damageTarget(target,shellShipDmg(s,target),s.owner,pos); boom(pos, 0.7); }
 }
 function impactFx(s,pos){
   if(!pos||fx.length>MAX_FX-24)return;
@@ -9651,7 +9692,12 @@ function updateAIPlane(p,dt){
     p.fireT-=dt; p.ordT-=dt;
     const from=p.pos.clone();
     // strafing guns (every type that has them)
-    if(p.def.guns&&p.fireT<=0&&lined&&dist<150&&(tgtAir||p.pos.y<atkY+10)&&(p.gunAmmo==null||p.gunAmmo>0)){p.fireT=0.6+Math.random()*0.7;if(p.gunAmmo!=null)p.gunAmmo--;
+    if(p.def.guns&&p.fireT<=0&&lined&&dist<AI_GUN_RANGE&&(tgtAir||p.pos.y<atkY+10)&&(p.gunAmmo==null||p.gunAmmo>0)){
+      // The AI used to fire ONE bullet every 0.6-1.3 s regardless of the aircraft, so an AI P-51
+      // managed about 8 dps while the same plane in a player's hands did 133 — the identical
+      // airframe was sixteen times stronger depending on who held it. It fires a real burst at
+      // the aircraft's own cadence now, with a handicap so it is dangerous, not merciless.
+      p.fireT=(p.def.guns.cd||0.06)*AI_GUN_HANDICAP; if(p.gunAmmo!=null)p.gunAmmo--;
       const aimY=tgtAir?tgtPos.y:tgtY; const dir=tgtPos.clone().setY(aimY).sub(from).normalize();
       const gw={...p.def.guns, col: p.team===1?0xff6a4a:0x70b0ff};
       spawnShell(gw,from,aircraftGunDir(dir,gw),p.team,p); }
