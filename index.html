@@ -570,7 +570,7 @@ const SHIPS = {
   // launch cells. vls scales the RELOAD of every missile mount she carries and nothing else —
   // reach is deliberately untouched, because a hull that also outranges the map is not a choice.
   missilecruiser:{ name:'Missile Cruiser', cls:'Guided-Missile Ship', len:72, beam:11, depth:4.4, deckY:3.5, hp:330, kind:'surface', mounts:7, vls:{cd:0.72},
-                desc:'A farm of vertical launch cells on the forecastle. Only she can load the Kh-35 Sea Skimmer — 1000 m of reach, further than anything else afloat, though it hits softly and is for ships, not harbours. Every missile aboard reloads about a quarter faster, and she sails with a Kh-35 and a SAM already fitted. Built light to carry them, so her hull is thinner than a gun cruiser\'s.' },
+                desc:'A farm of vertical launch cells on the forecastle. Only she can load the Kh-35 Sea Skimmer — 2000 m of reach, nearly three times as far as a Tomahawk and further than anything else afloat, though it hits softly and is for ships, not harbours. Every missile aboard reloads about a quarter faster, and she sails with a Kh-35 and a SAM already fitted. Built light to carry them, so her hull is thinner than a gun cruiser\'s.' },
   battleship: { name:'Battleship', cls:'Capital Ship',  len:82, beam:13, depth:5.0, deckY:3.9, hp:520, kind:'surface', mounts:8,
                 desc:'Thick armor, big main batteries. Slow but punishing.' },
   dreadnought:{ name:'Dreadnought', cls:'Super Capital',len:96, beam:15, depth:5.6, deckY:4.3, hp:680, kind:'surface', mounts:10,
@@ -705,13 +705,16 @@ const WEAPONS = {
   m777:    { name:'M777 Howitzer',   cost:1800,dmg:92, cd:2.8,  spd:92,  kind:'cannon', col:0xc4c8d0, size:1.5, splash:12, lob:16 },      // long-range artillery
   patriot: { name:'Patriot SAM',     cost:2200,dmg:50, cd:1.3,  spd:195, kind:'missile', col:0xd8dce2, size:1.1, splash:6, homing:true, aa:true, turn:4.5, range:520 }, // long-range air defense
   tomahawk:{ name:'Tomahawk Launcher',cost:2700,dmg:120,cd:3.6, spd:88,  kind:'missile', col:0xc0c6cc, size:1.2, splash:13, homing:true, turn:2.0, range:720 }, // cruise missile
-  // The Missile Cruiser's own round, and the longest reach in the game by a wide margin — 1000 m,
-  // against 720 for a Tomahawk. It pays for that in punch: 28 damage is barely more than a deck
-  // gun's 16 and a quarter of a Harpoon's, and at 2.6 s a shot it is about half a deck gun's dps.
-  // vlsOnly keeps it in the launch cells: bolted onto a Dreadnought's fifteen mounts a 1000 m
+  // The Missile Cruiser's own round, and the longest reach in the game by a mile — 2000 m, against
+  // 720 for a Tomahawk. It pays for that in punch: 28 damage is barely more than a deck gun's 16
+  // and a quarter of a Harpoon's, and at 2.6 s a shot it is about half a deck gun's dps.
+  // life:16 is load-bearing, not decoration. Shells also expire on flight TIME (default 9 s), and
+  // 2000 m at 165 m/s takes 12.1 — on the default the round would quietly self-destruct around
+  // 1485 m and never once reach the range printed on its card.
+  // vlsOnly keeps it in the launch cells: bolted onto a Dreadnought's fifteen mounts a 2000 m
   // round would simply delete the enemy fleet from outside their reach, which is the P-51 all
   // over again. On the one hull that can carry it, it is a scalpel, not a siege engine.
-  kh35:    { name:'Kh-35 Sea Skimmer',cost:1800,dmg:28, cd:2.6, spd:165, kind:'missile', col:0xd6dade, size:1.1, splash:4, homing:true, turn:3.0, range:1000, vlsOnly:true, antiShip:true },
+  kh35:    { name:'Kh-35 Sea Skimmer',cost:1800,dmg:28, cd:2.6, spd:165, kind:'missile', col:0xd6dade, size:1.1, splash:4, homing:true, turn:3.0, range:2000, life:16, vlsOnly:true, antiShip:true },
 };
 // Buyable, pilotable, armed aircraft. Park on deck → press E to fly.
 const PLANES = {
@@ -11330,7 +11333,7 @@ const SHIPS_ZH = {
   submarine:  { name:'攻击潜艇',   cls:'潜水艇',   desc:'按 C 下潜——潜在水下时敌人看不见你，火炮也打不到你，但你只能用鱼雷。想用甲板炮就得上浮。' },
   destroyer:  { name:'驱逐舰',     cls:'护航舰',   desc:'全能选手。速度、船体和炮位都很均衡。' },
   cruiser:    { name:'重巡洋舰',   cls:'战列线舰', desc:'炮更重、装甲带更结实，甲板空间也很充足。' },
-  missilecruiser:{ name:'导弹巡洋舰', cls:'导弹舰', desc:'前甲板上是一整片垂直发射单元。只有她能装 Kh-35 掠海导弹——一千米射程，全场最远，代价是威力不大，而且只擅长打船、不擅长砸海港。舰上每一个导弹炮位的装填都快上约四分之一，出港时就已经装好了一发 Kh-35 和一具防空导弹。为了塞下这些发射井，船体造得比重巡洋舰更薄。' },
+  missilecruiser:{ name:'导弹巡洋舰', cls:'导弹舰', desc:'前甲板上是一整片垂直发射单元。只有她能装 Kh-35 掠海导弹——两千米射程，全场最远，代价是威力不大，而且只擅长打船、不擅长砸海港。舰上每一个导弹炮位的装填都快上约四分之一，出港时就已经装好了一发 Kh-35 和一具防空导弹。为了塞下这些发射井，船体造得比重巡洋舰更薄。' },
   battleship: { name:'战列舰',     cls:'主力舰',   desc:'装甲厚、主炮大。开得慢，但一炮一个疼。' },
   dreadnought:{ name:'无畏舰',     cls:'超级主力舰', desc:'一座会漂的堡垒。炮位密密麻麻，船体巨大。' },
   boss:       { name:'利维坦',     cls:'首领战舰', desc:'每方只有一艘。缓慢的装甲旗舰，自带十二门炮，火力吓人，沉了就没有第二艘。' },
@@ -11344,7 +11347,7 @@ const WEAPONS_ZH = {
   beamcannon:{ name:'Mk 12 光束炮', desc:'连续能量束，不用提前量。' },
   flak88:  { name:'88 毫米 Flak 36', desc:'有名的两用炮：打飞机，也打船。' },
   harpoon: { name:'鱼叉反舰导弹', desc:'射程远超甲板上任何一门炮。' },
-  kh35:    { name:'Kh-35 掠海导弹', desc:'全游戏射程最远的一发——一千米，比战斧还远两百八。代价是威力很小、装填也慢，而且它是反舰弹：贴着海面飞，打船很好用，砸海港几乎不掉血。只能装进导弹巡洋舰的垂直发射单元里。' },
+  kh35:    { name:'Kh-35 掠海导弹', desc:'全游戏射程最远的一发——两千米，差不多是战斧的三倍。代价是威力很小、装填也慢，而且它是反舰弹：贴着海面飞，打船很好用，砸海港几乎不掉血。只能装进导弹巡洋舰的垂直发射单元里。' },
   katyusha:{ name:'BM-13 火箭炮架', desc:'六联齐射：不讲瞄准，讲把那一片全覆盖。' },
   railmount:{ name:'Mk 9 电磁炮', desc:'弹道笔直、初速极快，指哪打哪，就是充能慢。' },
   deckgun: { name:'甲板炮', desc:'' },

@@ -93,7 +93,7 @@ test('missiles reload faster aboard her — and only aboard her, and only missil
 
 // The Kh-35 is the reason to sail her: the longest reach in the game, bought with damage. Both
 // halves of that bargain have to hold, or it is either a dud or the next P-51.
-test('the Kh-35 reaches 1000 m, hits softly, and flies the whole way', async ({ page }) => {
+test('the Kh-35 reaches 2000 m, hits softly, and flies the whole way', async ({ page }) => {
   await page.goto('http://localhost:3000/');
   await page.waitForFunction(() => typeof WEAPONS !== 'undefined' && typeof spawnShell === 'function');
   const r = await page.evaluate(([PRE_SRC]) => {
@@ -106,15 +106,16 @@ test('the Kh-35 reaches 1000 m, hits softly, and flies the whole way', async ({ 
     difficulty = 'easy'; currentSandboxIdx = -1; currentMapIdx = 4;
     startGame('missilecruiser'); skipBanner();
     // Fire one into empty water away from every contact, so nothing is near enough to home onto
-    // and it flies its own straight max-range profile. life defaults to 9 s and 1000 m at 165 m/s
-    // is 6.1 s — close enough that a slower round would quietly expire before reaching its range.
+    // and it flies its own straight max-range profile. This is the assertion that matters most:
+    // shells expire on flight TIME as well as distance, and 2000 m at 165 m/s takes 12.1 s against
+    // a 9 s default — on the default this round dies around 1485 m and never reaches its own card.
     enemies.length = 0; aiPlanes.length = 0;
     const before = shells.length;
     spawnShell(k, player.pos.clone().setY(6), new THREE.Vector3(0, 0.02, -1).normalize(), 0, null);
     const sh = shells[shells.length - 1];
     const dt = 1 / 30;
     let flew = 0, expiredEarly = false;
-    for (let i = 0; i < 30 * 12; i++) {
+    for (let i = 0; i < 30 * 25; i++) {          // long enough to cover the full 12.1 s flight
       t2 += dt; updateShells(dt);
       if (!shells.includes(sh)) { expiredEarly = sh.dist < k.range - 40; break; }
       flew = sh.dist;
@@ -126,7 +127,7 @@ test('the Kh-35 reaches 1000 m, hits softly, and flies the whole way', async ({ 
              kh35Dps: +(k.dmg / k.cd).toFixed(1) };
   }, [PRE.toString()]);
 
-  expect(r.range).toBe(1000);
+  expect(r.range).toBe(2000);
   expect(r.range).toBeGreaterThan(r.longestOther);        // the longest reach in the game, not merely a long one
   expect(r.kind).toBe('missile');
   expect(r.homing).toBe(true);
@@ -140,7 +141,7 @@ test('the Kh-35 reaches 1000 m, hits softly, and flies the whole way', async ({ 
   expect(r.flew).toBeGreaterThan(r.range - 60);
 });
 
-// 1000 m of reach against a harbour is a siege engine, and it was: measured on Operation 1, one
+// 2000 m of reach against a harbour is a siege engine, and it was: measured on Operation 1, one
 // starter launcher flattened the enemy HQ from standoff in 110 seconds while taking 8 damage back.
 // A sea skimmer is an anti-SHIP round, so it now barely marks shore — while its real job is
 // untouched. Both halves matter: a weapon that is weak against everything is just a bad weapon.
