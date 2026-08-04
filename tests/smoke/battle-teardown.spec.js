@@ -14,9 +14,19 @@ test('replaying a battle strikes the previous one instead of stacking on it', as
     const runs = [];
     for (let i = 0; i < 4; i++) {
       startGame('destroyer'); skipBanner();
-      for (let f = 0; f < 30; f++) await frame();   // let the fleets open fire, so shells and FX are live at the next restart
-      runs.push({ enemies: enemies.length, allies: allies.length, islands: islands.length,
-                  landUnits: landUnits.length, meshes: meshes() });
+      // Fleet sizes are read from the theater as BUILT, before a single frame runs. Reinforcements
+      // are a per-frame coin flip (Math.random() < dt*allyReinforceRate), so once the clock is
+      // moving allies.length is a random variable — reading it after the sim window below made an
+      // unlucky roll in any one of these four runs fail the identity check at random. Stacking
+      // still shows here: leftover hulls from the last battle would be in these arrays already.
+      const built = { enemies: enemies.length, allies: allies.length,
+                      islands: islands.length, landUnits: landUnits.length };
+      // Then let a fixed slice of SIMULATED time pass, so shells and FX are live at the next
+      // restart — which is what the mesh count is really testing. Simulated, not a frame count:
+      // the loop clamps dt to 0.05, so thirty frames is half a second idle and up to 1.5s loaded.
+      const t0 = t2;
+      while (t2 - t0 < 0.6) await frame();
+      runs.push({ ...built, meshes: meshes() });
     }
     return runs;
   });

@@ -566,6 +566,11 @@ const SHIPS = {
                 desc:'The all-rounder. Balanced speed, hull and gun mounts.' },
   cruiser:    { name:'Heavy Cruiser', cls:'Line Ship',  len:68, beam:11, depth:4.5, deckY:3.4, hp:380, kind:'surface', mounts:7,
                 desc:'Heavier guns, sturdier belt armor, plenty of deck space.' },
+  // The gun cruiser's opposite number: same size, same mount count, and she trades belt armor for
+  // launch cells. vls scales the RELOAD of every missile mount she carries and nothing else —
+  // reach is deliberately untouched, because a hull that also outranges the map is not a choice.
+  missilecruiser:{ name:'Missile Cruiser', cls:'Guided-Missile Ship', len:72, beam:11, depth:4.4, deckY:3.5, hp:330, kind:'surface', mounts:7, vls:{cd:0.72},
+                desc:'A farm of vertical launch cells on the forecastle — every missile mount aboard reloads about a quarter faster, and she sails with a launcher and a SAM already fitted. Built light to carry them, so her hull is thinner than a gun cruiser\'s.' },
   battleship: { name:'Battleship', cls:'Capital Ship',  len:82, beam:13, depth:5.0, deckY:3.9, hp:520, kind:'surface', mounts:8,
                 desc:'Thick armor, big main batteries. Slow but punishing.' },
   dreadnought:{ name:'Dreadnought', cls:'Super Capital',len:96, beam:15, depth:5.6, deckY:4.3, hp:680, kind:'surface', mounts:10,
@@ -1998,6 +2003,22 @@ function addNavalHardware(g,def,L,B,deckY,enemy){
     const cranePost=mkCyl(.12,.16,3.3,steel,9);cranePost.position.set(B*.7,deckY+1.7,-L*.58);g.add(cranePost);
     const boom=mkBox(4,.12,.14,steel);boom.position.set(B*.54,deckY+3.25,-L*.58);boom.rotation.z=-.15;g.add(boom);
   }else{
+    // A vertical-launch farm on the forecastle — the one thing that reads as "missile ship" from
+    // the outside before she has fired anything. It goes forward because that is the only large
+    // piece of deck this hull does not already owe to something: the flight strip and its parked
+    // aircraft live out on the starboard sponson (x 10-17), the tank slots run down the port
+    // quarter and the helipad owns the starboard quarter. Sits on the raised forecastle plate
+    // (deckY + .26 + .3), well inboard of the fore gun mounts at x=B*0.70.
+    if(def.vls){
+      const fcY=deckY+.56, wellM=SILVER(0x2b3137), lidM=SILVER(0x79848e), coamM=SILVER(0x545c64);
+      const cx=-1.5, cz=L*.42, pitch=2.4, cols=5, rows=4;
+      const coaming=mkBox(pitch*cols+1.2,.5,pitch*rows+1.2,coamM); coaming.position.set(cx,fcY+.25,cz); g.add(coaming);
+      for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+        const x=cx+(c-(cols-1)/2)*pitch, z=cz+(r-(rows-1)/2)*pitch;
+        const well=mkBox(2.1,.14,2.1,wellM); well.position.set(x,fcY+.53,z); g.add(well);
+        const cap =mkBox(1.7,.12,1.7,lidM); cap.position.set(x,fcY+.62,z); g.add(cap);
+      }
+    }
     const breakwater=navalBlock(B*1.3,.65,.25,steel,.72);breakwater.position.set(0,deckY+.48,L*.5);g.add(breakwater);
     if(def.len<62)for(const sx of[-1,1]){const rack=mkBox(.55,.42,L*.18,dark);rack.position.set(sx*B*.67,deckY+.38,-L*.69);g.add(rack);}
     if(def.len>68){const reel=mkCyl(.48,.48,1.5,steel,12);reel.rotation.z=Math.PI/2;reel.position.set(0,deckY+.65,-L*.4);g.add(reel);}
@@ -5467,6 +5488,8 @@ function makePlayerShip(shipId){
   }
   if(def.boss)installBossStarterGuns(build);
   else if(def.kind==='sub') installStarterGuns(build,[WEAPONS.deckgun,WEAPONS.deckgun],[0,2]);   // skip mounts[1] — the sail top, where the periscope lives
+  // a missile ship that starts with two deck guns is a missile ship in name only
+  else if(def.vls) installStarterGuns(build,[WEAPONS.missile,WEAPONS.sam,WEAPONS.deckgun]);
   else installStarterGuns(build, (def.len0||def.len)>60?[WEAPONS.deckgun,WEAPONS.deckgun,WEAPONS.aa]:[WEAPONS.deckgun,WEAPONS.deckgun]);
   walkPos.set(0, deckEyeY(), def.len*0.28); camYaw.v=player.heading; camPitch.v=0.04;
 }
@@ -8248,10 +8271,19 @@ function dropBomb(P){
 // =====================================================================
 //  FIRE
 // =====================================================================
+// A missile cruiser fights out of vertical launch cells instead of trainable rails: nothing has to
+// traverse and nothing has to be hand-loaded, so every missile mount she carries cycles faster.
+// Reload only, and only for kind:'missile' — guns, cannon, torpedoes and bombs are untouched, and
+// so is range. Reaches through player.def, so it follows the hull rather than the weapon: fit the
+// same launcher to a destroyer and it reloads at its own rate.
+function vlsReload(w){
+  const v = player && player.def && player.def.vls;
+  return (v && w.kind==='missile') ? v.cd : 1;
+}
 function fireTurret(pl, aim){
   if(pl.cd>0 || pl.ko) return;
   if(player.submerged && pl.def.kind!=='torpedo') return;    // submerged: only torpedo tubes fire
-  const w=pl.def; pl.cd=w.cd;   // knocked-out turret can't fire
+  const w=pl.def; pl.cd=w.cd*vlsReload(w);   // knocked-out turret can't fire
   const bl=pl.group.userData.barrelLen||2;
   // aim dir from turret yaw/pitch (turret yaw is world via group rotation? we store absolute)
   const yaw=pl.yaw, pitch=pl.pitch;
@@ -11272,6 +11304,7 @@ const SHIPS_ZH = {
   submarine:  { name:'攻击潜艇',   cls:'潜水艇',   desc:'按 C 下潜——潜在水下时敌人看不见你，火炮也打不到你，但你只能用鱼雷。想用甲板炮就得上浮。' },
   destroyer:  { name:'驱逐舰',     cls:'护航舰',   desc:'全能选手。速度、船体和炮位都很均衡。' },
   cruiser:    { name:'重巡洋舰',   cls:'战列线舰', desc:'炮更重、装甲带更结实，甲板空间也很充足。' },
+  missilecruiser:{ name:'导弹巡洋舰', cls:'导弹舰', desc:'前甲板上是一整片垂直发射单元——舰上每一个导弹炮位的装填都快上约四分之一，出港时就已经装好了一具发射架和一具防空导弹。为了塞下这些发射井，船体造得比重巡洋舰更薄。' },
   battleship: { name:'战列舰',     cls:'主力舰',   desc:'装甲厚、主炮大。开得慢，但一炮一个疼。' },
   dreadnought:{ name:'无畏舰',     cls:'超级主力舰', desc:'一座会漂的堡垒。炮位密密麻麻，船体巨大。' },
   boss:       { name:'利维坦',     cls:'首领战舰', desc:'每方只有一艘。缓慢的装甲旗舰，自带十二门炮，火力吓人，沉了就没有第二艘。' },
@@ -12104,6 +12137,8 @@ const NAME_ZH = {
   'Aegis VLS Battery':'宙斯盾垂发导弹阵',
   // 上游新增的传奇旗舰(真实历史名舰,用通行中文舰名)
   'Missile Frigate':'导弹护卫舰',
+  'Missile Cruiser':'导弹巡洋舰',
+  'Guided-Missile Ship':'导弹舰',
   'Battlecruiser':'战列巡洋舰',
   'Coastal Monitor':'近岸浅水重炮舰',
   'Akagi':'赤城号',
