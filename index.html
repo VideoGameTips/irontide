@@ -573,6 +573,14 @@ const SHIPS = {
                 desc:'A farm of vertical launch cells on the forecastle. Only she can load the Kh-35 Sea Skimmer — 2000 m of reach, nearly three times as far as a Tomahawk and further than anything else afloat, though it hits softly and is for ships, not harbours. Every missile aboard reloads about a quarter faster, and she sails with a Kh-35 and a SAM already fitted. Built light to carry them, so her hull is thinner than a gun cruiser\'s.' },
   battleship: { name:'Battleship', cls:'Capital Ship',  len:82, beam:13, depth:5.0, deckY:3.9, hp:520, kind:'surface', mounts:8,
                 desc:'Thick armor, big main batteries. Slow but punishing.' },
+  // ---- Pincurchin Republic: the faction whose SS-17, P-11 and SP-9-R already fly for you ----
+  // Their first hull, and the only ship in the game that sails already armed with its own guns.
+  // starter[] is a general field rather than another special case in makePlayerShip — the boss
+  // had a hard-coded loadout and the missile cruiser a second branch, and this is the third.
+  pincurchin: { name:'Pincurchin', cls:'Republic Plasma Battleship', faction:'Pincurchin Republic', year:2054,
+                len:86, beam:14, depth:5.0, deckY:4.0, hp:600, kind:'surface', mounts:8, urchin:true,
+                starter:['plasmamini','plasmamini','plasmamini','plasmamini'],
+                desc:'2054 plasma battleship, and the only warship that sails already armed: four Plasma Miniguns fitted from the yard, twenty bolts a second each. A ring of charged spines runs the length of the hull. The bolts are small, so armour blunts them and distance drains them — but nothing with wings survives crossing her.' },
   dreadnought:{ name:'Dreadnought', cls:'Super Capital',len:96, beam:15, depth:5.6, deckY:4.3, hp:680, kind:'surface', mounts:10,
                 desc:'A floating fortress. Bristling with mounts, immense hull.' },
   boss:       { name:'Leviathan', cls:'Boss Warship',len:148,beam:25,depth:7.2,deckY:5.6,hp:1800,kind:'surface',mounts:16,boss:true,turn:.11,
@@ -715,6 +723,18 @@ const WEAPONS = {
   // round would simply delete the enemy fleet from outside their reach, which is the P-51 all
   // over again. On the one hull that can carry it, it is a scalpel, not a siege engine.
   kh35:    { name:'Kh-35 Sea Skimmer',cost:1800,dmg:28, cd:2.6, spd:165, kind:'missile', col:0xd6dade, size:1.1, splash:4, homing:true, turn:3.0, range:2000, life:16, vlsOnly:true, antiShip:true },
+  // Pincurchin Republic ordnance, matching the electric-cyan guns their aircraft already fly with.
+  // Twenty bolts a second at 10 damage — 200 dps raw, the highest rate of fire afloat. It stays
+  // Priced at 3900 by the balance guardrail, not by taste: at 200 raw dps it is the highest
+  // rate of fire in the game, and at 2600 it came out 3.5x the median dps-per-dollar against
+  // ships and tripped tests/smoke/balance.spec.js. Raising the price was the honest answer;
+  // relaxing the guardrail to fit the newest toy is exactly what it exists to prevent. The four
+  // aboard the Pincurchin are still free — the cost only governs bolting on more.
+  // sane because it obeys the SAME downrange rule Andy's own P-51 fix created: kind:'gun', so it
+  // bleeds energy with distance and armour blunts a 10-damage bolt hard. Against aircraft, which
+  // carry no armour, it is a wall of fire. Fast bolts (520 m/s) on purpose — at 20/s a slow round
+  // would keep ~250 shells alive at once and crowd the 360 cap, evicting everyone else's fire.
+  plasmamini:{name:'Plasma Minigun', cost:3900,dmg:10, cd:0.05,spd:520, kind:'gun', col:0x9df6ff, tracerCol:0x7be0ff, size:0.9, spread:0.012, range:800, plasma:true },
 };
 // Buyable, pilotable, armed aircraft. Park on deck → press E to fly.
 const PLANES = {
@@ -2041,6 +2061,32 @@ function addNavalHardware(g,def,L,B,deckY,enemy){
         const x=cx+(c-(cols-1)/2)*pitch, z=cz+(r-(rows-1)/2)*pitch;
         const well=mkBox(2.1,.14,2.1,wellM); well.position.set(x,fcY+.53,z); g.add(well);
         const cap =mkBox(1.7,.12,1.7,lidM); cap.position.set(x,fcY+.62,z); g.add(cap);
+      }
+    }
+    // Charged spines down both rails — a sea urchin that happens to be a battleship. Angled out
+    // and up so they read as spines from the deck rather than as a fence, and glowing in the same
+    // electric cyan the Republic's aircraft already fire.
+    if(def.urchin){
+      const spineM=new THREE.MeshStandardMaterial({color:0x2b3a44,metalness:.7,roughness:.35,
+        emissive:0x4fd8ff,emissiveIntensity:.6});
+      const tipM=new THREE.MeshStandardMaterial({color:0x9df6ff,emissive:0x7be0ff,emissiveIntensity:1.8,roughness:.25});
+      // A cylinder's axis is local +Y; rotating by -sx*TILT about Z swings it to
+      // (sx*sin TILT, cos TILT, 0) — outboard and up on BOTH rails. Everything below is measured
+      // from the spine's ROOT at the deck edge, or the tip lights drift off the ends.
+      const TILT=0.62, sN=Math.sin(TILT), cN=Math.cos(TILT), n=13;
+      for(let i=0;i<n;i++){ const z=(i/(n-1)-0.5)*L*1.62;
+        for(const sx of [-1,1]){
+          // Sized against the HULL, not against a real sea urchin: on a 190 m ship a three-metre
+          // needle is invisible. These run 9-14 m, so they read as spines from the bridge.
+          const len=9+Math.abs(Math.sin(i*1.7))*5;
+          const rootX=sx*B*.92, rootY=deckY+.5;
+          const sp=mkCyl(.10,.55,len,spineM,7);
+          sp.position.set(rootX+sx*sN*len/2, rootY+cN*len/2, z);
+          sp.rotation.z=-sx*TILT;
+          g.add(sp);
+          const tip=new THREE.Mesh(new THREE.SphereGeometry(.42,8,7),tipM);
+          tip.position.set(rootX+sx*sN*len, rootY+cN*len, z); g.add(tip);
+        }
       }
     }
     const breakwater=navalBlock(B*1.3,.65,.25,steel,.72);breakwater.position.set(0,deckY+.48,L*.5);g.add(breakwater);
@@ -5538,6 +5584,8 @@ function makePlayerShip(shipId){
   }
   if(def.boss)installBossStarterGuns(build);
   else if(def.kind==='sub') installStarterGuns(build,[WEAPONS.deckgun,WEAPONS.deckgun],[0,2]);   // skip mounts[1] — the sail top, where the periscope lives
+  // a hull may name its own starting loadout — the general form of the two special cases below
+  else if(def.starter) installStarterGuns(build, def.starter.map(k=>WEAPONS[k]).filter(Boolean));
   // a missile ship that starts with two deck guns is a missile ship in name only
   else if(def.vls) installStarterGuns(build,[WEAPONS.kh35,WEAPONS.sam,WEAPONS.deckgun]);   // her own round is fitted from the off
   else installStarterGuns(build, (def.len0||def.len)>60?[WEAPONS.deckgun,WEAPONS.deckgun,WEAPONS.aa]:[WEAPONS.deckgun,WEAPONS.deckgun]);
@@ -8391,7 +8439,7 @@ function spawnShell(w,pos,dir,team,owner,enemyArc,velOverride){
   if(w.kind==='torpedo'){ m.position.y=0.6; vel.y=0; }
   const sh={ mesh:m, pos:m.position, vel, dmg:w.dmg, team, splash:w.splash||0, homing:!!w.homing, water:w.kind==='torpedo',
     arc:!!lob||!!velOverride, owner, life:w.life||9, col, aa:!!w.aa, strategic:!!w.strategic, nuclear:!!w.nuclear,
-    hp:w.hp||0, fixedTarget:w.targetPos?w.targetPos.clone():null, spareHarbors:!!w.spareHarbors, antiShip:!!w.antiShip,
+    hp:w.hp||0, fixedTarget:w.targetPos?w.targetPos.clone():null, spareHarbors:!!w.spareHarbors, antiShip:!!w.antiShip, plasma:!!w.plasma,
     turn:w.turn||2.4, maxDist:w.range||0, dist:0, kind:w.kind||'gun', weaponName:w.name||'', size:w.size||0.5, tracerCol, tone, spawnIsl:islandUnderPos(pos) };  // spawnIsl exempts shore weapons from detonating on their own launch island
   if(w.nuclear){const mark=teamMarker(team,12);mark.position.y=7;m.add(mark);}
   // flame streak / tracer trail — white-hot core sheathed in an orange glow (skip torpedoes — they're in the water)
@@ -9390,8 +9438,12 @@ function armourOf(t){
 const SKIMMER_VS_SHORE=0.15;
 function shellShipDmg(s,target){
   let d = s.aa ? s.dmg*AA_VS_ARMOUR : s.dmg;
-  // bullets bleed energy downrange; shells, torpedoes and missiles are unaffected
-  if(s.kind==='gun' && s.travel>0)
+  // Bullets bleed energy downrange; shells, torpedoes and missiles are unaffected. So is plasma —
+  // a bolt is not a slug, and the two nerfs were compounding: falloff cut a 10-damage bolt to 3.5,
+  // then the armour threshold SQUARED that ratio down to 0.09 against a hull. A weapon whose card
+  // says 800 m reach was doing nine hundredths of a point at 400. The armour rule still applies at
+  // full strength, which is what actually stops fast light guns beating armour.
+  if(s.kind==='gun' && s.travel>0 && !s.plasma)
     d *= Math.max(GUN_FALLOFF_MIN, 1-(s.travel/GUN_FALLOFF_M)*(1-GUN_FALLOFF_MIN));
   // PENETRATION THRESHOLD, not a flat tax. A first attempt used dmg^2/(dmg+armour), which taxes
   // EVERY shell — it cut a deck gun from 26 to 7.5 and gutted ordinary naval gunnery, which was
@@ -11388,6 +11440,7 @@ const SHIPS_ZH = {
   submarine:  { name:'攻击潜艇',   cls:'潜水艇',   desc:'按 C 下潜——潜在水下时敌人看不见你，火炮也打不到你，但你只能用鱼雷。想用甲板炮就得上浮。' },
   destroyer:  { name:'驱逐舰',     cls:'护航舰',   desc:'全能选手。速度、船体和炮位都很均衡。' },
   cruiser:    { name:'重巡洋舰',   cls:'战列线舰', desc:'炮更重、装甲带更结实，甲板空间也很充足。' },
+  pincurchin:{ name:'海胆号', cls:'共和国等离子战列舰', desc:'2054 年的等离子战列舰，也是全游戏唯一一艘出厂就带枪的军舰：四门等离子转管炮，每门每秒二十发。船舷两侧插满通着电的长刺。单发威力很小，所以装甲挡得住、距离也会把它耗光——但任何长翅膀的东西都别想从她头顶飞过去。' },
   missilecruiser:{ name:'导弹巡洋舰', cls:'导弹舰', desc:'前甲板上是一整片垂直发射单元。只有她能装 Kh-35 掠海导弹——两千米射程，全场最远，代价是威力不大，而且只擅长打船、不擅长砸海港。舰上每一个导弹炮位的装填都快上约四分之一，出港时就已经装好了一发 Kh-35 和一具防空导弹。为了塞下这些发射井，船体造得比重巡洋舰更薄。' },
   battleship: { name:'战列舰',     cls:'主力舰',   desc:'装甲厚、主炮大。开得慢，但一炮一个疼。' },
   dreadnought:{ name:'无畏舰',     cls:'超级主力舰', desc:'一座会漂的堡垒。炮位密密麻麻，船体巨大。' },
@@ -11402,6 +11455,7 @@ const WEAPONS_ZH = {
   beamcannon:{ name:'Mk 12 光束炮', desc:'连续能量束，不用提前量。' },
   flak88:  { name:'88 毫米 Flak 36', desc:'有名的两用炮：打飞机，也打船。' },
   harpoon: { name:'鱼叉反舰导弹', desc:'射程远超甲板上任何一门炮。' },
+  plasmamini:{ name:'等离子转管炮', desc:'每秒二十发，全场射速最快。单发只有 10 点伤害，所以打有装甲的东西不疼、打远了更不疼——但打飞机是一堵火墙。' },
   kh35:    { name:'Kh-35 掠海导弹', desc:'全游戏射程最远的一发——两千米，差不多是战斧的三倍。代价是威力很小、装填也慢，而且它是反舰弹：贴着海面飞，打船很好用，砸海港几乎不掉血。只能装进导弹巡洋舰的垂直发射单元里。' },
   katyusha:{ name:'BM-13 火箭炮架', desc:'六联齐射：不讲瞄准，讲把那一片全覆盖。' },
   railmount:{ name:'Mk 9 电磁炮', desc:'弹道笔直、初速极快，指哪打哪，就是充能慢。' },
@@ -12225,6 +12279,9 @@ const NAME_ZH = {
   'Missile Cruiser':'导弹巡洋舰',
   'Guided-Missile Ship':'导弹舰',
   'Kh-35 Sea Skimmer':'Kh-35 掠海导弹',
+  'Pincurchin':'海胆号',
+  'Republic Plasma Battleship':'共和国等离子战列舰',
+  'Plasma Minigun':'等离子转管炮',
   'Battlecruiser':'战列巡洋舰',
   'Coastal Monitor':'近岸浅水重炮舰',
   'Akagi':'赤城号',
