@@ -8886,8 +8886,13 @@ function update(dt,t){
     const roll=Math.sin(t*0.9)*0.02*sea + player._heel;
     const pitch=Math.sin(t*0.72+1.3)*0.02*sea;
     const heave=Math.sin(t*0.6)*0.15*(0.6+sea*0.7);
-    player.build.group.position.set(player.pos.x, heave-(player.diveY||0), player.pos.z);
-    player.build.group.rotation.set(pitch, player.heading, roll); }
+    // A ground theatre has no ship at all: deployLandCampaignStart hides the hull and parks it
+    // below the world. This line ran unconditionally and hauled it straight back out — and in
+    // land mode the player anchor follows the SOLDIER, so an invisible warship trailed the
+    // player around the battlefield for the whole assault. Leave it parked.
+    if(!landCampaignMode){
+      player.build.group.position.set(player.pos.x, heave-(player.diveY||0), player.pos.z);
+      player.build.group.rotation.set(pitch, player.heading, roll); } }
   setShipWake(player.build,player.speed||0);
   if(player.helmMark) player.helmMark.material.emissiveIntensity=0.5+Math.abs(Math.sin(t*3))*0.5;
   // keep the sun's shadow box centered on the player across the big map
@@ -8898,7 +8903,10 @@ function update(dt,t){
   // --- placed turrets: auto-gunner when unmanned, manual when manned (knocked-out guns sit dead) ---
   placed.forEach(pl=>{ if(pl.cd>0)pl.cd-=dt; if(pl.recoil>0)pl.recoil-=dt*3;
     if(pl.ko){ pl.pitch=-0.32; }                                        // dead turret droops its barrel
-    else if(pl!==manning) autoGun(pl,dt);
+    // ...and a ground theatre has no ship, so it has no deck guns either. Measured before the
+    // fix: two invisible turrets riding on the soldier fired 88 shells in 25 seconds and killed
+    // nine enemy units on their own — free artillery nobody could see, aim or lose.
+    else if(pl!==manning && !landCampaignMode) autoGun(pl,dt);
     pl.group.userData.yawG.rotation.y = pl.yaw - player.heading;        // world aim -> local
     if(pl.group.userData.pitchG) pl.group.userData.pitchG.rotation.x = -pl.pitch + (pl.recoil>0?pl.recoil*0.3:0);
     if(pl.gunner) pl.gunner.visible = (pl!==manning && !pl.ko);
