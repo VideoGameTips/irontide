@@ -1576,10 +1576,18 @@ function sfxInit(){
   const sea=loopNoise(), seaBP=ctx.createBiquadFilter(), seaG=ctx.createGain();
   seaBP.type='bandpass'; seaBP.frequency.value=520; seaBP.Q.value=0.6;
   seaG.gain.value=0; sea.connect(seaBP); seaBP.connect(seaG); seaG.connect(SFX.master); sea.start();
-  const wash=loopNoise(), washHP=ctx.createBiquadFilter(), washG=ctx.createGain();
-  washHP.type='highpass'; washHP.frequency.value=1400; washG.gain.value=0;
-  wash.connect(washHP); washHP.connect(washG); washG.connect(SFX.master); wash.start();
-  SFX.seaGain=seaG; SFX.seaFilt=seaBP; SFX.washGain=washG; SFX.seaPhase=0;
+  // A bow wash is water breaking along a hull — it has body, and it has a top end. This was a
+  // bare highpass at 1400 Hz with nothing above it, so it ran all the way to Nyquist: BRIGHTER
+  // than the game's own rain layer (950-6200 Hz) and with no low end at all, which is precisely
+  // the recipe for "static". Pinned at full level from 16 m/s — below every hull's cruising
+  // speed — it played flat out the whole time you were under way, and read as rain that would
+  // not stop even on a clear day. Band it top and bottom so it sounds like water instead.
+  const wash=loopNoise(), washHP=ctx.createBiquadFilter(), washLP=ctx.createBiquadFilter(), washG=ctx.createGain();
+  washHP.type='highpass'; washHP.frequency.value=700;
+  washLP.type='lowpass';  washLP.frequency.value=2100;
+  washG.gain.value=0;
+  wash.connect(washHP); washHP.connect(washLP); washLP.connect(washG); washG.connect(SFX.master); wash.start();
+  SFX.seaGain=seaG; SFX.seaFilt=seaBP; SFX.washGain=washG; SFX.washFilt=washLP; SFX.seaPhase=0;
 }
 function _ramp(param,v){ param.setTargetAtTime(v, SFX.ctx.currentTime, 0.15); }
 function sfxResume(){ sfxInit(); if(SFX.ctx && SFX.ctx.state==='suspended') SFX.ctx.resume(); }
@@ -1900,7 +1908,10 @@ function sfxEngine(){   // called each frame — picks the right continuous laye
   // rotor noise and its blade pulse, which reads as air and physical blades.
   _ramp(SFX.rotorToneGain.gain, 0); _ramp(SFX.rotorToneDepth.gain, 0);
   _ramp(SFX.rotorLFO.frequency, rlf);
-  const storm=(phase==='play'&&typeof weather==='object'&&weather.type==='storm')?1:0;
+  // Use the SAME test the visible rain uses. updateStormRain draws rain whenever weatherForce()
+  // is >= 0.9 — storm, supercell AND tornado — while this asked for weather.type==='storm'
+  // alone, so a supercell threw rain down the whole screen in complete silence.
+  const storm=(phase==='play'&&typeof weatherForce==='function'&&weatherForce()>=0.9)?1:0;
   if(SFX.rainGain){
     const sea=(typeof weather==='object'&&weather.sea)?weather.sea:1;
     const target=storm?1:0, rate=storm?0.018:0.032;SFX.rainLevel+=(target-SFX.rainLevel)*rate;SFX.rainPhase+=0.016;
@@ -1920,8 +1931,11 @@ function sfxEngine(){   // called each frame — picks the right continuous laye
     const swell=0.72+0.28*Math.sin(SFX.seaPhase*0.21)+0.09*Math.sin(SFX.seaPhase*0.53);
     _ramp(SFX.seaGain.gain, atSea*swell*(0.016+Math.min(0.028,seaState*0.009)));
     _ramp(SFX.seaFilt.frequency, 430+seaState*90+swell*70);
-    const speed=(atSea&&player&&!onFoot&&!piloting&&!drivingTank&&player.vel)?Math.min(1,player.vel.length()/16):0;
-    _ramp(SFX.washGain.gain, atSea*speed*0.014);
+    // Was min(1, speed/16), which saturates below every hull's cruising speed — so it sat pinned
+    // at maximum whenever the ship was moving at all. Squared and referenced to a real turn of
+    // speed, so idling whispers and only running flat out makes a wash you can hear.
+    const rel=(atSea&&player&&!onFoot&&!piloting&&!drivingTank&&player.vel)?Math.min(1,player.vel.length()/24):0;
+    _ramp(SFX.washGain.gain, atSea*rel*rel*0.012);
   }
 }
 
@@ -4924,9 +4938,15 @@ function buildCampaignPicker(){
   SANDBOX_MAPS.map((M,i)=>({M,i})).sort((a,b)=>(b.M.training?1:0)-(a.M.training?1:0))
     .forEach(({M,i})=>{ const sel=i===currentSandboxIdx;
     const c=document.createElement('div');
-    c.style.cssText='width:164px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:pointer;border:1px solid '+(sel?'#ffd060':'#3a3020')+';background:'+(sel?'#2a2212':'#141b22')+';';
+    // The course card is not one of eight nuclear sandboxes — it is the tutorial. Give it its own
+    // colour and a label that says so, because "Training Ground" sitting next to "Training Bay"
+    // (campaign operation 1) told nobody which was which.
+    const edge=M.training?(sel?'#7fd0a0':'#4b8a68'):(sel?'#ffd060':'#3a3020');
+    const fill=M.training?(sel?'#16301f':'#101d17'):(sel?'#2a2212':'#141b22');
+    c.style.cssText='width:164px;padding:9px;border-radius:9px;font-size:11px;transition:.15s;cursor:pointer;border:1px solid '+edge+';background:'+fill+';';
     { const sz=isZh()&&typeof SANDBOX_ZH!=='undefined'&&SANDBOX_ZH[M.name];
-    c.innerHTML='<div style="color:#ffe6a0;font-weight:700;font-size:13px">'+(M.training?'🎓':'☢')+' '+(sz?sz.name:M.name)+'</div>'+
+    c.innerHTML='<div style="color:'+(M.training?'#a6f2c3':'#ffe6a0')+';font-weight:700;font-size:13px">'+(M.training?'🎓':'☢')+' '+(sz?sz.name:M.name)+'</div>'+
+      (M.training?'<div style="color:#7fd0a0;font-size:10px;letter-spacing:1.5px;margin-top:3px">'+T('★ THE TUTORIAL — START HERE','★ 新手教程——从这里开始')+'</div>':'')+
       '<div style="color:#9fb1bd;margin-top:4px;line-height:1.4">'+(sz?sz.theme:M.theme)+'</div>'; }
     c.onclick=()=>{ currentSandboxIdx = currentSandboxIdx===i ? -1 : i; buildCampaignPicker(); };   // click the selected one again to deselect
 
@@ -5302,6 +5322,26 @@ function buildMenu(){
       qb.innerHTML='<span style="cursor:pointer;color:#ffe6a0;font-size:12px;letter-spacing:2px;border:1px solid #4e3f21;border-radius:20px;padding:6px 18px;background:rgba(255,208,96,0.05)">⏱ '+T('5-MINUTE BATTLE','5 分钟快速战斗')+'</span>';
       qb.firstChild.onclick=startQuickBattle;
       sub2.after(qb); } }
+  // 🎓 LEARN TO PLAY — the tutorial was effectively unfindable.
+  // It lives on the "Training Ground" sandbox map, which sat as one of eight identical cards a
+  // long scroll down the menu — while the big card at the TOP reads "Training Bay", which is
+  // campaign operation 1 and teaches nothing. Two near-identical names and the visible one is
+  // the wrong one, so a new player either never found the course or thought they had done it.
+  // This is one unmissable button, above everything else, straight into the course in one click.
+  const _tutMapIdx=SANDBOX_MAPS.findIndex(m=>m.training);
+  let learnB=document.getElementById('learnBtn');
+  if(!learnB && _tutMapIdx>=0){
+    const sub3=document.querySelector('#menu .sub');
+    if(sub3){ learnB=document.createElement('div'); learnB.id='learnBtn';
+      learnB.style.cssText='text-align:center;margin:12px 0 2px;';
+      learnB.innerHTML='<span style="cursor:pointer;display:inline-block;color:#062015;background:#7fd0a0;font-size:14px;font-weight:700;'+
+        'letter-spacing:2px;border-radius:22px;padding:11px 28px;box-shadow:0 0 20px rgba(127,208,160,.38)">🎓 '+
+        T('NEW HERE? LEARN TO PLAY','第一次玩？先学怎么玩')+'</span>';
+      learnB.firstChild.onclick=()=>{ currentSandboxIdx=_tutMapIdx; quickMode=false; markCourseSeen(); chooseShip('destroyer'); };
+      sub3.after(learnB); } }
+  // Retires itself once the player has actually taken the course — but the course stays fully
+  // replayable from its card, which is why this is its own flag and not the course's own one.
+  if(learnB) learnB.style.display=courseSeen()?'none':'block';
   // continue button — appears when a saved war exists (fresh menu only, not the respawn picker)
   let rb=document.getElementById('resumeBtn');
   if(!rb){ rb=document.createElement('button'); rb.id='resumeBtn';
@@ -10938,6 +10978,12 @@ const TOUCH=(()=>{ try{ const q=new URLSearchParams(location.search).get('touch'
 const TUT_DONE_KEY='ironTideTutorialDone';
 const TUT_PLANE_KEY='ironTideTutorialPlaneDone', TUT_TANK_KEY='ironTideTutorialTankDone';
 const TUT_TRAIN_KEY='ironTideTrainingRun';   // per-run only: the training course is meant to be replayable
+// Separate from TUT_TRAIN_KEY on purpose. That one is deliberately never persisted so the course
+// replays every time you walk in; this one only decides whether the menu still needs to SHOUT
+// about it. Taking the course once retires the banner; the card stays there forever.
+const TUT_SEEN_KEY='ironTideCourseSeen';
+function courseSeen(){ try{ return localStorage.getItem(TUT_SEEN_KEY)==='1'; }catch(e){ return false; } }
+function markCourseSeen(){ try{ localStorage.setItem(TUT_SEEN_KEY,'1'); }catch(e){} }
 function onTrainingMap(){ const M=(typeof currentSandboxIdx!=='undefined'&&currentSandboxIdx>=0)?SANDBOX_MAPS[currentSandboxIdx]:null; return !!(M&&M.training); }
 let tutSteps=null, tutIdx=-1, tutHold=0, tutCamBase=0, tutPlacedBase=0, tutSunkBase=0, _tutLast='';
 let tutDoneKey=TUT_DONE_KEY, _tutGunBase=0, _tutBombBase=0, _tutTankPos=null;
@@ -10988,6 +11034,7 @@ function trainingIssue(id){                            // put an aircraft on the
 }
 function startTrainingCourse(){
   if(!onTrainingMap()) return;
+  markCourseSeen();      // however you got here — banner or card — the menu can stop shouting
   tutDoneKey=TUT_TRAIN_KEY;
   money=Math.max(money, 60000);                        // every lesson below costs something
   tutCeasefire=true;                                   // nobody shoots at a student
