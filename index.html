@@ -570,7 +570,7 @@ const SHIPS = {
   // launch cells. vls scales the RELOAD of every missile mount she carries and nothing else —
   // reach is deliberately untouched, because a hull that also outranges the map is not a choice.
   missilecruiser:{ name:'Missile Cruiser', cls:'Guided-Missile Ship', len:72, beam:11, depth:4.4, deckY:3.5, hp:330, kind:'surface', mounts:7, vls:{cd:0.72},
-                desc:'A farm of vertical launch cells on the forecastle — every missile mount aboard reloads about a quarter faster, and she sails with a launcher and a SAM already fitted. Built light to carry them, so her hull is thinner than a gun cruiser\'s.' },
+                desc:'A farm of vertical launch cells on the forecastle. Only she can load the Kh-35 Sea Skimmer — 1000 m of reach, further than anything else afloat, though it hits softly and is for ships, not harbours. Every missile aboard reloads about a quarter faster, and she sails with a Kh-35 and a SAM already fitted. Built light to carry them, so her hull is thinner than a gun cruiser\'s.' },
   battleship: { name:'Battleship', cls:'Capital Ship',  len:82, beam:13, depth:5.0, deckY:3.9, hp:520, kind:'surface', mounts:8,
                 desc:'Thick armor, big main batteries. Slow but punishing.' },
   dreadnought:{ name:'Dreadnought', cls:'Super Capital',len:96, beam:15, depth:5.6, deckY:4.3, hp:680, kind:'surface', mounts:10,
@@ -705,6 +705,13 @@ const WEAPONS = {
   m777:    { name:'M777 Howitzer',   cost:1800,dmg:92, cd:2.8,  spd:92,  kind:'cannon', col:0xc4c8d0, size:1.5, splash:12, lob:16 },      // long-range artillery
   patriot: { name:'Patriot SAM',     cost:2200,dmg:50, cd:1.3,  spd:195, kind:'missile', col:0xd8dce2, size:1.1, splash:6, homing:true, aa:true, turn:4.5, range:520 }, // long-range air defense
   tomahawk:{ name:'Tomahawk Launcher',cost:2700,dmg:120,cd:3.6, spd:88,  kind:'missile', col:0xc0c6cc, size:1.2, splash:13, homing:true, turn:2.0, range:720 }, // cruise missile
+  // The Missile Cruiser's own round, and the longest reach in the game by a wide margin — 1000 m,
+  // against 720 for a Tomahawk. It pays for that in punch: 28 damage is barely more than a deck
+  // gun's 16 and a quarter of a Harpoon's, and at 2.6 s a shot it is about half a deck gun's dps.
+  // vlsOnly keeps it in the launch cells: bolted onto a Dreadnought's fifteen mounts a 1000 m
+  // round would simply delete the enemy fleet from outside their reach, which is the P-51 all
+  // over again. On the one hull that can carry it, it is a scalpel, not a siege engine.
+  kh35:    { name:'Kh-35 Sea Skimmer',cost:1800,dmg:28, cd:2.6, spd:165, kind:'missile', col:0xd6dade, size:1.1, splash:4, homing:true, turn:3.0, range:1000, vlsOnly:true, antiShip:true },
 };
 // Buyable, pilotable, armed aircraft. Park on deck → press E to fly.
 const PLANES = {
@@ -5489,7 +5496,7 @@ function makePlayerShip(shipId){
   if(def.boss)installBossStarterGuns(build);
   else if(def.kind==='sub') installStarterGuns(build,[WEAPONS.deckgun,WEAPONS.deckgun],[0,2]);   // skip mounts[1] — the sail top, where the periscope lives
   // a missile ship that starts with two deck guns is a missile ship in name only
-  else if(def.vls) installStarterGuns(build,[WEAPONS.missile,WEAPONS.sam,WEAPONS.deckgun]);
+  else if(def.vls) installStarterGuns(build,[WEAPONS.kh35,WEAPONS.sam,WEAPONS.deckgun]);   // her own round is fitted from the off
   else installStarterGuns(build, (def.len0||def.len)>60?[WEAPONS.deckgun,WEAPONS.deckgun,WEAPONS.aa]:[WEAPONS.deckgun,WEAPONS.deckgun]);
   walkPos.set(0, deckEyeY(), def.len*0.28); camYaw.v=player.heading; camPitch.v=0.04;
 }
@@ -6946,6 +6953,7 @@ function buildShopUI(){
     recFirst(obj).forEach(k=>{
       if(contentFilterOn()&&((obj===PLANES&&FILTERED_PLANES.has(k))||(obj===STRUCTS&&k==='nukesilo'))) return;   // kid-safe mode
       if(nukesBannedHere()&&(k==='nukesilo'||isNuclear(obj[k]))) return;   // no strategic arsenal on small / land theatres
+      if(obj===WEAPONS&&obj[k].vlsOnly&&!vlsHull()) return;                // launch-cell rounds need a hull with launch cells
       const fold=!SHOP_REC.has(k)&&(obj[k].cost||0)>SHOP_HIDE_COST[key];
       if(fold) hidden++;
       if(fold&&!SHOP_SHOW_ALL[key]) return;
@@ -7022,7 +7030,11 @@ function describe(w){
     const dA=w.dmg>strongest.def.dmg?'↑':w.dmg<strongest.def.dmg?'↓':'≈', rA=(1/w.cd)>(1/strongest.def.cd)?'↑':(1/w.cd)<(1/strongest.def.cd)?'↓':'≈';
     cmp=`<br><span style="color:#6b7d92;font-size:11px">${T('vs your best gun — dmg','对比你最强的炮——伤害')} ${dA} · ${T('rate','射速')} ${rA}</span>`;
   }
-  return `${k} · ${w.dmg}${T(' dmg',' 伤害')} · ${(1/w.cd).toFixed(1)}${T('/s','/秒')}${w.splash?T(' · splash',' · 溅射'):''}${cmp}`;
+  // Reach is the whole point of a guided round and it was invisible in here — a Missile Launcher
+  // stops at 320 m, a Tomahawk carries 720 and a Kh-35 a thousand, and nothing on the card said so.
+  const reach = w.range ? ` · ${w.range}${T('m reach','米射程')}` : '';
+  const only = w.antiShip ? T(' · ships only','　·　只打船') : '';   // barely scratches a harbour, and the card has to say so
+  return `${k} · ${w.dmg}${T(' dmg',' 伤害')} · ${(1/w.cd).toFixed(1)}${T('/s','/秒')}${reach}${w.splash?T(' · splash',' · 溅射'):''}${only}${cmp}`;
 }
 function refreshShop(){
   shopBalance();
@@ -7254,6 +7266,9 @@ function tryPlace(){
   if(!selectedWeapon){ flashPrompt(keyPrompt('Pick a weapon in the Armory (Tab)','Pick a weapon in the Armory (tap Shop)','先在军械库（点「商店」）里选一件武器')); return; }
   const w=WEAPONS[selectedWeapon]; const cost=priceOf(w.cost);
   if(marketBlocked('weapon',selectedWeapon,w))return;
+  // The armory already hides these on a hull without cells, but a selection survives a ship swap
+  // mid-war — so the install itself has to refuse, or the gate is one screen deep.
+  if(w.vlsOnly&&!vlsHull()){ flashPrompt(T(trName(w.name)+' needs vertical launch cells — only the Missile Cruiser has them',trName(w.name)+'要装在垂直发射单元里——只有导弹巡洋舰有'),'bad'); return; }
   if(placed.length>=player.def.mounts){ flashPrompt('Gun limit reached — this hull mounts only '+player.def.mounts+' guns','bad'); return; }
   if(money<cost){ flashPrompt('Not enough funds','bad'); return; }
   if(fromShop) toggleShop();   // checks passed — get the panel out of the way and mount it
@@ -8276,9 +8291,9 @@ function dropBomb(P){
 // Reload only, and only for kind:'missile' — guns, cannon, torpedoes and bombs are untouched, and
 // so is range. Reaches through player.def, so it follows the hull rather than the weapon: fit the
 // same launcher to a destroyer and it reloads at its own rate.
+function vlsHull(){ return !!(player && player.def && player.def.vls); }
 function vlsReload(w){
-  const v = player && player.def && player.def.vls;
-  return (v && w.kind==='missile') ? v.cd : 1;
+  return (vlsHull() && w.kind==='missile') ? player.def.vls.cd : 1;
 }
 function fireTurret(pl, aim){
   if(pl.cd>0 || pl.ko) return;
@@ -8333,7 +8348,7 @@ function spawnShell(w,pos,dir,team,owner,enemyArc,velOverride){
   if(w.kind==='torpedo'){ m.position.y=0.6; vel.y=0; }
   const sh={ mesh:m, pos:m.position, vel, dmg:w.dmg, team, splash:w.splash||0, homing:!!w.homing, water:w.kind==='torpedo',
     arc:!!lob||!!velOverride, owner, life:w.life||9, col, aa:!!w.aa, strategic:!!w.strategic, nuclear:!!w.nuclear,
-    hp:w.hp||0, fixedTarget:w.targetPos?w.targetPos.clone():null, spareHarbors:!!w.spareHarbors,
+    hp:w.hp||0, fixedTarget:w.targetPos?w.targetPos.clone():null, spareHarbors:!!w.spareHarbors, antiShip:!!w.antiShip,
     turn:w.turn||2.4, maxDist:w.range||0, dist:0, kind:w.kind||'gun', weaponName:w.name||'', size:w.size||0.5, tracerCol, tone, spawnIsl:islandUnderPos(pos) };  // spawnIsl exempts shore weapons from detonating on their own launch island
   if(w.nuclear){const mark=teamMarker(team,12);mark.position.y=7;m.add(mark);}
   // flame streak / tracer trail — white-hot core sheathed in an orange glow (skip torpedoes — they're in the water)
@@ -9315,6 +9330,13 @@ function armourOf(t){
   if(t.kind&&!t.def) return 12;                           // shore structures
   return 0;                                               // aircraft, infantry: unarmoured
 }
+// A sea skimmer is an anti-SHIP round: a small warhead flying flat over the water, made to hole a
+// hull, not to break a fortified harbour. Without this the Kh-35's 1000 m reach was a siege engine
+// — measured on Operation 1, one starter launcher flattened the enemy HQ from standoff in 110
+// seconds while taking 8 damage back, which is the P-51 all over again. Against shore it now does
+// about a point and a half a second, so grinding an HQ down that way is slower than fighting the
+// battle. Against ships, which is its job, nothing changes.
+const SKIMMER_VS_SHORE=0.15;
 function shellShipDmg(s,target){
   let d = s.aa ? s.dmg*AA_VS_ARMOUR : s.dmg;
   // bullets bleed energy downrange; shells, torpedoes and missiles are unaffected
@@ -9330,6 +9352,10 @@ function shellShipDmg(s,target){
     if(target) target._armour=Math.max(0, t - d*ARMOUR_WEAR);   // sustained fire does wear it down
     d *= ratio*ratio;
   }
+  // ...and the shore penalty last, so armour and this don't compound into literally nothing —
+  // the number on a harbour should tick, just far too slowly to be a plan.
+  if(s.antiShip && target && (target===enemyHarbor || target===friendlyHarbor || (target.kind && !target.def)))
+    d *= SKIMMER_VS_SHORE;
   return d;
 }
 function onShellHit(s,pos,target){
@@ -11304,7 +11330,7 @@ const SHIPS_ZH = {
   submarine:  { name:'攻击潜艇',   cls:'潜水艇',   desc:'按 C 下潜——潜在水下时敌人看不见你，火炮也打不到你，但你只能用鱼雷。想用甲板炮就得上浮。' },
   destroyer:  { name:'驱逐舰',     cls:'护航舰',   desc:'全能选手。速度、船体和炮位都很均衡。' },
   cruiser:    { name:'重巡洋舰',   cls:'战列线舰', desc:'炮更重、装甲带更结实，甲板空间也很充足。' },
-  missilecruiser:{ name:'导弹巡洋舰', cls:'导弹舰', desc:'前甲板上是一整片垂直发射单元——舰上每一个导弹炮位的装填都快上约四分之一，出港时就已经装好了一具发射架和一具防空导弹。为了塞下这些发射井，船体造得比重巡洋舰更薄。' },
+  missilecruiser:{ name:'导弹巡洋舰', cls:'导弹舰', desc:'前甲板上是一整片垂直发射单元。只有她能装 Kh-35 掠海导弹——一千米射程，全场最远，代价是威力不大，而且只擅长打船、不擅长砸海港。舰上每一个导弹炮位的装填都快上约四分之一，出港时就已经装好了一发 Kh-35 和一具防空导弹。为了塞下这些发射井，船体造得比重巡洋舰更薄。' },
   battleship: { name:'战列舰',     cls:'主力舰',   desc:'装甲厚、主炮大。开得慢，但一炮一个疼。' },
   dreadnought:{ name:'无畏舰',     cls:'超级主力舰', desc:'一座会漂的堡垒。炮位密密麻麻，船体巨大。' },
   boss:       { name:'利维坦',     cls:'首领战舰', desc:'每方只有一艘。缓慢的装甲旗舰，自带十二门炮，火力吓人，沉了就没有第二艘。' },
@@ -11318,6 +11344,7 @@ const WEAPONS_ZH = {
   beamcannon:{ name:'Mk 12 光束炮', desc:'连续能量束，不用提前量。' },
   flak88:  { name:'88 毫米 Flak 36', desc:'有名的两用炮：打飞机，也打船。' },
   harpoon: { name:'鱼叉反舰导弹', desc:'射程远超甲板上任何一门炮。' },
+  kh35:    { name:'Kh-35 掠海导弹', desc:'全游戏射程最远的一发——一千米，比战斧还远两百八。代价是威力很小、装填也慢，而且它是反舰弹：贴着海面飞，打船很好用，砸海港几乎不掉血。只能装进导弹巡洋舰的垂直发射单元里。' },
   katyusha:{ name:'BM-13 火箭炮架', desc:'六联齐射：不讲瞄准，讲把那一片全覆盖。' },
   railmount:{ name:'Mk 9 电磁炮', desc:'弹道笔直、初速极快，指哪打哪，就是充能慢。' },
   deckgun: { name:'甲板炮', desc:'' },
@@ -12139,6 +12166,7 @@ const NAME_ZH = {
   'Missile Frigate':'导弹护卫舰',
   'Missile Cruiser':'导弹巡洋舰',
   'Guided-Missile Ship':'导弹舰',
+  'Kh-35 Sea Skimmer':'Kh-35 掠海导弹',
   'Battlecruiser':'战列巡洋舰',
   'Coastal Monitor':'近岸浅水重炮舰',
   'Akagi':'赤城号',
