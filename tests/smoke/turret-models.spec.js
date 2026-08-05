@@ -15,6 +15,7 @@ test('weapons are no longer all the same mount', async ({ page }) => {
       const t = buildTurret(w);
       let n = 0; t.traverse(x => { if (x.isMesh) n++; });
       per[id] = n; arch[id] = turretArchetype(w); sigs[id] = sig(t);
+      if (id === 'torpedo' || id === 'quadtorp') per['_meshes_' + id] = n;
       // the aiming rig every caller depends on must survive whatever the model looks like
       if (!t.userData.yawG || !t.userData.pitchG || !(t.userData.barrelLen > 0)) per[id] = -1;
     }
@@ -26,12 +27,13 @@ test('weapons are no longer all the same mount', async ({ page }) => {
   });
 
   // every weapon still has a working aiming rig — a pretty model that cannot train is useless
-  for (const [id, n] of Object.entries(r.per)) expect(n, `${id} lost its yaw/pitch/barrelLen`).toBeGreaterThan(0);
+  for (const [id, n] of Object.entries(r.per)) { if (id.startsWith('_meshes_')) continue;
+    expect(n, `${id} lost its yaw/pitch/barrelLen`).toBeGreaterThan(0); }
   // the headline: a battleship's main battery and a machine gun are no longer one mesh
   expect(r.sameAsEachOther).toBe(false);
   // and the catalogue really is varied now, not two shapes with a rename
-  expect(r.archCount).toBeGreaterThanOrEqual(8);
-  expect(r.distinctShapes).toBeGreaterThanOrEqual(9);
+  expect(r.archCount).toBeGreaterThanOrEqual(13);
+  expect(r.distinctShapes).toBeGreaterThanOrEqual(13);
   // sanity on the derivation: these must land on the mount they actually are
   expect(r.arch.sixteen).toBe('capital');
   expect(r.arch.eightin).toBe('capital');
@@ -43,6 +45,18 @@ test('weapons are no longer all the same mount', async ({ page }) => {
   expect(r.arch.railmount).toBe('rail');
   expect(r.arch.beamcannon).toBe('beam');
   expect(r.arch.plasmamini).toBe('gatling');
+  // Missiles used to be ONE four-tube rack for all six of them. They are three different objects:
+  // a SAM rides a trainable twin-arm launcher, an anti-ship round never leaves its sealed
+  // canister, and a Tomahawk lives in an armoured box that lies flat until it hinges up.
+  expect(r.arch.sam).toBe('armlaunch');
+  expect(r.arch.patriot).toBe('armlaunch');
+  expect(r.arch.harpoon).toBe('canister');
+  expect(r.arch.kh35).toBe('canister');
+  expect(r.arch.tomahawk).toBe('abl');
+  expect(r.arch.bomb).toBe('mortar');
+  expect(r.arch.torpedo).toBe('torpedo');
+  // ...and a "Quint Torpedo" now actually has five tubes, where both banks used to draw two
+  expect(r.per._meshes_quadtorp).toBeGreaterThan(r.per._meshes_torpedo);
 });
 
 // Detail costs draw calls, and EVERY AI ship builds real turrets via syncNPCDeck — one per weapon

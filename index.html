@@ -682,7 +682,7 @@ const WEAPONS = {
   deckgun: { name:'Deck Gun',        cost:520, dmg:16, cd:0.55, spd:130, kind:'gun',     col:0xb8bcc4, size:0.8 },
   aa:      { name:'AA Battery',      cost:480, dmg:7,  cd:0.10, spd:165, kind:'gun',     col:0xa8b0b8, size:0.7, spread:0.04, aa:true },
   twin:    { name:'Twin Turret',     cost:850, dmg:21, cd:0.5,  spd:135, kind:'gun',     col:0xc0c4cc, size:1.0, barrels:2 },
-  torpedo: { name:'Torpedo Tube',    cost:900, dmg:95, cd:3.2,  spd:55,  kind:'torpedo', col:0x9aa2aa, size:1.1, splash:7 },
+  torpedo: { name:'Torpedo Tube',    cost:900, dmg:95, cd:3.2,  spd:55,  kind:'torpedo', col:0x9aa2aa, size:1.1, splash:7 , tubes:3 },
   bomb:    { name:'Bomb Mortar',     cost:1050,dmg:58, cd:1.5,  spd:48,  kind:'bomb',    col:0xb0b6be, size:1.0, splash:9, lob:18 },
   cannon:  { name:'Main Battery',    cost:950, dmg:78, cd:2.4,  spd:95,  kind:'cannon',  col:0xc8ccd2, size:1.5, splash:8, lob:14, barrels:2 },
   missile: { name:'Missile Launcher',cost:1600,dmg:46, cd:1.7,  spd:78,  kind:'missile', col:0xbcbcc4, size:1.1, splash:5, homing:true, range:320 },
@@ -696,7 +696,7 @@ const WEAPONS = {
   sixinch: { name:'6" Cruiser Gun',  cost:1500,dmg:50, cd:1.4,  spd:110, kind:'cannon', col:0xc4c8d0, size:1.3, barrels:3, splash:6, lob:12 },
   eightin: { name:'8" Heavy Cruiser',cost:2100,dmg:74, cd:2.0,  spd:105, kind:'cannon', col:0xc8ccd2, size:1.6, barrels:3, splash:8, lob:13 },
   sixteen: { name:'16" Mk 7 Battery',cost:1900,dmg:135,cd:3.4,  spd:92,  kind:'cannon', col:0xccd0d6, size:2.0, barrels:3, splash:13, lob:13 }, // capital main battery
-  quadtorp:{ name:'Quint Torpedo',   cost:1300,dmg:105,cd:3.0,  spd:58,  kind:'torpedo', col:0x9aa2aa, size:1.3, splash:8 },
+  quadtorp:{ name:'Quint Torpedo',   cost:1300,dmg:105,cd:3.0,  spd:58,  kind:'torpedo', col:0x9aa2aa, size:1.3, splash:8 , tubes:5 },
   // ---- marketplace mounts ----
   mortar:  { name:'Deck Mortar',     cost:620, dmg:52, cd:1.9,  spd:78,  kind:'cannon', col:0x8d9298, size:0.9, splash:11, lob:20, marketOnly:true , gfx:'mortar' },   // cheap, steep, lands behind cover
   beamcannon:{name:'Mk 12 Beam Cannon',cost:2900,dmg:22,cd:0.16, spd:400, kind:'gun',   col:0x7fe8ff, size:1.4, marketOnly:true , gfx:'beam' },                       // continuous energy beam, no lead needed
@@ -712,7 +712,7 @@ const WEAPONS = {
   m2:      { name:'M2 Browning',     cost:200, dmg:5,  cd:0.14, spd:185, kind:'gun', col:0x8f969e, size:0.5, spread:0.04, aa:true },     // light dual-purpose HMG
   m777:    { name:'M777 Howitzer',   cost:1800,dmg:92, cd:2.8,  spd:92,  kind:'cannon', col:0xc4c8d0, size:1.5, splash:12, lob:16 , gfx:'dual' },      // long-range artillery
   patriot: { name:'Patriot SAM',     cost:2200,dmg:50, cd:1.3,  spd:195, kind:'missile', col:0xd8dce2, size:1.1, splash:6, homing:true, aa:true, turn:4.5, range:520 }, // long-range air defense
-  tomahawk:{ name:'Tomahawk Launcher',cost:2700,dmg:120,cd:3.6, spd:88,  kind:'missile', col:0xc0c6cc, size:1.2, splash:13, homing:true, turn:2.0, range:720 }, // cruise missile
+  tomahawk:{ name:'Tomahawk Launcher',cost:2700,dmg:120,cd:3.6, spd:88,  kind:'missile', col:0xc0c6cc, size:1.2, splash:13, homing:true, turn:2.0, range:720 , gfx:'abl' }, // cruise missile
   // The Missile Cruiser's own round, and the longest reach in the game by a mile — 2000 m, against
   // 720 for a Tomahawk. It pays for that in punch: 28 damage is barely more than a deck gun's 16
   // and a quarter of a Harpoon's, and at 2.6 s a shot it is about half a deck gun's dps.
@@ -2917,6 +2917,32 @@ function gunShield(r, h, thick, mat){
   const mesh=new THREE.Mesh(geo, mat); mesh.material.side=THREE.DoubleSide;
   mesh.castShadow=mesh.receiveShadow=true; return mesh;
 }
+// A missile is an ogive nose, a parallel body and a tail of fins — three meshes, lathed, so the
+// nose is actually pointed rather than a cylinder with a cone stuck on it.
+function missileRound(len, r, bodyMat, finMat){
+  const g=new THREE.Group();
+  const P=(rr,t)=>new THREE.Vector2(Math.max(0.0001,rr), t*len);
+  const geo=new THREE.LatheGeometry([
+    P(0,0), P(r*0.30,0.03), P(r*0.62,0.08), P(r*0.88,0.15), P(r,0.24),
+    P(r,0.86), P(r*0.94,0.95), P(r*0.72,1.0), P(0,1.0)
+  ], 14);
+  geo.rotateX(-Math.PI/2);            // nose down +Z
+  geo.computeVertexNormals();
+  const body=new THREE.Mesh(geo, bodyMat); body.castShadow=true; g.add(body);
+  for(let i=0;i<2;i++){ const fin=mkBox(i?r*0.28:r*3.0, i?r*3.0:r*0.28, len*0.16, finMat);
+    fin.position.z=len*0.08; g.add(fin); }
+  return g;
+}
+// A torpedo tube is a smooth pressure tube with a heavy breech door at the back and a muzzle
+// ring at the front. Five of these side by side is a quintuple bank, which is what the game's
+// "Quint Torpedo" has always claimed to be while drawing two.
+function torpedoTube(len, r, mat){
+  const g=new THREE.Group();
+  const tube=mkCyl(r, r*1.04, len, mat, 16); tube.rotation.x=Math.PI/2; tube.position.z=len*0.5; g.add(tube);
+  const muzzle=mkCyl(r*1.16, r*1.16, len*0.05, mat, 16); muzzle.rotation.x=Math.PI/2; muzzle.position.z=len*0.975; g.add(muzzle);
+  const breech=mkCyl(r*1.22, r*1.22, len*0.10, mat, 16); breech.rotation.x=Math.PI/2; breech.position.z=len*0.05; g.add(breech);
+  return g;
+}
 // Roof furniture: sighting hoods and a hatch. Cheap, and it stops a roof reading as a lid.
 function turretRoofKit(g, w, d, y, sz, mat){
   for(const sx of [-1,1]){ const hood=mkCyl(0.16*sz,0.19*sz,0.20*sz,mat,8);
@@ -2931,7 +2957,9 @@ function turretArchetype(def){
   if(def.gfx) return def.gfx;
   if(def.kind==='torpedo') return 'torpedo';
   if(def.kind==='bomb')    return 'mortar';
-  if(def.kind==='missile') return 'missile';
+  // A SAM rides a trainable twin-arm launcher; an anti-ship round lives sealed in a canister
+  // and never comes out until it is flying. Same kind, completely different object.
+  if(def.kind==='missile') return def.aa ? 'armlaunch' : 'canister';
   if(def.aa)               return 'openaa';
   if(def.kind==='cannon')  return (def.size||1)>=1.3 ? 'capital' : 'dual';
   return 'dual';
@@ -2951,27 +2979,71 @@ function buildTurret(def){
   }
   // Turrets and open AA bring their own footing — a barbette and a training ring respectively —
   // so only the mounts that don't get the old generic drum under them.
-  if(arch!=='capital'&&arch!=='dual'&&arch!=='openaa'){
+  const OWN_FOOTING=['capital','dual','openaa','torpedo','canister','abl','armlaunch','mortar'];
+  if(OWN_FOOTING.indexOf(arch)<0){
     const base=mkCyl(0.7*sz,0.85*sz,0.4*sz,m); base.position.y=pedestalH+0.2*sz; g.add(base);
   }
   const yawG=new THREE.Group(); yawG.position.y=pedestalH+0.4*sz; g.add(yawG); g.userData.yawG=yawG;
   g.userData.pedestalH=pedestalH;
   let housing, pitchG=new THREE.Group();
-  if(def.kind==='torpedo'){
-    housing=mkBox(0.9*sz,0.5*sz,1.6*sz,m); housing.position.y=0.25*sz; yawG.add(housing);
-    for(const sx of [-0.25,0.25]){ const tube=mkCyl(0.18*sz,0.18*sz,2.2*sz,m); tube.rotation.x=Math.PI/2; tube.position.set(sx*sz,0.3*sz,0.6*sz); yawG.add(tube); }
-    g.userData.barrelLen=2.0*sz;
-  } else if(def.kind==='missile'){
-    housing=mkBox(1.0*sz,0.7*sz,1.0*sz,m); housing.position.y=0.35*sz; yawG.add(housing);
-    yawG.add(pitchG); pitchG.position.y=0.45*sz;
-    const rack=mkBox(0.9*sz,0.9*sz,0.5*sz,m); pitchG.add(rack);
-    for(let i=0;i<4;i++){ const t=mkCyl(0.12*sz,0.12*sz,1.0*sz,SILVER(0x3a4048)); t.rotation.x=Math.PI/2; t.position.set((i%2-0.5)*0.5*sz,(Math.floor(i/2)-0.5)*0.5*sz,0.6*sz); pitchG.add(t); }
-    g.userData.barrelLen=1.1*sz;
-  } else if(def.kind==='bomb'){
-    housing=mkBox(0.9*sz,0.6*sz,0.9*sz,m); housing.position.y=0.3*sz; yawG.add(housing);
-    yawG.add(pitchG); pitchG.position.y=0.4*sz; pitchG.rotation.x=-0.6;
-    const tube=mkCyl(0.34*sz,0.36*sz,1.5*sz,m); tube.rotation.x=Math.PI/2; tube.position.z=0.7*sz; pitchG.add(tube);
-    g.userData.barrelLen=1.4*sz;
+  if(arch==='torpedo'){
+    // A trainable tube BANK, not a box with two pipes. def.tubes says how many: the game has
+    // always called one of these a "Quint Torpedo" while drawing two.
+    const n=def.tubes||3, tl=2.5*sz, tr=0.19*sz;
+    const ring=mkCyl(0.62*sz,0.72*sz,0.20*sz,ARMOURPLATE(def.col),18); ring.position.y=0.10*sz; yawG.add(ring);
+    const bed=mkBox(n*0.44*sz+0.2*sz,0.16*sz,tl*0.72,ARMOURPLATE(def.col)); bed.position.set(0,0.30*sz,tl*0.30); yawG.add(bed);
+    for(let i=0;i<n;i++){
+      const t=torpedoTube(tl, tr, GUNSTEEL(0x8a939b));
+      t.position.set((i-(n-1)/2)*0.44*sz, 0.46*sz, 0.05*sz); yawG.add(t);
+    }
+    // the sighting/training station a torpedoman actually stands at
+    const stand=mkBox(0.30*sz,0.42*sz,0.22*sz,GUNSTEEL(0x5c646c)); stand.position.set(0,0.62*sz,-0.52*sz); yawG.add(stand);
+    g.userData.barrelLen=tl+0.1*sz;
+  } else if(arch==='canister'){
+    // The classic anti-ship look: four sealed canisters in an angled frame, fixed elevation.
+    // Harpoon and Kh-35 both leave the ship this way — they are shipped, stored and fired from
+    // the same box, which is why there is no barrel and no breech to see.
+    const ring=mkCyl(0.58*sz,0.68*sz,0.18*sz,ARMOURPLATE(def.col),18); ring.position.y=0.09*sz; yawG.add(ring);
+    yawG.add(pitchG); pitchG.position.set(0,0.34*sz,0); pitchG.rotation.x=-0.55;   // canted up, fixed
+    const frame=mkBox(1.15*sz,0.10*sz,1.5*sz,GUNSTEEL(0x5f676f)); frame.position.z=0.6*sz; pitchG.add(frame);
+    for(let i=0;i<4;i++){
+      const cx=((i%2)-0.5)*0.56*sz, cy=(Math.floor(i/2)-0.5)*0.52*sz+0.34*sz;
+      const can=mkBox(0.50*sz,0.46*sz,1.55*sz,ARMOURPLATE(0x9aa3ab)); can.position.set(cx,cy,0.66*sz); pitchG.add(can);
+      const cap=mkBox(0.44*sz,0.40*sz,0.06*sz,GUNSTEEL(0x2c3238)); cap.position.set(cx,cy,1.45*sz); pitchG.add(cap);
+    }
+    g.userData.barrelLen=1.7*sz;
+  } else if(arch==='abl'){
+    // Armoured box launcher: a slab that lies flat and hinges up to shoot. Tomahawk's whole
+    // silhouette is that it does NOT look like a gun.
+    const ring=mkCyl(0.60*sz,0.70*sz,0.18*sz,ARMOURPLATE(def.col),18); ring.position.y=0.09*sz; yawG.add(ring);
+    yawG.add(pitchG); pitchG.position.set(0,0.30*sz,-0.55*sz); pitchG.rotation.x=-0.62;
+    const box=mkBox(1.25*sz,0.85*sz,2.2*sz,ARMOURPLATE(def.col)); box.position.z=1.05*sz; pitchG.add(box);
+    const lid=mkBox(1.30*sz,0.09*sz,2.24*sz,GUNSTEEL(0x6f7880)); lid.position.set(0,0.47*sz,1.05*sz); pitchG.add(lid);
+    for(const sx of [-1,1]){ const hinge=mkCyl(0.09*sz,0.09*sz,0.28*sz,GUNSTEEL(0x4e565e),10);
+      hinge.rotation.z=Math.PI/2; hinge.position.set(sx*0.62*sz,0.44*sz,0.05*sz); pitchG.add(hinge); }
+    g.userData.barrelLen=2.3*sz;
+  } else if(arch==='armlaunch'){
+    // Trainable twin-arm launcher over a magazine drum — the standard SAM mount, and you can see
+    // the two rounds sitting on the rails waiting to go.
+    const drum=mkCyl(0.66*sz,0.76*sz,0.46*sz,ARMOURPLATE(def.col),18); drum.position.y=0.23*sz; yawG.add(drum);
+    yawG.add(pitchG); pitchG.position.set(0,0.62*sz,0); pitchG.rotation.x=-0.42;
+    const yoke=mkBox(0.95*sz,0.20*sz,0.55*sz,GUNSTEEL(0x5f676f)); pitchG.add(yoke);
+    for(const sx of [-1,1]){
+      const rail=mkBox(0.10*sz,0.10*sz,1.5*sz,GUNSTEEL(0x7b848c)); rail.position.set(sx*0.30*sz,0.06*sz,0.75*sz); pitchG.add(rail);
+      const rnd=missileRound(1.45*sz, 0.115*sz, ARMOURPLATE(0xcfd6dc), GUNSTEEL(0x3c434a));
+      rnd.position.set(sx*0.30*sz, 0.21*sz, 0.12*sz); pitchG.add(rnd);
+    }
+    g.userData.barrelLen=1.7*sz;
+  } else if(arch==='mortar'){
+    // Baseplate, bipod and a banded tube at a fixed steep angle. A mortar is not a turret.
+    const plate=mkCyl(0.72*sz,0.78*sz,0.12*sz,ARMOURPLATE(def.col),16); plate.position.y=0.06*sz; yawG.add(plate);
+    yawG.add(pitchG); pitchG.position.set(0,0.18*sz,-0.28*sz); pitchG.rotation.x=-0.95;
+    const tube=mkCyl(0.24*sz,0.30*sz,1.7*sz,GUNSTEEL(0x808991),16); tube.rotation.x=Math.PI/2; tube.position.z=0.85*sz; pitchG.add(tube);
+    for(let i=0;i<2;i++){ const band=mkCyl(0.33*sz,0.33*sz,0.09*sz,GUNSTEEL(0x5a626a),16);
+      band.rotation.x=Math.PI/2; band.position.z=(0.45+i*0.6)*sz; pitchG.add(band); }
+    for(const sx of [-1,1]){ const leg=mkBox(0.07*sz,0.90*sz,0.07*sz,GUNSTEEL(0x6b737b));
+      leg.position.set(sx*0.34*sz,0.38*sz,0.30*sz); leg.rotation.z=sx*0.30; yawG.add(leg); }
+    g.userData.barrelLen=1.8*sz;
   } else if(def.gfx==='ciws'){ // Phalanx — white radome + 6-barrel gatling
     const dome=new THREE.Mesh(new THREE.SphereGeometry(0.7*sz,18,14,0,Math.PI*2,0,Math.PI*0.55), GUNSTEEL(0xeef1f4)); dome.position.y=0.62*sz; yawG.add(dome);
     const collar=mkCyl(0.52*sz,0.62*sz,0.26*sz,SILVER(0xdfe4e8),12); collar.position.y=0.13*sz; yawG.add(collar);
