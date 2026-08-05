@@ -2657,7 +2657,16 @@ function buildLand(kind,team,pos,type){
     const hull=mkBox(T.hullW,T.hullH,T.hullL,body); hull.position.y=0.6+T.hullH/2; hull.castShadow=true; g.add(hull);
     for(const sx of [-1,1]){ const tr=mkBox(0.7,0.9,T.hullL*1.05,trackM); tr.position.set(sx*(T.hullW/2),0.55,0); g.add(tr);
       tr.userData.partName=sx<0?'trackL':'trackR';(sx<0?g.userData.trackL:g.userData.trackR).push(tr);
-      for(let i=0;i<4;i++){ const w=mkCyl(0.34,0.34,0.32,SILVER(0x16180f),8); w.rotation.z=Math.PI/2; w.position.set(sx*(T.hullW/2),0.45,(i-1.5)*(T.hullL*0.24)); g.add(w); }
+      // Road wheels scale with the hull instead of always being four, and the drive sprocket at
+      // the back and idler at the front are bigger than the wheels between them — that stepped
+      // silhouette is what makes running gear read as running gear.
+      const nw=Math.max(4,Math.min(8,Math.round(T.hullL/0.72))), wr=Math.min(0.38,T.hullL*0.085);
+      for(let i=0;i<nw;i++){ const w=mkCyl(wr,wr,0.32,SILVER(0x16180f),10); w.rotation.z=Math.PI/2;
+        w.position.set(sx*(T.hullW/2),0.42,(i-(nw-1)/2)*(T.hullL*0.90/nw)); g.add(w); }
+      for(const [z,r] of [[T.hullL*0.46,wr*1.26],[-T.hullL*0.46,wr*1.20]]){
+        const s2=mkCyl(r,r,0.34,SILVER(0x22261c),10); s2.rotation.z=Math.PI/2; s2.position.set(sx*(T.hullW/2),0.50,z); g.add(s2); }
+      for(let i=0;i<3;i++){ const rr=mkCyl(wr*0.42,wr*0.42,0.24,SILVER(0x1b1e16),8); rr.rotation.z=Math.PI/2;
+        rr.position.set(sx*(T.hullW/2),1.00,(i-1)*(T.hullL*0.28)); g.add(rr); }   // return rollers
       for(let i=0;i<7;i++){ const z=(i-3)*T.hullL*.145, rib=mkBox(.12,.78,.12,treadM); rib.position.set(sx*(T.hullW/2+.38),.55,z); g.add(rib); }
       const trackRoof=mkBox(.72,.16,T.hullL*1.0,body); trackRoof.position.set(sx*(T.hullW/2+.16),1.04,0); g.add(trackRoof);
     }
@@ -2690,7 +2699,21 @@ function buildLand(kind,team,pos,type){
     const turretTop=mkBox(T.turW*.74,.14,T.turL*.72,body); turretTop.position.y=.52;turretTop.position.z=-T.turL*.06;tur.add(turretTop);
     const turretFace=mkBox(T.turW*.62,.42,.22,SILVER(0x30352f));turretFace.position.set(0,.05,T.turL*.52);tur.add(turretFace);
     const mant=mkBox(0.7,0.6,0.5,SILVER(0x44483a)); mant.position.z=T.turL/2; tur.add(mant);
-    const barrel=mkCyl(T.barR,T.barR*1.1,T.barL,SILVER(0x9aa0a8)); barrel.rotation.x=Math.PI/2; barrel.position.z=T.turL/2+T.barL/2; tur.add(barrel);
+    // the stowage bustle overhanging the back of the turret — every tank in the game had a bare
+    // box, and the bustle is most of what tells a turret which way it is pointing
+    const turBustle=mkBox(T.turW*.82,.46,T.turL*.44,body); turBustle.position.set(0,.10,-T.turL*.62); tur.add(turBustle);
+    const turBasket=mkBox(T.turW*.86,.30,.09,SILVER(0x3d443a)); turBasket.position.set(0,.10,-T.turL*.84); tur.add(turBasket);
+    // commander's cupola and hatch
+    const turCupola=mkCyl(T.turW*.20,T.turW*.22,.30,body,12); turCupola.position.set(T.turW*.20,.60,-T.turL*.12); tur.add(turCupola);
+    const turHatch=mkCyl(T.turW*.19,T.turW*.19,.07,SILVER(0x4b5247),12); turHatch.position.set(T.turW*.20,.77,-T.turL*.12); tur.add(turHatch);
+    const turScope=mkBox(.13,.10,.16,SILVER(0x18201c)); turScope.position.set(T.turW*.20,.72,-T.turL*.12+T.turW*.20); tur.add(turScope);
+    // smoke dischargers on the cheeks
+    for(const sx of [-1,1]) for(let i=0;i<3;i++){
+      const smokeTube=mkCyl(.075,.075,.30,SILVER(0x33392f),8);
+      smokeTube.rotation.set(-0.35,0,0); smokeTube.position.set(sx*(T.turW*.42),.22,-T.turL*.10+i*.18); tur.add(smokeTube); }
+    // ...and the gun is lathed like every other gun in the game: breech swell, taper, muzzle band
+    const barrel=navalGunBarrel(T.barL, T.barR*1.05, T.barR*0.82, GUNSTEEL(0x9aa0a8), false);
+    barrel.position.z=T.turL/2; tur.add(barrel);
     g.userData.barrel=barrel;
     const muzzle=mkCyl(T.barR*1.55,T.barR*1.65,.34,SILVER(0x252a2e),8);muzzle.rotation.x=Math.PI/2;muzzle.position.z=T.turL/2+T.barL+.18;tur.add(muzzle);
     if(T.prototype){
@@ -3164,15 +3187,17 @@ function smoothSkinOf(mat){
   if(!_smoothSkins[k]){ const m=mat.clone(); m.flatShading=false; _smoothSkins[k]=m; }
   return _smoothSkins[k];
 }
-function aircraftFuselage(length,radius,mat,slender=1){
+function aircraftFuselage(length,radius,mat,slender=1,facets=0){
   const L=length/2,r=radius,pts=[
     new THREE.Vector2(.018,-L),new THREE.Vector2(r*.28,-L*.88),new THREE.Vector2(r*.72,-L*.6),
     new THREE.Vector2(r*.98,-L*.22),new THREE.Vector2(r,L*.18),new THREE.Vector2(r*.76,L*.58),
     new THREE.Vector2(r*.36,L*.86),new THREE.Vector2(.012,L)
   ];
   pts.forEach(p=>p.x*=slender);
-  const geo=new THREE.LatheGeometry(pts,22);geo.rotateX(Math.PI/2);geo.computeVertexNormals();
-  const mesh=new THREE.Mesh(geo,smoothSkinOf(mat));mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
+  // facets>0 = a deliberately angular body: few lathe segments, hard chines, and the FLAT skin
+  // kept. A stealth fighter is folded plate, not a curve — smoothing it is the wrong answer.
+  const geo=new THREE.LatheGeometry(pts,facets||22);geo.rotateX(Math.PI/2);geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo,facets?mat:smoothSkinOf(mat));mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
 }
 function taperAircraftWing(geo,halfSpan,secondary=null){
   // Main wings and the smaller horizontal tailplane each taper against their
@@ -3395,15 +3420,39 @@ function buildPlane(def){
     span=7.6;length=6.4;const single=/F-16|F-35/.test(def.name),stealth=/F-22|F-35|M-42|SS-17/.test(def.name);
     aircraftUnifiedAirframe(g,{span,length,fuselageWidth:stealth?.5:.4,wingZ:-.2,root:2.65,tip:.64,sweep:1.48,
       tailSpan:3.25,tailZ:-length*.36,tailRoot:1.15,tailTip:.36,tailSweep:.62,thick:.2},m);
-    const fus=aircraftFuselage(length,.46,m,stealth?1.12:1);fus.scale.y=stealth?.82:1;g.add(fus);
+    // Chined and angular for the stealth jets, rounded for everyone else.
+    const fus=aircraftFuselage(length,.46,m,stealth?1.12:1,stealth?6:0);fus.scale.y=stealth?.82:1;g.add(fus);
+    if(stealth) for(const sx of[-1,1]){          // the chine running nose-to-wing along each side
+      const chine=mkBox(.10,.09,length*.62,m); chine.position.set(sx*.46,-.02,length*.10);
+      chine.rotation.y=-sx*.05; g.add(chine); }
     aircraftCanopy(g,0,.42,length*.2,.36,.25,.9,glass);
     const engines=single?[0]:[-.3,.3];g.userData.burners=[];
-    engines.forEach(x=>{const nac=aircraftFuselage(2.15,.27,dark);nac.position.set(x,-.04,-length*.3);g.add(nac);
-      const noz=mkCyl(.23,.18,.44,intakeMat,18);noz.rotation.x=Math.PI/2;noz.position.set(x,-.04,-length*.52);g.add(noz);addJetFlame(x,-.04,-length*.59,.17);});
-    const tails=single?[0]:[-.62,.62];tails.forEach((x,i)=>{const fin=addFin(x,.15,-length*.37,1.05,1.25,.45,.45);
-      fin.rotation.z=Math.PI/2+(single?0:(i?-.2:.2));});
-    for(const sx of[-1,1]){const intake=new THREE.Mesh(new THREE.CylinderGeometry(.28,.4,1.15,16,1,false,0,Math.PI),intakeMat);
-      intake.rotation.set(Math.PI/2,0,sx<0?Math.PI:0);intake.position.set(sx*.5,-.07,length*.09);g.add(intake);}
+    engines.forEach(x=>{const nac=aircraftFuselage(2.15,.27,dark,1,stealth?6:0);nac.position.set(x,-.04,-length*.3);g.add(nac);
+      if(stealth){
+        // 2D thrust-vectoring nozzles: flat slots between paddles, not round cans. On the real
+        // aircraft this is the single most recognisable thing about the back end.
+        const noz=mkBox(.42,.13,.52,intakeMat); noz.position.set(x,-.04,-length*.52); g.add(noz);
+        for(const sy of[-1,1]){ const paddle=mkBox(.46,.07,.46,m);
+          paddle.position.set(x,-.04+sy*.13,-length*.53); paddle.rotation.x=sy*.12; g.add(paddle); }
+        addJetFlame(x,-.04,-length*.59,.13);
+      }else{
+        const noz=mkCyl(.23,.18,.44,intakeMat,18);noz.rotation.x=Math.PI/2;noz.position.set(x,-.04,-length*.52);g.add(noz);
+        addJetFlame(x,-.04,-length*.59,.17);
+      }});
+    // Twin tails canted hard outboard is the F-22's silhouette. 0.2 rad was barely a lean;
+    // the real aircraft sits at about 28 degrees.
+    const tails=single?[0]:[-.62,.62], cant=stealth?.49:.2;
+    tails.forEach((x,i)=>{const fin=addFin(x,.15,-length*.37,1.05,1.25,.45,.45);
+      fin.rotation.z=Math.PI/2+(single?0:(i?-cant:cant));});
+    for(const sx of[-1,1]){
+      if(stealth){                                // caret inlets: diamond mouths, raked and angled
+        const lip=mkBox(.5,.42,1.15,intakeMat); lip.position.set(sx*.52,-.07,length*.09);
+        lip.rotation.y=-sx*.14; lip.rotation.z=sx*.22; g.add(lip);
+        const rake=mkBox(.1,.46,.5,m); rake.position.set(sx*.74,-.05,length*.30); rake.rotation.y=-sx*.30; g.add(rake);
+      }else{
+        const intake=new THREE.Mesh(new THREE.CylinderGeometry(.28,.4,1.15,16,1,false,0,Math.PI),intakeMat);
+        intake.rotation.set(Math.PI/2,0,sx<0?Math.PI:0);intake.position.set(sx*.5,-.07,length*.09);g.add(intake);
+      }}
   }else if(shape==='attack'&&def.name.includes('P-38')){
     span=9.6;length=6.1;
     const pod=aircraftFuselage(length*.7,.38,m);pod.position.z=length*.12;g.add(pod);aircraftCanopy(g,0,.4,length*.22,.35,.25,.72,glass);
