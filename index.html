@@ -3154,6 +3154,16 @@ function buildTurret(def){
 function aircraftSkin(col){
   const m=surfaceMaterial(col,'paint',.66,.08);m.envMapIntensity=.7;return m;   // matte painted airframe, not glossy semi-metal
 }
+// The smooth twin of whatever skin it is handed, cached by colour. A wing or a fin is folded
+// panel and stays flat-shaded; a fuselage is a compound curve and must not be. Cloning keeps the
+// paint map, roughness, metalness and envMapIntensity and flips one flag.
+const _smoothSkins={};
+function smoothSkinOf(mat){
+  if(!mat||!mat.color||mat.flatShading===false) return mat;
+  const k=mat.color.getHex()+':'+mat.roughness+':'+mat.metalness;
+  if(!_smoothSkins[k]){ const m=mat.clone(); m.flatShading=false; _smoothSkins[k]=m; }
+  return _smoothSkins[k];
+}
 function aircraftFuselage(length,radius,mat,slender=1){
   const L=length/2,r=radius,pts=[
     new THREE.Vector2(.018,-L),new THREE.Vector2(r*.28,-L*.88),new THREE.Vector2(r*.72,-L*.6),
@@ -3161,8 +3171,8 @@ function aircraftFuselage(length,radius,mat,slender=1){
     new THREE.Vector2(r*.36,L*.86),new THREE.Vector2(.012,L)
   ];
   pts.forEach(p=>p.x*=slender);
-  const geo=new THREE.LatheGeometry(pts,18);geo.rotateX(Math.PI/2);geo.computeVertexNormals();
-  const mesh=new THREE.Mesh(geo,mat);mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
+  const geo=new THREE.LatheGeometry(pts,22);geo.rotateX(Math.PI/2);geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo,smoothSkinOf(mat));mesh.castShadow=true;mesh.receiveShadow=true;return mesh;
 }
 function taperAircraftWing(geo,halfSpan,secondary=null){
   // Main wings and the smaller horizontal tailplane each taper against their
@@ -3231,6 +3241,36 @@ function aircraftPropeller(radius,blades,dark,contra=false){
   const hub=new THREE.Mesh(new THREE.SphereGeometry(radius*.15,14,10),SILVER(0xb5bbc0));hub.scale.z=1.45;pg.add(hub);
   const disc=new THREE.Mesh(new THREE.CircleGeometry(radius,32),new THREE.MeshBasicMaterial({color:0x82909a,transparent:true,opacity:.08,side:THREE.DoubleSide,depthWrite:false}));
   pg.add(disc);return pg;
+}
+// Nothing in the game had wheels. Aircraft spend a lot of their life PARKED on your deck, a few
+// metres from where you stand, and an aeroplane resting on its belly is the sort of thing you
+// notice immediately without being able to say why. Struts fold up into the wing in flight.
+function aircraftLandingGear(g,span,length,shape,mat){
+  if(shape==='heli'||shape==='quad') return;      // skids and legs already come with those bodies
+  const strutM=SILVER(0x9aa2aa), tyreM=surfaceMaterial(0x1c2024,'paint',.95,.02);
+  const legs=[];
+  const leg=(x,z,drop,r)=>{
+    const pivot=new THREE.Group(); pivot.position.set(x,-.06,z); g.add(pivot);
+    const strut=mkCyl(.045,.055,drop,strutM,8); strut.position.y=-drop*.5; pivot.add(strut);
+    const hub=mkCyl(.05,.05,r*.55,strutM,8); hub.rotation.z=Math.PI/2; hub.position.y=-drop; pivot.add(hub);
+    const tyre=new THREE.Mesh(new THREE.TorusGeometry(r,r*.42,7,14), tyreM);
+    tyre.rotation.y=Math.PI/2; tyre.position.y=-drop; pivot.add(tyre);
+    legs.push(pivot); return pivot;
+  };
+  const heavy=shape==='heavyjet'||shape==='heavyprop';
+  const mainX=Math.min(span*.20, heavy?2.4:1.35), drop=heavy?.95:.72, r=heavy?.26:.19;
+  for(const sx of [-1,1]) leg(sx*mainX, -length*.06, drop, r);
+  leg(0, shape==='wing'?length*.22:length*.34, drop*.92, r*.78);      // nose leg
+  g.userData.gear=legs;
+}
+// Down when the wheels have any business being down — parked, taxiing, taking off, landing, or
+// simply close enough to the deck that they would be. Folded outward and up otherwise.
+function setAircraftGear(group, down){
+  const legs=group.userData.gear; if(!legs) return;
+  const t=group.userData._gearT==null ? (down?1:0) : group.userData._gearT;
+  const want=down?1:0, now=t+(want-t)*0.14;                 // eases, so it never snaps
+  group.userData._gearT=now;
+  for(const l of legs){ l.rotation.x=(1-now)*1.35; l.visible=now>0.02; }
 }
 function addAircraftControlSurfaces(g,span,length,shape,dark){
   const ailerons=[],elevators=[];
@@ -3490,6 +3530,7 @@ function buildPlane(def){
   if(def.gunCount&&shape!=='heli')for(let i=0;i<Math.min(8,def.gunCount);i++){const x=(i-(Math.min(8,def.gunCount)-1)/2)*.18,gun=mkCyl(.03,.04,1.05,intakeMat,10);
     gun.rotation.x=Math.PI/2;gun.position.set(x,-.1,length*.49);g.add(gun);}
   const pitot=shape==='heli'?null:mkCyl(.012,.018,.65,SILVER(0x20252a),8);if(pitot){pitot.rotation.x=Math.PI/2;pitot.position.set(0,0,length*.55);g.add(pitot);}
+  aircraftLandingGear(g,span,length,shape,m);
   g.userData.airMeta={span,length,shape};addAircraftGraphicDetails(g,def,shape);addAircraftInterior(g,def,shape,length);
   if(def.scale)g.scale.setScalar(def.scale);
   g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
@@ -7982,6 +8023,11 @@ function spinProp(pa,dt){
   if(pa.group.userData.rotor) pa.group.userData.rotor.rotation.y += dt*30*k;     // helicopter main rotor
   if(pa.group.userData.trotor) pa.group.userData.trotor.rotation.x += dt*40*k;   // tail rotor spins around its side-facing axle
   if(pa.group.userData.burner) pa.group.userData.burner.scale.setScalar(dead?0:0.7+Math.random()*0.6);
+  // Wheels down whenever they would really be down. A parked aircraft, anything still on or near
+  // the deck, and every phase that is not simply "flying".
+  const ph = (piloting && piloting.plane===pa) ? piloting.phase : (pa.phase||null);
+  const y  = pa.group.position.y - (typeof deckTopWorldY==='function' ? deckTopWorldY() : 0);
+  setAircraftGear(pa.group, !!pa.parked || (ph && ph!=='fly') || y < 14);
 }
 function deckTopWorldY(){ return player.build.group.position.y + player.def.deckY + (player.def.kind==='carrier'?0.5:0); }
 // Anything on deck that is not flat is a hazard while taxiing: mounted turrets, other parked
