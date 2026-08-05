@@ -59,8 +59,13 @@ git 历史里的邮箱清理干净了，隐私文档却把它明文登记在仓�
 ## 部署
 
 ```bash
-ssh irontide-vps 'cd /opt/games/irontide && git fetch origin main && git reset --hard origin/main'
+ssh irontide-vps 'cd /opt/games/sushigamelab && ./update-games.sh irontide'
 ```
+
+⚠️ **路径变了**：搬到 sushigamelab.com 之后旧的 `/opt/games/irontide` 已经不存在，
+checkout 在 `/opt/games/sushigamelab/irontide`。别再手写 `git reset --hard`——
+`update-games.sh` 是这台机器上九个游戏统一的更新入口，它还会顺带重启 pvp 服务端。
+只更新一个游戏就带上名字：`./update-games.sh irontide`，不带参数则全部更新。
 
 `irontide-vps` 是本机 `~/.ssh/config` 里的别名，**真实地址和用户名不写进这个仓库**——
 这是公开仓库，写进来等于把 root 登录目标广播给全网扫描器。本机加一段即可：
