@@ -698,19 +698,19 @@ const WEAPONS = {
   sixteen: { name:'16" Mk 7 Battery',cost:1900,dmg:135,cd:3.4,  spd:92,  kind:'cannon', col:0xccd0d6, size:2.0, barrels:3, splash:13, lob:13 }, // capital main battery
   quadtorp:{ name:'Quint Torpedo',   cost:1300,dmg:105,cd:3.0,  spd:58,  kind:'torpedo', col:0x9aa2aa, size:1.3, splash:8 },
   // ---- marketplace mounts ----
-  mortar:  { name:'Deck Mortar',     cost:620, dmg:52, cd:1.9,  spd:78,  kind:'cannon', col:0x8d9298, size:0.9, splash:11, lob:20, marketOnly:true },   // cheap, steep, lands behind cover
-  beamcannon:{name:'Mk 12 Beam Cannon',cost:2900,dmg:22,cd:0.16, spd:400, kind:'gun',   col:0x7fe8ff, size:1.4, marketOnly:true },                       // continuous energy beam, no lead needed
+  mortar:  { name:'Deck Mortar',     cost:620, dmg:52, cd:1.9,  spd:78,  kind:'cannon', col:0x8d9298, size:0.9, splash:11, lob:20, marketOnly:true , gfx:'mortar' },   // cheap, steep, lands behind cover
+  beamcannon:{name:'Mk 12 Beam Cannon',cost:2900,dmg:22,cd:0.16, spd:400, kind:'gun',   col:0x7fe8ff, size:1.4, marketOnly:true , gfx:'beam' },                       // continuous energy beam, no lead needed
   flak88:  { name:'88mm Flak 36',    cost:1150,dmg:44, cd:1.05, spd:190, kind:'gun',    col:0xb7bcc4, size:1.1, aa:true, marketOnly:true },   // the famous dual-purpose gun: aircraft AND ships
   harpoon: { name:'Harpoon SSM',     cost:2400,dmg:120,cd:3.2,  spd:150, kind:'missile',col:0xd0d4da, size:1.2, splash:9, homing:true, range:620, marketOnly:true },  // stand-off anti-ship missile
 
   // barrels fire n shells per trigger, so real output is dmg x barrels — priced against that,
   // not against the single-shot number, or a premium blueprint ends up worse value than the
   // free starter deck gun (which is what the balance guardrail caught the first time).
-  katyusha:{ name:'BM-13 Rocket Rack',cost:1300,dmg:45, cd:1.5,  spd:118, kind:'cannon', col:0x8a7f66, size:1.2, barrels:4, splash:14, lob:15, marketOnly:true },  // ~120 dps, saturates an area
-  railmount:{name:'Mk 9 Rail Cannon', cost:2200,dmg:150,cd:1.9,  spd:300, kind:'gun',    col:0xd8e2ea, size:1.8, splash:7, marketOnly:true },                      // flat and very fast — easy to actually hit with
+  katyusha:{ name:'BM-13 Rocket Rack',cost:1300,dmg:45, cd:1.5,  spd:118, kind:'cannon', col:0x8a7f66, size:1.2, barrels:4, splash:14, lob:15, marketOnly:true , gfx:'rocket' },  // ~120 dps, saturates an area
+  railmount:{name:'Mk 9 Rail Cannon', cost:2200,dmg:150,cd:1.9,  spd:300, kind:'gun',    col:0xd8e2ea, size:1.8, splash:7, marketOnly:true , gfx:'rail' },                      // flat and very fast — easy to actually hit with
   // ---- modern mounts ----
   m2:      { name:'M2 Browning',     cost:200, dmg:5,  cd:0.14, spd:185, kind:'gun', col:0x8f969e, size:0.5, spread:0.04, aa:true },     // light dual-purpose HMG
-  m777:    { name:'M777 Howitzer',   cost:1800,dmg:92, cd:2.8,  spd:92,  kind:'cannon', col:0xc4c8d0, size:1.5, splash:12, lob:16 },      // long-range artillery
+  m777:    { name:'M777 Howitzer',   cost:1800,dmg:92, cd:2.8,  spd:92,  kind:'cannon', col:0xc4c8d0, size:1.5, splash:12, lob:16 , gfx:'dual' },      // long-range artillery
   patriot: { name:'Patriot SAM',     cost:2200,dmg:50, cd:1.3,  spd:195, kind:'missile', col:0xd8dce2, size:1.1, splash:6, homing:true, aa:true, turn:4.5, range:520 }, // long-range air defense
   tomahawk:{ name:'Tomahawk Launcher',cost:2700,dmg:120,cd:3.6, spd:88,  kind:'missile', col:0xc0c6cc, size:1.2, splash:13, homing:true, turn:2.0, range:720 }, // cruise missile
   // The Missile Cruiser's own round, and the longest reach in the game by a mile — 2000 m, against
@@ -734,7 +734,7 @@ const WEAPONS = {
   // bleeds energy with distance and armour blunts a 10-damage bolt hard. Against aircraft, which
   // carry no armour, it is a wall of fire. Fast bolts (520 m/s) on purpose — at 20/s a slow round
   // would keep ~250 shells alive at once and crowd the 360 cap, evicting everyone else's fire.
-  plasmamini:{name:'Plasma Minigun', cost:3900,dmg:10, cd:0.05,spd:520, kind:'gun', col:0x9df6ff, tracerCol:0x7be0ff, size:0.9, spread:0.012, range:800, plasma:true },
+  plasmamini:{name:'Plasma Minigun', cost:3900,dmg:10, cd:0.05,spd:520, kind:'gun', col:0x9df6ff, tracerCol:0x7be0ff, size:0.9, spread:0.012, range:800, plasma:true, gfx:'gatling' },
 };
 // Buyable, pilotable, armed aircraft. Park on deck → press E to fly.
 const PLANES = {
@@ -2816,19 +2816,88 @@ function buildLand(kind,team,pos,type){
 // =====================================================================
 //  TURRET BUILDER
 // =====================================================================
+// ===== TURRET PARTS ==================================================================
+// Every gun and cannon in the game used to come out of one branch: a box with N cylinders
+// through it. A 16-inch Mk 7 and an M2 Browning were the same mesh at different scales.
+// These are the pieces real naval mounts are actually made of, so the archetypes below can be
+// assembled from them instead of re-describing a box each time.
+//
+// Budget: measured at 139 turret meshes across a 42-ship battle whose scene holds ~10,500, so
+// turrets were 1.3% of it. That headroom is why these can be detailed without an LOD split —
+// the player's gun and the AI's are the same model, which is one less thing to drift.
+
+// A gun barrel is not a tube: it is thick at the breech, tapers toward the muzzle, and wears a
+// reinforcing band at the lip. Returned lying along +Z, root at the origin.
+function navalGunBarrel(len, rBreech, rMuzzle, mat, jacket){
+  const b=new THREE.Group();
+  const tube=mkCyl(rMuzzle, rBreech, len, mat, 10); tube.rotation.x=Math.PI/2; tube.position.z=len*0.5; b.add(tube);
+  const lip=mkCyl(rMuzzle*1.22, rMuzzle*1.22, len*0.045, mat, 10); lip.rotation.x=Math.PI/2; lip.position.z=len*0.975; b.add(lip);
+  // a water-cooling jacket is what makes a light automatic weapon read as one at a glance
+  if(jacket){ const jk=mkCyl(rBreech*1.35, rBreech*1.35, len*0.42, SILVER(0x7a828a), 9);
+    jk.rotation.x=Math.PI/2; jk.position.z=len*0.30; b.add(jk); }
+  return b;
+}
+// The canvas bloomer sealing the slot where a barrel leaves the turret face. Small, and the
+// single most recognisable detail on a WWII naval turret.
+function blastBag(r, mat){ const c=mkCyl(r*1.05, r*1.75, r*2.2, mat, 9); c.rotation.x=Math.PI/2; return c; }
+// A gunhouse profile drawn side-on and extruded across the beam: near-vertical front plate, a
+// sloped upper face, a flat roof and a raked back. That silhouette is the whole difference
+// between "turret" and "crate".
+function turretHouse(w, h, d, mat){
+  const s=new THREE.Shape();
+  s.moveTo(-d*0.50, 0);      s.lineTo( d*0.50, 0);
+  s.lineTo( d*0.50, h*0.52); s.lineTo( d*0.17, h);
+  s.lineTo(-d*0.32, h);      s.lineTo(-d*0.50, h*0.60);
+  s.closePath();
+  const geo=new THREE.ExtrudeGeometry(s,{depth:w,steps:1,bevelEnabled:true,bevelSegments:1,bevelSize:h*0.03,bevelThickness:h*0.03});
+  geo.rotateY(Math.PI/2); geo.translate(w*0.5,0,0); geo.computeVertexNormals();
+  const mesh=new THREE.Mesh(geo,mat); mesh.castShadow=mesh.receiveShadow=true; return mesh;
+}
+// The armoured drum a turret turns on. Real mounts sit ON something.
+function barbette(r, h, mat){ const c=mkCyl(r, r*1.06, h, mat, 14); c.position.y=h*0.5; return c; }
+// Open light-AA mounts have a curved splinter shield rather than a roof.
+function gunShield(r, h, thick, mat){
+  const geo=new THREE.CylinderGeometry(r, r, h, 16, 1, true, -Math.PI*0.42, Math.PI*0.84);
+  const mesh=new THREE.Mesh(geo, mat); mesh.material.side=THREE.DoubleSide;
+  mesh.castShadow=mesh.receiveShadow=true; return mesh;
+}
+// Roof furniture: sighting hoods and a hatch. Cheap, and it stops a roof reading as a lid.
+function turretRoofKit(g, w, d, y, sz, mat){
+  for(const sx of [-1,1]){ const hood=mkCyl(0.16*sz,0.19*sz,0.20*sz,mat,8);
+    hood.position.set(sx*w*0.33, y+0.09*sz, d*0.06); g.add(hood); }
+  const hatch=mkCyl(0.20*sz,0.20*sz,0.06*sz,SILVER(0x6d757d),10); hatch.position.set(0,y+0.03*sz,-d*0.22); g.add(hatch);
+}
+// Which mount a weapon actually is. Derived, so 29 weapons do not need 29 tags — only the ones
+// that are genuinely their own thing (railgun, beam, plasma gatling, rocket rack, Phalanx) carry
+// an explicit gfx. Everything else falls out of what the weapon IS: every light AA gun in this
+// game is an open shielded mount in reality, and a heavy cannon is a turret with a barbette.
+function turretArchetype(def){
+  if(def.gfx) return def.gfx;
+  if(def.kind==='torpedo') return 'torpedo';
+  if(def.kind==='bomb')    return 'mortar';
+  if(def.kind==='missile') return 'missile';
+  if(def.aa)               return 'openaa';
+  if(def.kind==='cannon')  return (def.size||1)>=1.3 ? 'capital' : 'dual';
+  return 'dual';
+}
 function buildTurret(def){
   const g=new THREE.Group(); const sz=def.size||1; const m=SILVER(def.col);
+  const arch=turretArchetype(def);
   // Light open mounts need a waist-high pedestal. Without it, half-scale guns such
   // as the M2 sit almost flush with the deck and disappear below the walking POV.
   // The pedestal shrinks smoothly as the weapon gets larger, so every gun remains
   // seated on its actual deck/terrain surface rather than being floated upward.
-  const pedestalH=def.kind==='gun'&&sz<0.75 ? Math.max(0,(0.78-sz)*1.8) : 0;
+  const pedestalH=arch==='openaa'&&sz<0.9 ? Math.max(0,(0.92-sz)*1.6) : 0;
   if(pedestalH>0){
     const foot=mkCyl(0.62*sz,0.78*sz,0.12*sz,m);foot.position.y=0.06*sz;g.add(foot);
     const post=mkCyl(0.25*sz,0.38*sz,pedestalH,m);post.position.y=0.12*sz+pedestalH*0.5;g.add(post);
     const collar=mkCyl(0.42*sz,0.32*sz,0.14*sz,m);collar.position.y=pedestalH+0.1*sz;g.add(collar);
   }
-  const base=mkCyl(0.7*sz,0.85*sz,0.4*sz,m); base.position.y=pedestalH+0.2*sz; g.add(base);
+  // Turrets and open AA bring their own footing — a barbette and a training ring respectively —
+  // so only the mounts that don't get the old generic drum under them.
+  if(arch!=='capital'&&arch!=='dual'&&arch!=='openaa'){
+    const base=mkCyl(0.7*sz,0.85*sz,0.4*sz,m); base.position.y=pedestalH+0.2*sz; g.add(base);
+  }
   const yawG=new THREE.Group(); yawG.position.y=pedestalH+0.4*sz; g.add(yawG); g.userData.yawG=yawG;
   g.userData.pedestalH=pedestalH;
   let housing, pitchG=new THREE.Group();
@@ -2849,17 +2918,96 @@ function buildTurret(def){
     g.userData.barrelLen=1.4*sz;
   } else if(def.gfx==='ciws'){ // Phalanx — white radome + 6-barrel gatling
     const dome=new THREE.Mesh(new THREE.SphereGeometry(0.7*sz,12,10,0,Math.PI*2,0,Math.PI*0.55), SILVER(0xeef1f4)); dome.position.y=0.62*sz; yawG.add(dome);
+    const collar=mkCyl(0.52*sz,0.62*sz,0.26*sz,SILVER(0xdfe4e8),12); collar.position.y=0.13*sz; yawG.add(collar);
     yawG.add(pitchG); pitchG.position.set(0,0.42*sz,0.45*sz);
     const drum=mkCyl(0.2*sz,0.22*sz,0.55*sz,SILVER(0x3a4048)); drum.rotation.x=Math.PI/2; drum.position.z=0.4*sz; pitchG.add(drum);
     for(let i=0;i<6;i++){ const b=mkCyl(0.04*sz,0.04*sz,0.9*sz,SILVER(0x6a7078)); b.rotation.x=Math.PI/2; b.position.set(Math.cos(i/6*6.28)*0.1*sz,Math.sin(i/6*6.28)*0.1*sz,0.95*sz); pitchG.add(b); }
     g.userData.barrelLen=1.3*sz;
-  } else { // gun / cannon
-    housing=mkBox(1.0*sz,0.7*sz,1.1*sz,m); housing.position.y=0.4*sz; yawG.add(housing);
-    yawG.add(pitchG); pitchG.position.set(0,0.55*sz,0.3*sz);
-    const nb=def.barrels||1;
-    for(let i=0;i<nb;i++){ const bl=(def.kind==='cannon'?2.6:1.9)*sz; const br=mkCyl(0.12*sz,0.14*sz,bl,SILVER(0x9aa0a8)); br.rotation.x=Math.PI/2;
-      br.position.set((i-(nb-1)/2)*0.3*sz,0,bl*0.5); pitchG.add(br); }
-    g.userData.barrelLen=(def.kind==='cannon'?2.6:1.9)*sz;
+  } else if(arch==='openaa'){
+    // Light automatic AA is an OPEN mount: a curved splinter shield, a gunner's seat behind it,
+    // a magazine drum and jacketed barrels. Enclosing these in a box was what made an Oerlikon
+    // and a 16-inch battery read as the same object.
+    const shield=gunShield(0.86*sz, 1.05*sz, 0.05*sz, SILVER(0x767f88)); shield.position.set(0,0.5*sz,0.16*sz); yawG.add(shield);
+    const ring=mkCyl(0.5*sz,0.56*sz,0.14*sz,m,12); ring.position.y=0.07*sz; yawG.add(ring);
+    const seat=mkBox(0.34*sz,0.08*sz,0.34*sz,SILVER(0x4d545b)); seat.position.set(0,0.44*sz,-0.42*sz); yawG.add(seat);
+    const backrest=mkBox(0.34*sz,0.34*sz,0.07*sz,SILVER(0x4d545b)); backrest.position.set(0,0.62*sz,-0.58*sz); yawG.add(backrest);
+    yawG.add(pitchG); pitchG.position.set(0,0.56*sz,0.10*sz);
+    const cradle=mkBox(0.40*sz,0.26*sz,0.52*sz,SILVER(0x5c646c)); pitchG.add(cradle);
+    const nb=def.barrels||1, bl=1.55*sz;
+    for(let i=0;i<nb;i++){
+      const br=navalGunBarrel(bl, 0.075*sz, 0.05*sz, SILVER(0x8f979f), true);
+      br.position.set((i-(nb-1)/2)*0.26*sz, (nb>2&&i>1?0.2*sz:0), 0.2*sz); pitchG.add(br);
+    }
+    const mag=mkCyl(0.24*sz,0.24*sz,0.16*sz,SILVER(0x3f464d),10); mag.position.set(0.22*sz,0.24*sz,0.05*sz); pitchG.add(mag);
+    g.userData.barrelLen=bl+0.2*sz;
+  } else if(arch==='rocket'){
+    // A rail rack, not a gun: rows of open rails with the rockets still sitting on them.
+    const frame=mkBox(1.5*sz,0.28*sz,0.7*sz,m); frame.position.y=0.3*sz; yawG.add(frame);
+    yawG.add(pitchG); pitchG.position.set(0,0.5*sz,0); pitchG.rotation.x=-0.30;
+    for(let r=0;r<2;r++) for(let c=0;c<4;c++){
+      const rail=mkBox(0.09*sz,0.06*sz,2.3*sz,SILVER(0x6e767e));
+      rail.position.set((c-1.5)*0.34*sz, r*0.30*sz, 0.9*sz); pitchG.add(rail);
+      const rk=mkCyl(0.10*sz,0.10*sz,1.5*sz,SILVER(0x8a7f66),8); rk.rotation.x=Math.PI/2;
+      rk.position.set((c-1.5)*0.34*sz, r*0.30*sz+0.11*sz, 0.85*sz); pitchG.add(rk);
+    }
+    g.userData.barrelLen=2.2*sz;
+  } else if(arch==='rail'){
+    // Twin accelerator rails with the capacitor bank stacked behind them, glowing between shots.
+    const glow=new THREE.MeshStandardMaterial({color:0x1d5f78,emissive:0x35b6e8,emissiveIntensity:1.0,roughness:.3});
+    const body=turretHouse(1.15*sz,0.72*sz,1.35*sz,m); body.position.set(-0.575*sz,0.06*sz,0); yawG.add(body);
+    for(const sx of [-1,1]){ const cap=mkCyl(0.20*sz,0.20*sz,0.8*sz,SILVER(0x39414a),10);
+      cap.rotation.z=Math.PI/2; cap.position.set(sx*0.42*sz,0.5*sz,-0.5*sz); yawG.add(cap); }
+    yawG.add(pitchG); pitchG.position.set(0,0.66*sz,0.4*sz);
+    for(const sx of [-1,1]){ const rail=mkBox(0.13*sz,0.16*sz,3.0*sz,SILVER(0xb9c2ca));
+      rail.position.set(sx*0.17*sz,0,1.4*sz); pitchG.add(rail); }
+    for(let i=0;i<4;i++){ const ring=mkCyl(0.30*sz,0.30*sz,0.07*sz,glow,10);
+      ring.rotation.x=Math.PI/2; ring.position.z=(0.5+i*0.72)*sz; pitchG.add(ring); }
+    g.userData.barrelLen=3.0*sz;
+  } else if(arch==='beam'){
+    // One heavy emitter tube inside focusing coils — no breech, no barrels, no recoil.
+    const glow=new THREE.MeshStandardMaterial({color:0x1f6b82,emissive:0x46c9ef,emissiveIntensity:1.1,roughness:.25});
+    const body=turretHouse(1.2*sz,0.78*sz,1.3*sz,m); body.position.set(-0.6*sz,0.06*sz,0); yawG.add(body);
+    yawG.add(pitchG); pitchG.position.set(0,0.72*sz,0.35*sz);
+    const emitter=mkCyl(0.22*sz,0.30*sz,2.4*sz,SILVER(0x757f88),12); emitter.rotation.x=Math.PI/2; emitter.position.z=1.2*sz; pitchG.add(emitter);
+    for(let i=0;i<3;i++){ const coil=mkCyl(0.40*sz,0.40*sz,0.14*sz,glow,12);
+      coil.rotation.x=Math.PI/2; coil.position.z=(0.55+i*0.75)*sz; pitchG.add(coil); }
+    const lens=mkCyl(0.19*sz,0.19*sz,0.10*sz,glow,12); lens.rotation.x=Math.PI/2; lens.position.z=2.4*sz; pitchG.add(lens);
+    g.userData.barrelLen=2.5*sz;
+  } else if(arch==='gatling'){
+    // Republic plasma: a spun barrel cluster in a charged cage, in their own electric cyan.
+    const glow=new THREE.MeshStandardMaterial({color:0x21707f,emissive:0x4fd4ec,emissiveIntensity:1.05,roughness:.25});
+    const body=mkCyl(0.62*sz,0.74*sz,0.52*sz,m,12); body.position.y=0.26*sz; yawG.add(body);
+    const yoke=mkBox(1.0*sz,0.5*sz,0.34*sz,SILVER(0x525a62)); yoke.position.set(0,0.62*sz,-0.1*sz); yawG.add(yoke);
+    yawG.add(pitchG); pitchG.position.set(0,0.66*sz,0.2*sz);
+    const hub=mkCyl(0.26*sz,0.30*sz,0.5*sz,SILVER(0x3e454c),12); hub.rotation.x=Math.PI/2; hub.position.z=0.25*sz; pitchG.add(hub);
+    for(let i=0;i<6;i++){ const a=i/6*6.2832;
+      const br=mkCyl(0.055*sz,0.055*sz,1.5*sz,SILVER(0x8f979f),7); br.rotation.x=Math.PI/2;
+      br.position.set(Math.cos(a)*0.16*sz, Math.sin(a)*0.16*sz, 1.05*sz); pitchG.add(br); }
+    for(let i=0;i<2;i++){ const coil=mkCyl(0.30*sz,0.30*sz,0.10*sz,glow,10);
+      coil.rotation.x=Math.PI/2; coil.position.z=(0.62+i*0.62)*sz; pitchG.add(coil); }
+    g.userData.barrelLen=1.9*sz;
+  } else { // capital main battery, or an enclosed dual-purpose mount
+    const cap=arch==='capital';
+    const hw=(cap?1.55:1.05)*sz, hh=(cap?0.95:0.68)*sz, hd=(cap?1.85:1.25)*sz;
+    g.add(barbette((cap?0.92:0.66)*sz, pedestalH+0.40*sz, SILVER(0x646c74)));
+    const house=turretHouse(hw,hh,hd,m); house.position.set(-hw*0.5,0.04*sz,0); yawG.add(house);
+    turretRoofKit(yawG,hw,hd,hh+0.04*sz,sz,SILVER(0x6d757d));
+    // The rangefinder arms out of the turret cheeks are the signature of a main battery.
+    if(cap) for(const sx of [-1,1]){
+      const arm=mkBox(0.55*sz,0.24*sz,0.30*sz,SILVER(0x5f676f));
+      arm.position.set(sx*(hw*0.5+0.24*sz), hh*0.72, -hd*0.16); yawG.add(arm);
+      const eye=mkCyl(0.09*sz,0.09*sz,0.10*sz,SILVER(0x1d2830),8);
+      eye.rotation.z=Math.PI/2; eye.position.set(sx*(hw*0.5+0.52*sz), hh*0.72, -hd*0.16); yawG.add(eye);
+    }
+    yawG.add(pitchG); pitchG.position.set(0, hh*0.56, hd*0.30);
+    const nb=def.barrels||1, bl=(cap?3.1:2.0)*sz, spread=(cap?0.46:0.34)*sz;
+    for(let i=0;i<nb;i++){
+      const x=(i-(nb-1)/2)*spread;
+      const br=navalGunBarrel(bl, (cap?0.17:0.115)*sz, (cap?0.12:0.085)*sz, SILVER(0x9aa0a8), false);
+      br.position.set(x,0,0.16*sz); pitchG.add(br);
+      const bag=blastBag((cap?0.19:0.13)*sz, SILVER(0x8b8578)); bag.position.set(x,0,0.10*sz); pitchG.add(bag);
+    }
+    g.userData.barrelLen=bl+0.2*sz;
   }
   g.userData.pitchG=pitchG; g.userData.def=def;
   return g;
