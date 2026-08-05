@@ -1046,6 +1046,29 @@ function surfaceMap(kind='metal'){
     x.fillStyle='rgba(30,34,37,.28)';for(let py=4;py<s;py+=12)for(let px=4;px<s;px+=12){x.beginPath();x.arc(px,py,.7,0,6.283);x.fill();}}
   if(kind==='concrete'){x.strokeStyle='rgba(65,62,55,.18)';for(let i=0;i<8;i++){let px=Math.random()*s,py=Math.random()*s;x.beginPath();x.moveTo(px,py);
     for(let j=0;j<4;j++){px+=(Math.random()-.5)*18;py+=5+Math.random()*10;x.lineTo(px,py);}x.stroke();}}
+  // Fine circumferential turning bands: a barrel comes off a lathe, and this is what that reads
+  // as. Texture, not geometry — it costs nothing and this renderer has shadows switched off, so
+  // surface detail has to come from the map rather than from anything casting onto it.
+  if(kind==='gunmetal'){
+    x.strokeStyle='rgba(28,34,40,.20)'; x.lineWidth=1;
+    for(let p=0;p<s;p+=5){ x.beginPath(); x.moveTo(0,p); x.lineTo(s,p); x.stroke(); }
+    x.strokeStyle='rgba(210,220,228,.10)';
+    for(let p=2;p<s;p+=15){ x.beginPath(); x.moveTo(0,p); x.lineTo(s,p); x.stroke(); }
+  }
+  // Turret face armour: heavier plate seams than the hull's, with a riveted double row down each
+  // one and a little vertical staining under them. Twenty-odd rivets per plate as pixels instead
+  // of twenty-odd meshes is the whole reason this can be detailed and still cost nothing.
+  if(kind==='armour'){
+    x.strokeStyle='rgba(16,20,24,.34)'; x.lineWidth=2;
+    for(let p=0;p<=s;p+=32){ x.beginPath();x.moveTo(p,0);x.lineTo(p,s);x.stroke();
+                             x.beginPath();x.moveTo(0,p);x.lineTo(s,p);x.stroke(); }
+    x.fillStyle='rgba(20,25,29,.45)';
+    for(let p=0;p<=s;p+=32) for(let q=4;q<s;q+=7){
+      x.beginPath();x.arc(p+3.5,q,1.1,0,6.283);x.fill();
+      x.beginPath();x.arc(p-3.5,q,1.1,0,6.283);x.fill(); }
+    x.fillStyle='rgba(74,48,32,.13)';                       // rust weeping from the seams
+    for(let p=0;p<=s;p+=32) x.fillRect(p-1.5,0,3,s);
+  }
   const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(kind==='ground'?5:kind==='concrete'?3:2,kind==='ground'?5:kind==='concrete'?3:2);
   t.magFilter=THREE.NearestFilter; t.minFilter=THREE.NearestMipMapNearestFilter||THREE.NearestFilter;
   _surfaceMaps[kind]=t;return t;
@@ -1055,6 +1078,21 @@ function surfaceMaterial(color,kind='metal',roughness=.55,metalness=0){
 }
 const SILVER = c=>surfaceMaterial(c||0xaeb5bc,'metal',0.62,0.38);
 const PAINT  = c=>surfaceMaterial(c||0x6a6a4a,'paint',0.9,0.02);   // matte block-steel: readable Roblox-like military plastic/metal
+// ---- turret materials -------------------------------------------------------------------
+// Two deliberate departures from SILVER, and both are about what the thing IS rather than about
+// making everything glossy. A gun barrel is turned on a lathe: it is smooth, and with shadows off
+// in this renderer, smooth shading is the ONLY thing that gives it a round silhouette. A turret
+// face is welded and riveted plate: it stays flat-shaded, exactly like the hull it sits on.
+// Both are CACHED — surfaceMaterial() mints a new material per call, and a turret asks for the
+// same handful of tones a dozen times, so this also cuts the material count across the fleet.
+const _turretMats={};
+function turretMat(col, kind, rough, metal, smooth){
+  const k=kind+':'+col+':'+rough+':'+metal+':'+(smooth?1:0);
+  if(!_turretMats[k]){ const m=surfaceMaterial(col,kind,rough,metal); m.flatShading=!smooth; _turretMats[k]=m; }
+  return _turretMats[k];
+}
+const GUNSTEEL   = c=>turretMat(c||0x939ba3,'gunmetal',0.38,0.78,true);   // barrels, drums, shields
+const ARMOURPLATE= c=>turretMat(c||0xaeb5bc,'armour',0.68,0.30,false);    // turret faces and barbettes
 function mkBox(w,h,d,m){ const x=new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m.isMaterial?m:SILVER(m)); x.castShadow=x.receiveShadow=true; return x; }
 function mkCyl(rt,rb,h,m,seg=14){ const x=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), m.isMaterial?m:SILVER(m)); x.castShadow=true; return x; }
 
@@ -2830,16 +2868,27 @@ function buildLand(kind,team,pos,type){
 // reinforcing band at the lip. Returned lying along +Z, root at the origin.
 function navalGunBarrel(len, rBreech, rMuzzle, mat, jacket){
   const b=new THREE.Group();
-  const tube=mkCyl(rMuzzle, rBreech, len, mat, 10); tube.rotation.x=Math.PI/2; tube.position.z=len*0.5; b.add(tube);
-  const lip=mkCyl(rMuzzle*1.22, rMuzzle*1.22, len*0.045, mat, 10); lip.rotation.x=Math.PI/2; lip.position.z=len*0.975; b.add(lip);
+  // ONE lathed profile instead of a stack of cylinders — a real gun outline in a single mesh:
+  // breech swell, a step down to the chase, a long taper, the reinforcing band at the muzzle and
+  // the counterbore at the lip. This is both better looking AND cheaper than the tube+ring it
+  // replaces, which is what paid for the extra detail everywhere else in this pass.
+  const P=(r,t)=>new THREE.Vector2(Math.max(0.0001,r), t*len);
+  const geo=new THREE.LatheGeometry([
+    P(0,0), P(rBreech*1.42,0), P(rBreech*1.42,0.085), P(rBreech*1.08,0.125),
+    P(rBreech,0.17), P(rMuzzle*1.04,0.855), P(rMuzzle*1.34,0.885), P(rMuzzle*1.34,0.945),
+    P(rMuzzle*1.03,0.96), P(rMuzzle*1.03,1.0), P(rMuzzle*0.60,1.0)
+  ], 18);
+  geo.rotateX(Math.PI/2);            // lathe spins around +Y; the gun points down +Z
+  geo.computeVertexNormals();
+  const tube=new THREE.Mesh(geo, mat); tube.castShadow=true; b.add(tube);
   // a water-cooling jacket is what makes a light automatic weapon read as one at a glance
-  if(jacket){ const jk=mkCyl(rBreech*1.35, rBreech*1.35, len*0.42, SILVER(0x7a828a), 9);
-    jk.rotation.x=Math.PI/2; jk.position.z=len*0.30; b.add(jk); }
+  if(jacket){ const jk=mkCyl(rBreech*1.30, rBreech*1.30, len*0.40, GUNSTEEL(0x7f878f), 14);
+    jk.rotation.x=Math.PI/2; jk.position.z=len*0.32; b.add(jk); }
   return b;
 }
 // The canvas bloomer sealing the slot where a barrel leaves the turret face. Small, and the
 // single most recognisable detail on a WWII naval turret.
-function blastBag(r, mat){ const c=mkCyl(r*1.05, r*1.75, r*2.2, mat, 9); c.rotation.x=Math.PI/2; return c; }
+function blastBag(r, mat){ const c=mkCyl(r*1.05, r*1.75, r*2.2, mat, 14); c.rotation.x=Math.PI/2; return c; }
 // A gunhouse profile drawn side-on and extruded across the beam: near-vertical front plate, a
 // sloped upper face, a flat roof and a raked back. That silhouette is the whole difference
 // between "turret" and "crate".
@@ -2854,10 +2903,17 @@ function turretHouse(w, h, d, mat){
   const mesh=new THREE.Mesh(geo,mat); mesh.castShadow=mesh.receiveShadow=true; return mesh;
 }
 // The armoured drum a turret turns on. Real mounts sit ON something.
-function barbette(r, h, mat){ const c=mkCyl(r, r*1.06, h, mat, 14); c.position.y=h*0.5; return c; }
+function barbette(r, h, mat){
+  const g=new THREE.Group();
+  const drum=mkCyl(r, r*1.06, h, mat, 20); drum.position.y=h*0.5; g.add(drum);
+  // With shadows disabled, a hard 90-degree top edge reads as nothing at all. A chamfer gives
+  // the barbette one lit rim, which is what tells you it is a cylinder and not a flat disc.
+  const rim=mkCyl(r*0.93, r*1.03, h*0.17, mat, 20); rim.position.y=h*0.955; g.add(rim);
+  return g;
+}
 // Open light-AA mounts have a curved splinter shield rather than a roof.
 function gunShield(r, h, thick, mat){
-  const geo=new THREE.CylinderGeometry(r, r, h, 16, 1, true, -Math.PI*0.42, Math.PI*0.84);
+  const geo=new THREE.CylinderGeometry(r, r, h, 22, 1, true, -Math.PI*0.31, Math.PI*0.62);
   const mesh=new THREE.Mesh(geo, mat); mesh.material.side=THREE.DoubleSide;
   mesh.castShadow=mesh.receiveShadow=true; return mesh;
 }
@@ -2917,25 +2973,25 @@ function buildTurret(def){
     const tube=mkCyl(0.34*sz,0.36*sz,1.5*sz,m); tube.rotation.x=Math.PI/2; tube.position.z=0.7*sz; pitchG.add(tube);
     g.userData.barrelLen=1.4*sz;
   } else if(def.gfx==='ciws'){ // Phalanx — white radome + 6-barrel gatling
-    const dome=new THREE.Mesh(new THREE.SphereGeometry(0.7*sz,12,10,0,Math.PI*2,0,Math.PI*0.55), SILVER(0xeef1f4)); dome.position.y=0.62*sz; yawG.add(dome);
+    const dome=new THREE.Mesh(new THREE.SphereGeometry(0.7*sz,18,14,0,Math.PI*2,0,Math.PI*0.55), GUNSTEEL(0xeef1f4)); dome.position.y=0.62*sz; yawG.add(dome);
     const collar=mkCyl(0.52*sz,0.62*sz,0.26*sz,SILVER(0xdfe4e8),12); collar.position.y=0.13*sz; yawG.add(collar);
     yawG.add(pitchG); pitchG.position.set(0,0.42*sz,0.45*sz);
-    const drum=mkCyl(0.2*sz,0.22*sz,0.55*sz,SILVER(0x3a4048)); drum.rotation.x=Math.PI/2; drum.position.z=0.4*sz; pitchG.add(drum);
-    for(let i=0;i<6;i++){ const b=mkCyl(0.04*sz,0.04*sz,0.9*sz,SILVER(0x6a7078)); b.rotation.x=Math.PI/2; b.position.set(Math.cos(i/6*6.28)*0.1*sz,Math.sin(i/6*6.28)*0.1*sz,0.95*sz); pitchG.add(b); }
+    const drum=mkCyl(0.2*sz,0.22*sz,0.55*sz,GUNSTEEL(0x3a4048),16); drum.rotation.x=Math.PI/2; drum.position.z=0.4*sz; pitchG.add(drum);
+    for(let i=0;i<6;i++){ const b=mkCyl(0.04*sz,0.04*sz,0.9*sz,GUNSTEEL(0x6a7078),10); b.rotation.x=Math.PI/2; b.position.set(Math.cos(i/6*6.28)*0.1*sz,Math.sin(i/6*6.28)*0.1*sz,0.95*sz); pitchG.add(b); }
     g.userData.barrelLen=1.3*sz;
   } else if(arch==='openaa'){
     // Light automatic AA is an OPEN mount: a curved splinter shield, a gunner's seat behind it,
     // a magazine drum and jacketed barrels. Enclosing these in a box was what made an Oerlikon
     // and a 16-inch battery read as the same object.
-    const shield=gunShield(0.86*sz, 1.05*sz, 0.05*sz, SILVER(0x767f88)); shield.position.set(0,0.5*sz,0.16*sz); yawG.add(shield);
+    const shield=gunShield(0.74*sz, 0.72*sz, 0.05*sz, GUNSTEEL(0x99a2ab)); shield.position.set(0,0.56*sz,0.30*sz); yawG.add(shield);
     const ring=mkCyl(0.5*sz,0.56*sz,0.14*sz,m,12); ring.position.y=0.07*sz; yawG.add(ring);
     const seat=mkBox(0.34*sz,0.08*sz,0.34*sz,SILVER(0x4d545b)); seat.position.set(0,0.44*sz,-0.42*sz); yawG.add(seat);
     const backrest=mkBox(0.34*sz,0.34*sz,0.07*sz,SILVER(0x4d545b)); backrest.position.set(0,0.62*sz,-0.58*sz); yawG.add(backrest);
-    yawG.add(pitchG); pitchG.position.set(0,0.56*sz,0.10*sz);
+    yawG.add(pitchG); pitchG.position.set(0,0.62*sz,0.22*sz);
     const cradle=mkBox(0.40*sz,0.26*sz,0.52*sz,SILVER(0x5c646c)); pitchG.add(cradle);
     const nb=def.barrels||1, bl=1.55*sz;
     for(let i=0;i<nb;i++){
-      const br=navalGunBarrel(bl, 0.075*sz, 0.05*sz, SILVER(0x8f979f), true);
+      const br=navalGunBarrel(bl, 0.075*sz, 0.05*sz, GUNSTEEL(0x8f979f), true);
       br.position.set((i-(nb-1)/2)*0.26*sz, (nb>2&&i>1?0.2*sz:0), 0.2*sz); pitchG.add(br);
     }
     const mag=mkCyl(0.24*sz,0.24*sz,0.16*sz,SILVER(0x3f464d),10); mag.position.set(0.22*sz,0.24*sz,0.05*sz); pitchG.add(mag);
@@ -2954,7 +3010,7 @@ function buildTurret(def){
   } else if(arch==='rail'){
     // Twin accelerator rails with the capacitor bank stacked behind them, glowing between shots.
     const glow=new THREE.MeshStandardMaterial({color:0x1d5f78,emissive:0x35b6e8,emissiveIntensity:1.0,roughness:.3});
-    const body=turretHouse(1.15*sz,0.72*sz,1.35*sz,m); body.position.set(-0.575*sz,0.06*sz,0); yawG.add(body);
+    const body=turretHouse(1.15*sz,0.72*sz,1.35*sz,ARMOURPLATE(def.col)); body.position.set(-0.575*sz,0.06*sz,0); yawG.add(body);
     for(const sx of [-1,1]){ const cap=mkCyl(0.20*sz,0.20*sz,0.8*sz,SILVER(0x39414a),10);
       cap.rotation.z=Math.PI/2; cap.position.set(sx*0.42*sz,0.5*sz,-0.5*sz); yawG.add(cap); }
     yawG.add(pitchG); pitchG.position.set(0,0.66*sz,0.4*sz);
@@ -2966,9 +3022,9 @@ function buildTurret(def){
   } else if(arch==='beam'){
     // One heavy emitter tube inside focusing coils — no breech, no barrels, no recoil.
     const glow=new THREE.MeshStandardMaterial({color:0x1f6b82,emissive:0x46c9ef,emissiveIntensity:1.1,roughness:.25});
-    const body=turretHouse(1.2*sz,0.78*sz,1.3*sz,m); body.position.set(-0.6*sz,0.06*sz,0); yawG.add(body);
+    const body=turretHouse(1.2*sz,0.78*sz,1.3*sz,ARMOURPLATE(def.col)); body.position.set(-0.6*sz,0.06*sz,0); yawG.add(body);
     yawG.add(pitchG); pitchG.position.set(0,0.72*sz,0.35*sz);
-    const emitter=mkCyl(0.22*sz,0.30*sz,2.4*sz,SILVER(0x757f88),12); emitter.rotation.x=Math.PI/2; emitter.position.z=1.2*sz; pitchG.add(emitter);
+    const emitter=mkCyl(0.22*sz,0.30*sz,2.4*sz,GUNSTEEL(0x757f88),18); emitter.rotation.x=Math.PI/2; emitter.position.z=1.2*sz; pitchG.add(emitter);
     for(let i=0;i<3;i++){ const coil=mkCyl(0.40*sz,0.40*sz,0.14*sz,glow,12);
       coil.rotation.x=Math.PI/2; coil.position.z=(0.55+i*0.75)*sz; pitchG.add(coil); }
     const lens=mkCyl(0.19*sz,0.19*sz,0.10*sz,glow,12); lens.rotation.x=Math.PI/2; lens.position.z=2.4*sz; pitchG.add(lens);
@@ -2979,9 +3035,9 @@ function buildTurret(def){
     const body=mkCyl(0.62*sz,0.74*sz,0.52*sz,m,12); body.position.y=0.26*sz; yawG.add(body);
     const yoke=mkBox(1.0*sz,0.5*sz,0.34*sz,SILVER(0x525a62)); yoke.position.set(0,0.62*sz,-0.1*sz); yawG.add(yoke);
     yawG.add(pitchG); pitchG.position.set(0,0.66*sz,0.2*sz);
-    const hub=mkCyl(0.26*sz,0.30*sz,0.5*sz,SILVER(0x3e454c),12); hub.rotation.x=Math.PI/2; hub.position.z=0.25*sz; pitchG.add(hub);
+    const hub=mkCyl(0.26*sz,0.30*sz,0.5*sz,GUNSTEEL(0x3e454c),16); hub.rotation.x=Math.PI/2; hub.position.z=0.25*sz; pitchG.add(hub);
     for(let i=0;i<6;i++){ const a=i/6*6.2832;
-      const br=mkCyl(0.055*sz,0.055*sz,1.5*sz,SILVER(0x8f979f),7); br.rotation.x=Math.PI/2;
+      const br=mkCyl(0.055*sz,0.055*sz,1.5*sz,GUNSTEEL(0x8f979f),12); br.rotation.x=Math.PI/2;
       br.position.set(Math.cos(a)*0.16*sz, Math.sin(a)*0.16*sz, 1.05*sz); pitchG.add(br); }
     for(let i=0;i<2;i++){ const coil=mkCyl(0.30*sz,0.30*sz,0.10*sz,glow,10);
       coil.rotation.x=Math.PI/2; coil.position.z=(0.62+i*0.62)*sz; pitchG.add(coil); }
@@ -2989,8 +3045,8 @@ function buildTurret(def){
   } else { // capital main battery, or an enclosed dual-purpose mount
     const cap=arch==='capital';
     const hw=(cap?1.55:1.05)*sz, hh=(cap?0.95:0.68)*sz, hd=(cap?1.85:1.25)*sz;
-    g.add(barbette((cap?0.92:0.66)*sz, pedestalH+0.40*sz, SILVER(0x646c74)));
-    const house=turretHouse(hw,hh,hd,m); house.position.set(-hw*0.5,0.04*sz,0); yawG.add(house);
+    g.add(barbette((cap?0.92:0.66)*sz, pedestalH+0.40*sz, ARMOURPLATE(0x6d757d)));
+    const house=turretHouse(hw,hh,hd,ARMOURPLATE(def.col)); house.position.set(-hw*0.5,0.04*sz,0); yawG.add(house);
     turretRoofKit(yawG,hw,hd,hh+0.04*sz,sz,SILVER(0x6d757d));
     // The rangefinder arms out of the turret cheeks are the signature of a main battery.
     if(cap) for(const sx of [-1,1]){
@@ -2999,13 +3055,23 @@ function buildTurret(def){
       const eye=mkCyl(0.09*sz,0.09*sz,0.10*sz,SILVER(0x1d2830),8);
       eye.rotation.z=Math.PI/2; eye.position.set(sx*(hw*0.5+0.52*sz), hh*0.72, -hd*0.16); yawG.add(eye);
     }
+    // A crew has to get up there. Three rungs up the back plate, which is also the one thing that
+    // gives the turret a human scale next to a sailor standing on the deck.
+    if(cap) for(let i=0;i<3;i++){
+      const rung=mkBox(0.34*sz,0.05*sz,0.05*sz,GUNSTEEL(0x878f97));
+      rung.position.set(0, hh*(0.26+i*0.24), -hd*0.52); yawG.add(rung);
+    }
     yawG.add(pitchG); pitchG.position.set(0, hh*0.56, hd*0.30);
     const nb=def.barrels||1, bl=(cap?3.1:2.0)*sz, spread=(cap?0.46:0.34)*sz;
     for(let i=0;i<nb;i++){
       const x=(i-(nb-1)/2)*spread;
-      const br=navalGunBarrel(bl, (cap?0.17:0.115)*sz, (cap?0.12:0.085)*sz, SILVER(0x9aa0a8), false);
+      const br=navalGunBarrel(bl, (cap?0.17:0.115)*sz, (cap?0.12:0.085)*sz, GUNSTEEL(0x9aa0a8), false);
       br.position.set(x,0,0.16*sz); pitchG.add(br);
-      const bag=blastBag((cap?0.19:0.13)*sz, SILVER(0x8b8578)); bag.position.set(x,0,0.10*sz); pitchG.add(bag);
+      const bag=blastBag((cap?0.19:0.13)*sz, turretMat(0x8b8578,'paint',0.95,0.02,true)); bag.position.set(x,0,0.10*sz); pitchG.add(bag);
+      // muzzle blast burns the paint off the last foot of a gun; a scorched collar is the
+      // cheapest way to say "this has been fired" without a texture per barrel
+      const soot=mkCyl((cap?0.135:0.095)*sz,(cap?0.145:0.10)*sz,bl*0.10,GUNSTEEL(0x2f3438),14);
+      soot.rotation.x=Math.PI/2; soot.position.set(x,0,0.16*sz+bl*0.93); pitchG.add(soot);
     }
     g.userData.barrelLen=bl+0.2*sz;
   }
