@@ -33,6 +33,49 @@
   /* ---- Ship select menu ---- */
   #menu{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;
     background:linear-gradient(180deg,#0f1a26 0%,#0a1018 100%);overflow-y:auto;}
+
+  /* ---- TITLE CARD -------------------------------------------------------------------
+     Shown once per launch, over everything. It doubles as the loading screen: it is in the
+     static HTML so it paints before a single line of game code runs, which covers the
+     three.js boot instead of leaving a black canvas. Dismisses on any click or key, and
+     gives up on its own after a few seconds so it can never become a wall. */
+  #splash{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;cursor:pointer;
+    background:radial-gradient(ellipse at 50% 42%,#16303f 0%,#0c1a24 46%,#060d13 100%);
+    transition:opacity .55s ease;font-family:inherit;}
+  #splash.gone{opacity:0;pointer-events:none;}
+  #splash .anchor{font-size:34px;color:#7fb4d8;opacity:0;animation:spFade .7s ease .15s forwards;
+    text-shadow:0 0 24px rgba(120,180,240,.55);}
+  #splash .title{position:relative;margin:10px 0 2px;font-size:clamp(38px,9vw,86px);letter-spacing:.16em;
+    font-weight:700;color:#bfe0f7;text-shadow:0 0 34px rgba(120,180,240,.5),0 3px 0 rgba(0,0,0,.35);
+    opacity:0;animation:spRise .9s cubic-bezier(.2,.8,.25,1) .25s forwards;
+    background:linear-gradient(100deg,#bfe0f7 0%,#bfe0f7 38%,#ffffff 48%,#bfe0f7 58%,#bfe0f7 100%);
+    background-size:280% 100%;-webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;}
+  #splash .title.sweep{animation:spRise .9s cubic-bezier(.2,.8,.25,1) .25s forwards, spSweep 1.5s ease 1.0s 1;}
+  #splash .by{color:#8fb2cc;letter-spacing:.32em;font-size:clamp(11px,2.2vw,15px);text-transform:uppercase;
+    opacity:0;animation:spFade .8s ease .75s forwards;}
+  #splash .by b{color:#ffd884;font-weight:700;letter-spacing:.24em;}
+  #splash .rule{width:min(340px,62vw);height:1px;margin:20px 0 16px;opacity:0;
+    background:linear-gradient(90deg,transparent,#3f6f8e,transparent);animation:spFade .9s ease 1.0s forwards;}
+  #splash .stars{font-size:clamp(20px,4vw,30px);letter-spacing:.14em;color:#ffd166;
+    text-shadow:0 0 16px rgba(255,200,90,.5);display:flex;gap:.06em;}
+  #splash .stars span{opacity:0;transform:scale(.4);animation:spPop .45s cubic-bezier(.2,1.5,.4,1) forwards;}
+  #splash .ask{color:#cddced;font-size:clamp(12px,2.6vw,16px);margin-top:12px;text-align:center;
+    line-height:1.6;padding:0 22px;opacity:0;animation:spFade .8s ease 1.85s forwards;}
+  #splash .cta{margin-top:14px;padding:10px 24px;border-radius:22px;font-size:13px;letter-spacing:1.5px;
+    border:1px solid #d8a94a;background:rgba(255,209,102,.10);color:#ffd884;cursor:pointer;
+    opacity:0;animation:spFade .8s ease 2.05s forwards;}
+  #splash .cta:hover{background:rgba(255,209,102,.2);}
+  #splash .skip{position:absolute;bottom:26px;color:#5f7387;font-size:11px;letter-spacing:2px;
+    opacity:0;animation:spFade 1s ease 2.4s forwards;}
+  @keyframes spFade{to{opacity:1}}
+  @keyframes spRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  @keyframes spPop{to{opacity:1;transform:none}}
+  @keyframes spSweep{0%{background-position:130% 0}100%{background-position:-30% 0}}
+  @media (prefers-reduced-motion:reduce){
+    #splash *{animation-duration:.01s!important;animation-delay:0s!important;}
+  }
   #menu h1{text-align:center;padding:26px 0 2px;font-size:34px;letter-spacing:7px;color:#9fc6e8;
     text-shadow:0 0 20px rgba(120,180,240,.4);}
   #menu .sub{text-align:center;color:#6b7d92;margin-bottom:18px;font-size:13px;letter-spacing:1px;}
@@ -333,6 +376,18 @@
 </style>
 </head>
 <body>
+<!-- TITLE CARD — paints before the game boots, so it also covers the three.js load -->
+<div id="splash">
+  <div class="anchor">&#9875;</div>
+  <div class="title sweep" id="splashTitle">IRON TIDE</div>
+  <div class="by" id="splashBy">by <b>VideoGameTips</b></div>
+  <div class="rule"></div>
+  <div class="stars" id="splashStars"></div>
+  <div class="ask" id="splashAsk">Enjoying it? A 5-star review really helps.</div>
+  <button class="cta" id="splashCta">&#9733; LEAVE A REVIEW</button>
+  <div class="skip" id="splashSkip">CLICK ANYWHERE TO START</div>
+</div>
+
 <canvas id="c"></canvas>
 
 <!-- SHIP SELECT -->
@@ -11423,6 +11478,52 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) saveWar()
 const TOUCH=(()=>{ try{ const q=new URLSearchParams(location.search).get('touch');
   if(q==='1') return true; if(q==='0') return false;
   return matchMedia('(pointer:coarse)').matches; }catch(e){ return false; } })();
+
+// ---------- title card -------------------------------------------------------------------
+// Where "5 stars" actually points depends on where the game is running, and getting that wrong
+// is worse than not asking: on CrazyGames the rating control is on the page around the iframe,
+// so there is nothing to link to; on itch it is on the game page; on the family VPS there is no
+// review system at all, so it sends people to itch.
+const ITCH_URL='https://longmaolab.itch.io/irontide';
+function reviewTarget(host){
+  const h=(host!=null?host:(location.host||'')).toLowerCase();
+  if(h.includes('crazygames')) return {kind:'onpage'};
+  // Newgrounds does NOT serve game files from a newgrounds.com host — they come off
+  // uploads.ungrounded.net, so matching on the brand name alone silently missed it and would
+  // have shown an itch.io link to a Newgrounds player.
+  if(h.includes('newgrounds')||h.includes('ungrounded')) return {kind:'onpage'};
+  return {kind:'link', url:ITCH_URL};
+}
+function dismissSplash(){
+  const sp=document.getElementById('splash'); if(!sp||sp.classList.contains('gone')) return;
+  sp.classList.add('gone');
+  setTimeout(()=>{ if(sp.parentNode) sp.parentNode.removeChild(sp); }, 650);
+}
+function initSplash(){
+  const sp=document.getElementById('splash'); if(!sp) return;
+  const zh=(()=>{ try{ return (localStorage.getItem('ironTideLang')||'')==='zh'; }catch(e){ return false; } })();
+  const t=(en,cn)=>zh?cn:en;
+  // five stars, popped in one at a time
+  const stars=document.getElementById('splashStars');
+  for(let i=0;i<5;i++){ const st=document.createElement('span'); st.textContent='\u2605';
+    st.style.animationDelay=(1.15+i*0.11)+'s'; stars.appendChild(st); }
+  document.getElementById('splashBy').innerHTML=t('by <b>VideoGameTips</b>','作者 <b>VideoGameTips</b>');
+  const tgt=reviewTarget();
+  document.getElementById('splashAsk').textContent = tgt.kind==='onpage'
+    ? t('Having fun? Give it 5 stars on this page — it really helps.','玩得开心的话，在这个页面给它五星吧——真的很有用。')
+    : t('Having fun? A 5-star review really helps.','玩得开心的话，去给个五星好评吧——真的很有用。');
+  const cta=document.getElementById('splashCta');
+  if(tgt.kind==='onpage'){ cta.style.display='none'; }
+  else { cta.textContent=t('\u2605 LEAVE A 5-STAR REVIEW','\u2605 去打五星好评');
+    cta.onclick=e=>{ e.stopPropagation(); window.open(tgt.url,'_blank','noopener'); dismissSplash(); }; }
+  document.getElementById('splashSkip').textContent=t('CLICK ANYWHERE TO START','点击任意处开始');
+  // Any click or key gets you past it, and it clears itself regardless — a splash you cannot
+  // skip is the single most annoying thing a game can open with.
+  sp.addEventListener('click', dismissSplash);
+  addEventListener('keydown', dismissSplash, {once:true});
+  setTimeout(dismissSplash, 5200);
+}
+if(document.readyState==='loading') addEventListener('DOMContentLoaded', initSplash); else initSplash();
 
 // ---------- first-battle tutorial: one big hint at a time, condition-driven, shown once ----------
 const TUT_DONE_KEY='ironTideTutorialDone';
