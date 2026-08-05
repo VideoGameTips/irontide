@@ -15,7 +15,7 @@ const { chromium } = require('@playwright/test');
     if (profile.net) await cdp.send('Network.emulateNetworkConditions', { offline: false, ...profile.net });
 
     const t0 = Date.now();
-    await page.goto('https://game.boobank.com/irontide/', { waitUntil: 'domcontentloaded' });
+    await page.goto('https://sushigamelab.com/irontide/', { waitUntil: 'domcontentloaded' });
     const domReady = Date.now() - t0;
     await page.waitForFunction(() => typeof startGame === 'function' && typeof SHIPS === 'object');
     const gameReady = Date.now() - t0;

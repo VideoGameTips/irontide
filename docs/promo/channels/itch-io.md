@@ -206,7 +206,7 @@ General: N strategic map · T first / third person · L photo mode · K settings
 
 Gamepad: left stick steers, right stick looks, triggers fire. On phones and tablets you get a virtual stick and context buttons.
 
-The copy at game.boobank.com also installs to your home screen and plays offline; the build here runs in the page.
+The copy at sushigamelab.com also installs to your home screen and plays offline; the build here runs in the page.
 
 WHO MADE THIS
 
@@ -214,7 +214,7 @@ This game was designed and built almost entirely by my kid, solo, under the GitH
 
 It's open source: https://github.com/VideoGameTips/irontide
 
-The game also lives at https://game.boobank.com/irontide/ — same build, free either way.
+The game also lives at https://sushigamelab.com/irontide/ — same build, free either way.
 
 If you play it, a comment here means a lot. Every single one gets read out at our dinner table.
 ```
@@ -300,8 +300,8 @@ Ship, plane, tank, boots — one battle, four ways to fight. Free in your browse
 **itch.io:https://longmaolab.itch.io/irontide**
 ```
 
-- [ ] 仓库的 GitHub About(右上角齿轮)Website 字段保持 `https://game.boobank.com/irontide/` 不变,description 末尾可补 `| itch.io: longmaolab.itch.io/irontide`
-- [ ] boobank 门户回链:在 `portal/index.html` 的 Iron Tide 卡片上加一个指向 itch 页面的链接(锚文本用 `Also on itch.io`),按 portal 现有卡片样式手改即可
+- [ ] 仓库的 GitHub About(右上角齿轮)Website 字段保持 `https://sushigamelab.com/irontide/` 不变,description 末尾可补 `| itch.io: longmaolab.itch.io/irontide`
+- [ ] sushigamelab 门户回链:在 `portal/index.html` 的 Iron Tide 卡片上加一个指向 itch 页面的链接(锚文本用 `Also on itch.io`),按 portal 现有卡片样式手改即可
 
 下周起(7/27 周一开始,每周花 20 分钟):
 

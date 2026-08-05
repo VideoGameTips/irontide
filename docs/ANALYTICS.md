@@ -5,7 +5,15 @@
 
 ## 现状(2026-07-24 调查结果)
 
-- Iron Tide 公开地址:`https://game.boobank.com/irontide/`(Caddy `handle_path /irontide/*` → `/opt/games/irontide` 静态目录)
+- Iron Tide 公开地址:`https://sushigamelab.com/irontide/`
+  (2026-08-05 从 `game.boobank.com/irontide/` 迁来;新域名走独立 Cloudflare 账号 + 独立隧道
+  `sushigamelab`,Caddy 单 root `/opt/games/sushigamelab`,游戏目录 `/opt/games/sushigamelab/irontide`)
+- **⚠️ 日志文件换了**:迁移后 Iron Tide 的访问记录进 `/var/log/caddy/sushigamelab.log`,
+  **不再进 `access.log`**(那个现在只剩 boobank 的 arena-shooter / dadaboom / 门户)。
+  下面所有命令已按新路径更新;2026-08-05 之前的历史数据仍然在 `access.log` 里,
+  跨迁移点的统计要把两个文件都算上。
+- 旧地址 `game.boobank.com/irontide/*` 现在是 301,重定向本身会记在 `access.log`,
+  可以用它观察还有多少流量走老链接:`grep '"uri":"/irontide' /var/log/caddy/access.log | wc -l`
 - 调查时 `/var/log/caddy/access.log` **存在但为 0 字节,从 2025-05-09 起从未写入过**:
   `:80` 站点块没有 `log` 指令,而且文件属主是 `root`,Caddy 以 `caddy` 用户运行根本写不进去。
   换句话说:**上线以来没有任何访问数据,所有优先级判断都是纯猜测。**
@@ -17,14 +25,15 @@ SSH 到 VPS(`ssh irontide-vps`——别名定义在本机 `~/.ssh/config`，真�
 
 ```bash
 # 最近 7 天 irontide 页面命中数(排除静态资源,只算 HTML 入口)
-grep '"uri":"/irontide/"' /var/log/caddy/access.log | wc -l
+grep '"uri":"/irontide/"' /var/log/caddy/sushigamelab.log | wc -l
 
 # 粗略独立访客(按 IP 去重;Cloudflare 隧道下取 X-Forwarded-For 首段更准)
-grep '/irontide/' /var/log/caddy/access.log \
+grep '/irontide/' /var/log/caddy/sushigamelab.log \
   | grep -o '"client_ip":"[^"]*"' | sort -u | wc -l
 
-# 各游戏对比
-for p in irontide arena-shooter dadaboom; do
+# 各游戏对比(迁移后 irontide 在另一个日志文件里,不能和另外两个共用一条 grep)
+printf '%-14s %s\n' irontide "$(grep -c '/irontide/' /var/log/caddy/sushigamelab.log)"
+for p in arena-shooter dadaboom; do
   printf '%-14s %s\n' "$p" "$(grep -c "/$p/" /var/log/caddy/access.log)"
 done
 ```
@@ -49,31 +58,31 @@ Issue #40 的第 2 步(tutorial_step / first_death / session_end 三个事件)�
 其余渠道贴链接时都用带参数的地址,例如:
 
 ```
-https://game.boobank.com/irontide/?from=reddit-webgames
-https://game.boobank.com/irontide/?from=hn
-https://game.boobank.com/irontide/?from=ph
-https://game.boobank.com/irontide/?from=threejs-forum
+https://sushigamelab.com/irontide/?from=reddit-webgames
+https://sushigamelab.com/irontide/?from=hn
+https://sushigamelab.com/irontide/?from=ph
+https://sushigamelab.com/irontide/?from=threejs-forum
 ```
 
 `from=` 这个参数游戏本身不读,只是让日志里能分辨来源。
 (注意:游戏**确实**会读一个 query 参数——`?touch=1` / `?touch=0` 可以强制开关触屏控制,
 见 `index.html` 的 `TOUCH` 常量。这在渠道反馈里有人说"手机上没有摇杆"时很有用:
-让对方开 `https://game.boobank.com/irontide/?touch=1` 试一次就能分清是检测问题还是别的问题。
+让对方开 `https://sushigamelab.com/irontide/?touch=1` 试一次就能分清是检测问题还是别的问题。
 两个参数可以一起用:`?from=reddit-webgames&touch=1`。)
 
 ### 按渠道统计
 
 ```bash
 # 每个渠道的入口命中数
-grep '"uri":"/irontide/?from=' /var/log/caddy/access.log \
+grep '"uri":"/irontide/?from=' /var/log/caddy/sushigamelab.log \
   | grep -o 'from=[a-z0-9-]*' | sort | uniq -c | sort -rn
 
 # 没带参数但有 referer 的(别人转发的、搜索来的)
-grep '"uri":"/irontide/"' /var/log/caddy/access.log \
+grep '"uri":"/irontide/"' /var/log/caddy/sushigamelab.log \
   | grep -o '"Referer":\["[^"]*"' | sort | uniq -c | sort -rn | head -20
 
 # 发帖当天的逐小时曲线(判断有没有上首页)
-grep '/irontide/' /var/log/caddy/access.log \
+grep '/irontide/' /var/log/caddy/sushigamelab.log \
   | grep '2026-08-11' | grep -o 'T[0-9][0-9]' | sort | uniq -c
 ```
 

@@ -36,7 +36,7 @@
 const { chromium } = require('@playwright/test');
 const fs = require('fs'), path = require('path');
 
-const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
+const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
 const FRAMES = path.join(__dirname, 'frames');
 const W = Number(process.env.W || 1280), H = Number(process.env.H || 720);
 

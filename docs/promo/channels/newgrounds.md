@@ -251,7 +251,7 @@ Thanks for the report! Could you share your browser/device and roughly where it 
 多人模式抱怨类:
 
 ```
-Good catch — this upload is single-player only, so there's no multiplayer button here. There is an experimental multiplayer mode, but it only runs on the game's own site (game.boobank.com/irontide) and it's rough. The 31-theater campaign is the real game right now.
+Good catch — this upload is single-player only, so there's no multiplayer button here. There is an experimental multiplayer mode, but it only runs on the game's own site (sushigamelab.com/irontide) and it's rough. The 31-theater campaign is the real game right now.
 ```
 
 ---

@@ -10,7 +10,7 @@
 // It exits non-zero on drift, and prints the correct value so the copy can be fixed.
 const { chromium } = require('@playwright/test');
 
-const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
+const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
 
 (async () => {
   const browser = await chromium.launch();

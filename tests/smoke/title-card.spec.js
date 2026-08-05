@@ -36,7 +36,7 @@ test('the review call-to-action matches the site it is running on', async ({ pag
     itchFrame:   reviewTarget('html-classic.itch.zone'),
     crazygames:  reviewTarget('iron-tide.game-files.crazygames.com'),
     newgrounds:  reviewTarget('uploads.ungrounded.net'),
-    ownVps:      reviewTarget('game.boobank.com'),
+    ownVps:      reviewTarget('sushigamelab.com'),
   }));
   // portals that host their own rating widget get no link — the stars are already on the page
   expect(r.crazygames.kind).toBe('onpage');

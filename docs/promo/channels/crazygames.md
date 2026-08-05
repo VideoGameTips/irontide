@@ -19,7 +19,7 @@
 
 | 事项 | 内容 |
 |---|---|
-| 平台 | developer.crazygames.com(开放注册,免费,**非独占**——自家 game.boobank.com 照常运营) |
+| 平台 | developer.crazygames.com(开放注册,免费,**非独占**——自家 sushigamelab.com 照常运营) |
 | 提交类型 | **Basic Launch**(SDK 可选、无需广告接入;通过 QA 后进入约两周的限量测试) |
 | 提交身份 | **单机游戏**(联机是实验性的,且 CrazyGames 对多人游戏有额外要求——专用构建里隐藏联机入口) |
 | 构建体积 | 实测约 **1.4MB / 11 个文件**,远低于 250MB/1500 文件上限;低于 20MB → 有资格出现在**移动端首页** |
@@ -47,7 +47,7 @@
 1. **隐藏主菜单 MULTIPLAYER 按钮**(以单机身份提交;多人游戏会触发"即时匹配 + 邀请链接"等额外 UX 审核要求)
 2. **去掉 service worker 注册**(`index.html` 约 10497–10499 行)——游戏托管在 CrazyGames 的 CDN 上,SW 缓存会导致以后更新版本时玩家拿到旧包,而且在 iframe/跨域环境下没有收益,只有风险
 3. **去掉 PWA manifest 链接**(第 7 行)——iframe 里不需要,避免无意义的安装提示与 404
-4. **战报 PNG 水印去掉自家域名**(约 8560 行的 `game.boobank.com/irontide`)——平台不允许把玩家往站外导流
+4. **战报 PNG 水印去掉自家域名**(约 8560 行的 `sushigamelab.com/irontide`)——平台不允许把玩家往站外导流
 
 CrazyGames 专用的构建包**已经做进标准构建脚本**了，不用手工存 shell 脚本：
 
@@ -59,7 +59,7 @@ node tools/verify-portal-build.js
 
 产出 `promo/builds/irontide-crazygames.zip`。它在单机版的基础上又去掉了三样 CrazyGames 会介意的东西：
 
-- **战报 PNG 的站外域名水印**（`⚓ IRON TIDE · game.boobank.com/irontide` → `⚓ IRON TIDE`）——平台不允许把玩家导流到站外
+- **战报 PNG 的站外域名水印**（`⚓ IRON TIDE · sushigamelab.com/irontide` → `⚓ IRON TIDE`）——平台不允许把玩家导流到站外
 - **PWA manifest 链接**——iframe 里装不上，留着只会产生无意义的安装提示和 404
 - **Open Graph 标签**——指向我们自己的域名，在嵌入场景里没有意义
 
@@ -119,7 +119,7 @@ cd /Users/longmao/projects/irontide/promo/builds && python3 -m http.server 8080
 ### 1.5 首屏加载与外部请求
 
 - [ ] DevTools Network 面板 + "Fast 3G"节流:从打开到主菜单 **<10 秒**(官方 QA 红线是进入 gameplay ≤20 秒;1.4MB 的包即使 3G 也只要几秒)
-- [ ] Network 面板确认**零外部请求**:没有对 `game.boobank.com`、GitHub、统计服务的任何请求;唯一允许出现的是 cdnjs 兜底(正常情况下不该触发,见 §1.2)
+- [ ] Network 面板确认**零外部请求**:没有对 `sushigamelab.com`、GitHub、统计服务的任何请求;唯一允许出现的是 cdnjs 兜底(正常情况下不该触发,见 §1.2)
 - [ ] Performance 面板开 4× CPU 节流跑一场战斗(官方要求在 4GB 内存的 Chromebook 上流畅)
 
 ### 1.6 封面图(必需 3 张,**已生成**)
@@ -306,7 +306,7 @@ longmaolab
 
 - 通过 QA 后进入**约两周的限量测试**:游戏对部分真实玩家可见,平台记录数据
 - **没有收入**——Basic Launch 阶段广告等变现是关闭的;这一步的价值是**真实玩家数据和曝光**,不是钱
-- **非独占**:game.boobank.com、itch 等其它渠道完全不受影响
+- **非独占**:sushigamelab.com、itch 等其它渠道完全不受影响
 
 ### 平台看的三个 KPI(官方口径)
 

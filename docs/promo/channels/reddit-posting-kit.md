@@ -11,7 +11,7 @@
 > 物料在 `promo/`，文档在 `repo/docs/promo/`。物料不进版本库，用 `repo/tools/` 里的脚本重新生成。
 
 > 适用游戏:**Iron Tide — Battleship Command**
-> 试玩地址:https://game.boobank.com/irontide/ (免费、无需注册、无广告、无需安装)
+> 试玩地址:https://sushigamelab.com/irontide/ (免费、无需注册、无广告、无需安装)
 > 开源:https://github.com/VideoGameTips/irontide
 > 今天是 **2026-07-24(周五)**。本文所有日期均以此为起点。
 >
@@ -99,7 +99,7 @@
 **正文(复制即用):**
 
 ```text
-Play (free, no account, no download, loads in seconds): https://game.boobank.com/irontide/
+Play (free, no account, no download, loads in seconds): https://sushigamelab.com/irontide/
 
 My kid (GitHub: VideoGameTips) designed and built this naval action game almost entirely solo — the gameplay, the campaign, the systems. I'm the parent; I do the maintenance (bug fixes, translations, onboarding, performance). It's all one open-source repo.
 
@@ -143,7 +143,7 @@ A few tips if you jump in: Tab opens the armory — buy a deck gun there, then F
 **定位:** 直链游戏帖。规则要点:**标题必须以游戏名开头**;必须是**无需注册、无需下载**的游戏(Iron Tide 完全符合);**3 个月内不可重发**——只有一次机会,发之前把游戏线上版本检查一遍(加载、手机端、无报错)。
 
 - **发帖时间:** 北京 **8/4(二)21:00**(= 美东周二上午 9:00;工作日上午摸鱼时段是网页游戏版的黄金时间)
-- **帖子类型:** **Link post**,URL 填 `https://game.boobank.com/irontide/`
+- **帖子类型:** **Link post**,URL 填 `https://sushigamelab.com/irontide/`
 - **Flair:** 该版 flair 为体裁类(如 Action / Strategy 等),发帖时若有 **Action** 就选它;没有强制要求则可不选。以当天下拉列表为准。
 - **NSFW / Spoiler:** 都不勾。
 
@@ -213,7 +213,7 @@ Iron Tide: a free browser naval action game my kid built with three.js — 31-th
 **发帖后立刻发的第一条评论(视频帖没有正文,链接靠这条,复制即用):**
 
 ```text
-Play it here (free, no account, no download): https://game.boobank.com/irontide/
+Play it here (free, no account, no download): https://sushigamelab.com/irontide/
 
 Context: my kid (GitHub: VideoGameTips) designed and built the vast majority of this solo — gameplay, the 31-theater campaign, all the systems. I'm the parent and I handle the maintenance (bug fixes, translations, performance). Fully open source, one repo: https://github.com/VideoGameTips/irontide
 
@@ -245,7 +245,7 @@ Showoff Saturday: a single-file three.js game with a distinct procedural music p
 **正文(复制即用):**
 
 ```text
-Live: https://game.boobank.com/irontide/ — free, no account, loads in seconds.
+Live: https://sushigamelab.com/irontide/ — free, no account, loads in seconds.
 
 The technically interesting part: the whole game is essentially a single index.html (~800KB of HTML/JS) plus vendored libraries. three.js r128 for rendering, a manifest + service worker so it installs as a PWA and works like a native app, and it runs on both desktop and mobile.
 
@@ -337,7 +337,7 @@ r/WebGames 版主有个著名的怪传统:**如果你被 ban 了,申诉时版主
 - 严格执行第 2 节养号周,先评论后发链接;
 - 同一个 URL 不要短期内发到多个版块(这也是本日历把 4 个帖子拉开 3~7 天的原因);
 - 不删帖重发"刷时段"——删了再发同链接是典型垃圾行为特征;
-- 不用短链接(bit.ly 之类),永远直接贴 `https://game.boobank.com/irontide/`;
+- 不用短链接(bit.ly 之类),永远直接贴 `https://sushigamelab.com/irontide/`;
 - 绝不注册小号给自己点赞、也不叫亲友集中点赞(投票操纵会连坐封主号);
 - 每次发帖之间保持正常的评论互动,让账号行为像个真人。
 

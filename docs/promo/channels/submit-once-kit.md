@@ -62,7 +62,7 @@ I'd like to suggest a free browser game for your database:
 
 Name: Iron Tide (full title: "Iron Tide — Battleship Command")
 Play (free, no account, no ads, no install — loads in seconds):
-https://game.boobank.com/irontide/
+https://sushigamelab.com/irontide/
 Open source: https://github.com/VideoGameTips/irontide
 Platforms: browser (desktop + mobile), gamepad and touch supported, PWA installable
 
@@ -131,7 +131,7 @@ Family project: my kid (GitHub: VideoGameTips) designed and built the game
 solo — I maintain the repo (bug fixes, i18n, onboarding, performance)
 and front the accounts for their privacy.
 
-Play (free, no account, no ads): https://game.boobank.com/irontide/
+Play (free, no account, no ads): https://sushigamelab.com/irontide/
 Source: https://github.com/VideoGameTips/irontide
 Source: https://github.com/VideoGameTips/irontide
 
@@ -154,7 +154,7 @@ mobile + gamepad. Possibly newsletter-interesting angles: the
 single-file architecture, procedural per-theater music (31 generated
 profiles), and the adaptive quality system.
 
-Play: https://game.boobank.com/irontide/
+Play: https://sushigamelab.com/irontide/
 Source: https://github.com/VideoGameTips/irontide
 
 Transparency: it's a family project — my kid (GitHub: VideoGameTips)
@@ -198,7 +198,7 @@ Iron Tide — a free browser battleship-command game built with three.js
 (r128), shipped as essentially a single ~800 KB index.html plus vendored
 libs. PWA-installable, desktop + mobile, gamepad and touch support.
 
-Play (free, no account, no ads): https://game.boobank.com/irontide/
+Play (free, no account, no ads): https://sushigamelab.com/irontide/
 Source: https://github.com/VideoGameTips/irontide
 Source: https://github.com/VideoGameTips/irontide
 
@@ -230,7 +230,7 @@ Best,
 
 1. **账号**:用你自己的 Google 账号(家长实名注册,孩子不出现在任何账号资料里)。
 2. **建频道**:YouTube 右上角头像 → 创建频道。频道名建议 `Iron Tide Game`,handle 建议 `@irontidegame`(被占用就试 `@irontidebattleship` 或 `@playirontide`)。
-3. **头像/横幅**:头像用游戏内战列舰特写截图裁方形;横幅用 `final/01-menu.png` 加一行文字 "Free browser game — game.boobank.com/irontide"。不用任何真人照片。
+3. **头像/横幅**:头像用游戏内战列舰特写截图裁方形;横幅用 `final/01-menu.png` 加一行文字 "Free browser game — sushigamelab.com/irontide"。不用任何真人照片。
 4. **频道简介**(粘贴下面英文块);"链接"处添加 Play URL 和 GitHub 链接。
 5. **观众设置**:YouTube Studio → 设置 → 频道 → 高级设置,选"我需要逐个视频审核"(即不整频道标记为面向儿童)。每条 Short 上传时按实际情况选择;普通游戏实况通常选"不是面向儿童的内容",但这是 COPPA 合规判断,请你上传时自行确认。
 6. **纯 gameplay、无露脸、无孩子声音**。要配音就用你自己的声音或不配音(推荐不配音 + 屏幕字幕,最省事也最安全)。
@@ -241,7 +241,7 @@ Best,
 Iron Tide — a free battleship-command game that runs in your browser.
 No install, no account, no ads.
 
-Play: https://game.boobank.com/irontide/
+Play: https://sushigamelab.com/irontide/
 Open source: https://github.com/VideoGameTips/irontide
 
 Command a battleship across a 31-theater world campaign — and leave the
@@ -304,7 +304,7 @@ parent. New gameplay Short every Tuesday.
 Iron Tide — free battleship-command game in your browser. No install,
 no account, no ads.
 
-Play: https://game.boobank.com/irontide/
+Play: https://sushigamelab.com/irontide/
 Open source: https://github.com/VideoGameTips/irontide
 
 Built with three.js. Designed and built by a young solo dev (GitHub:
@@ -316,7 +316,7 @@ VideoGameTips); channel run by their parent.
 上传时:分类选 Gaming;"游戏"字段搜不到 Iron Tide 就留空;每条发出后自己置顶一条评论,内容就一行:
 
 ```
-Play free in your browser: https://game.boobank.com/irontide/
+Play free in your browser: https://sushigamelab.com/irontide/
 ```
 
 ### 4.4 节奏
@@ -379,7 +379,7 @@ Play free in your browser: https://game.boobank.com/irontide/
 
 ```
 Iron Tide — free in your browser
-game.boobank.com/irontide
+sushigamelab.com/irontide
 No install. No account. No ads.
 ```
 

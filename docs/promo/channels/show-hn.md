@@ -27,7 +27,7 @@
 **提交 URL（url 字段，原样粘贴）：**
 
 ```text
-https://game.boobank.com/irontide/
+https://sushigamelab.com/irontide/
 ```
 
 ### 标题候选（按推荐顺序排列，均 ≤80 字符）
@@ -81,7 +81,7 @@ What I'd genuinely love feedback on:
 - Whether the first five minutes teach the game well enough
 - Anything in the campaign that feels unfair or confusing
 
-Play: https://game.boobank.com/irontide/
+Play: https://sushigamelab.com/irontide/
 ```
 
 ---
@@ -197,10 +197,10 @@ There's a fair point buried in there — [restate the one actionable thing neutr
 HN 首页帖子通常带来**数万独立访客**，务必提前演练：
 
 1. `ssh irontide-vps` 检查 VPS：磁盘、内存、Caddy 进程正常。
-2. **Cloudflare 加缓存规则**：对 `game.boobank.com/irontide/*` 建 Cache Rule（Eligible for cache / 相当于 Cache Everything），Edge TTL 建议 2 小时。游戏是纯静态 HTML，走 Cloudflare 边缘后 VPS 几乎零压力——这是本次最重要的一步保险。
+2. **Cloudflare 加缓存规则**：对 `sushigamelab.com/irontide/*` 建 Cache Rule（Eligible for cache / 相当于 Cache Everything），Edge TTL 建议 2 小时。游戏是纯静态 HTML，走 Cloudflare 边缘后 VPS 几乎零压力——这是本次最重要的一步保险。
 3. 确认 Cloudflare 的 Brotli 压缩开启（800KB 的 HTML 压缩后会小很多）。
 4. **代码冻结**：周一起到发帖结束不改版。缓存 + service worker + 发布中途改代码 = 用户各自拿到不同版本的经典事故。
-5. 开无痕窗口 + 手机各实测一遍 `https://game.boobank.com/irontide/`，确认冷加载正常、PWA 安装正常。
+5. 开无痕窗口 + 手机各实测一遍 `https://sushigamelab.com/irontide/`，确认冷加载正常、PWA 安装正常。
 6. 唯一绕过缓存直连 VPS 的是实验性多人模式的 WebSocket——它本来就标注 experimental，如果当晚扛不住，属于可接受的降级，不必为它加班。
 
 ### 4.5 重发礼仪（如果首发没起来）

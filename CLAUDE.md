@@ -3,7 +3,7 @@
 ## 这是什么项目
 
 一个浏览器 3D 海战游戏，**主要由孩子（GitHub: VideoGameTips）独立开发**，家长做维护
-（bug 修复、中英双语、新手引导、成就、性能）。线上：https://game.boobank.com/irontide/
+（bug 修复、中英双语、新手引导、成就、性能）。线上：https://sushigamelab.com/irontide/
 
 **评价和改动以鼓励为主。** 批评性分析要框定成"降低新玩家门槛"，不是"这里写得不好"。
 

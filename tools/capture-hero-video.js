@@ -14,7 +14,7 @@ const OUT = require('path').join(__dirname, '..', 'promo', 'assets', 'hero-video
     recordVideo: { dir: OUT, size: { width: 1600, height: 900 } },
   });
   const page = await ctx.newPage();
-  await page.goto('https://game.boobank.com/irontide/', { waitUntil: 'load' });
+  await page.goto('https://sushigamelab.com/irontide/', { waitUntil: 'load' });
   await page.waitForFunction(() => typeof startGame === 'function');
   await page.evaluate(() => {
     const b = document.getElementById('storyBtn'), s = document.getElementById('story');

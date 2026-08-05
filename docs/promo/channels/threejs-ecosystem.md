@@ -88,7 +88,7 @@ My kid built a battleship campaign game in one index.html with three.js r128 —
 ### 一楼评论(发布后立刻贴)
 
 ````
-Play (free, no account, no install, loads in seconds): https://game.boobank.com/irontide/
+Play (free, no account, no install, loads in seconds): https://sushigamelab.com/irontide/
 
 **Iron Tide** is a WWII-style naval campaign: you command a battleship across a 31-theater world campaign, and you can also fly planes, drive amphibious tanks, and fight on foot. There's a rival boss ("Grand Marshal Varga") with story radio dialogue, deck-mountable extra cannons, medals, 3-star theater ratings, quick battle and sandbox modes, dynamic weather, and a photo mode (L key).
 
@@ -139,7 +139,7 @@ Iron Tide — a 31-theater battleship campaign in a single ~800 KB index.html (r
 ### 正文(这是三个渠道里技术含量最高的一篇)
 
 ````
-**Play (free, no account, no install):** https://game.boobank.com/irontide/
+**Play (free, no account, no install):** https://sushigamelab.com/irontide/
 
 Iron Tide is a WWII-style naval campaign game: command a battleship through a 31-theater world campaign, fly planes, drive amphibious tanks, fight on foot, and mount extra cannons on your deck. There's a rival boss with story radio dialogue, medals and 3-star theater ratings, quick battle and sandbox modes, dynamic weather, a photo mode, and bilingual English/中文 UI.
 
@@ -190,7 +190,7 @@ Bloom uses the vendored r128 `UnrealBloomPass`. A per-frame `updateAdaptiveQuali
 
 ## Links
 
-- Play: https://game.boobank.com/irontide/
+- Play: https://sushigamelab.com/irontide/
 - Source (one repo — game, docs, tools): https://github.com/VideoGameTips/irontide
 
 Feedback very welcome — especially on the adaptive-quality approach, and from anyone who has migrated a large single-file r128 project to a current three.js release: advice appreciated, it's on the roadmap.

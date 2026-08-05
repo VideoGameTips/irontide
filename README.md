@@ -5,9 +5,9 @@
 **你是舰长，站在自己军舰的甲板上。**
 买炮装炮、掌舵冲锋、起飞舰载机、开坦克登岛、上岸端着枪打——目标是摧毁敌方海港。
 
-### ▶ [点这里直接玩](https://game.boobank.com/irontide/) — 免费、免注册、免安装，浏览器里几秒钟就开打
+### ▶ [点这里直接玩](https://sushigamelab.com/irontide/) — 免费、免注册、免安装，浏览器里几秒钟就开打
 
-*A free browser naval-action game. No account, no ads, no install — [play it here](https://game.boobank.com/irontide/).*
+*A free browser naval-action game. No account, no ads, no install — [play it here](https://sushigamelab.com/irontide/).*
 
 ![Iron Tide](docs/images/preview.gif)
 
@@ -17,7 +17,7 @@
 
 ## 玩
 
-**在线试玩：https://game.boobank.com/irontide/**
+**在线试玩：https://sushigamelab.com/irontide/**
 
 或者把仓库下下来，在浏览器里打开 `index.html` 就行，不需要任何构建步骤。手机、平板、手柄都能玩，也能"添加到主屏幕"当 App 用（PWA，断网也能开战）。
 
@@ -110,6 +110,6 @@ node tools/trailer/capture-shot.js     # 预告片逐帧采集（见 tools/trail
 
 <div align="center">
 
-**[▶ 开打](https://game.boobank.com/irontide/)**
+**[▶ 开打](https://sushigamelab.com/irontide/)**
 
 </div>

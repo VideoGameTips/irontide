@@ -15,7 +15,7 @@
 const { chromium } = require('@playwright/test');
 const path = require('path'), fs = require('fs');
 const OUT = path.join(__dirname, '..', 'promo', 'assets', 'final');
-const GAME = process.env.IRONTIDE_URL || 'https://game.boobank.com/irontide/';
+const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
 
 // Photo mode flies a free camera with the HUD hidden. Offsets are (forward, height,
 // starboard) relative to the player ship, so a composition survives any heading.

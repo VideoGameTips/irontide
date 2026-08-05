@@ -69,7 +69,7 @@ Parent and maintainer of Iron Tide — a browser battleship game my kid built. I
 
 ### 1.5 发布前一晚 QA(8/22 周六晚)
 
-- [ ] 手机(iOS Safari + Android Chrome)和桌面(Chrome/Safari/Firefox)各开一次 https://game.boobank.com/irontide/ ,确认秒开、能进战斗
+- [ ] 手机(iOS Safari + Android Chrome)和桌面(Chrome/Safari/Firefox)各开一次 https://sushigamelab.com/irontide/ ,确认秒开、能进战斗
 - [ ] 语言切换正常,英文界面无明显漏翻(PH 访客默认看英文)
 - [ ] Service worker 没有缓存旧版本(硬刷新验证)
 - [ ] VPS/Caddy 正常(静态站,扛 PH 流量没问题,但确认一下安心)
@@ -116,7 +116,7 @@ Iron Tide is a free browser battleship game: a 31-theater world campaign where y
 
 | 字段 | 填写值 |
 |---|---|
-| Website / main link | `https://game.boobank.com/irontide/` |
+| Website / main link | `https://sushigamelab.com/irontide/` |
 | 附加链接(如有栏位) | `https://github.com/VideoGameTips/irontide`(唯一的开源仓库:游戏 + 文档 + 工具都在里面) |
 | Topics(选 3 个) | **Games**(必选)、**Open Source**、**Web App**(若无此项,备选:GitHub、Tech) |
 | Pricing | **Free** |
@@ -149,7 +149,7 @@ Feedback that would mean the most:
 
 Ask us anything, including about the AI part — I'm happy to be specific about what was human-built (almost everything) and where AI helped (code review on my maintenance work).
 
-Play: https://game.boobank.com/irontide/
+Play: https://sushigamelab.com/irontide/
 ```
 
 ### 2.7 图库计划(6 张截图:拍什么 + 英文说明)
@@ -219,7 +219,7 @@ ffmpeg -ss 5 -t 3 -i promo/assets/final/iron-tide-hero-45s.mp4 \
 | 30–36s | 下船步行作战片段 | `Fight on foot` |
 | 36–43s | 港口商店买炮 → 甲板副炮全开齐射 | `Mount extra cannons on your deck` |
 | 43–50s | 勋章页 + 三星评价 + 可分享的战报卡片 | `Medals, stars, and a shareable battle report` |
-| 50–58s | 最帅的一段海战收尾 → 结束卡 | `Free in your browser. No install, no ads. Open source.` 下一行 `game.boobank.com/irontide — built by a kid` |
+| 50–58s | 最帅的一段海战收尾 → 结束卡 | `Free in your browser. No install, no ads. Open source.` 下一行 `sushigamelab.com/irontide — built by a kid` |
 
 ---
 
@@ -334,7 +334,7 @@ Thanks for taking the time to write this — genuinely. You may well be right ab
 **4.10 「怎么支持你们?」:**
 
 ```text
-Three free ways: play it and tell us where you got confused (game.boobank.com/irontide), star the repo (github.com/VideoGameTips/irontide), and if you know a kid who's learning to code, show them the source — the whole game is readable in one file.
+Three free ways: play it and tell us where you got confused (sushigamelab.com/irontide), star the repo (github.com/VideoGameTips/irontide), and if you know a kid who's learning to code, show them the source — the whole game is readable in one file.
 ```
 
 ---

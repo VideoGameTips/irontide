@@ -18,7 +18,7 @@
 ```
 你要为一个叫 Iron Tide 的浏览器 3D 海战游戏做一支 20-25 秒的预告片。
 
-游戏地址：https://game.boobank.com/irontide/
+游戏地址：https://sushigamelab.com/irontide/
 源码：index.html（单文件 835KB，用 Grep 定位，不要整个读）
 工作目录：tools/trailer/
 

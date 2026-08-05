@@ -40,7 +40,7 @@ git log --format='%an <%ae>' | sort -u
 
 `index.html` 原有四处中文注释写着孩子的名字。按新口径名字本身没问题，但这四处注释的内容是"谁写了哪段代码"，对读源码的人没有意义，已统一改成不带人名的中性注释。`server/README.md` 的示例玩家名同步改成 `Captain`。
 
-（这条只在部署后生效：`curl -s https://game.boobank.com/irontide/ | grep -c gmail` 应为 0。）
+（这条只在部署后生效：`curl -s https://sushigamelab.com/irontide/ | grep -c gmail` 应为 0。）
 
 ## 还需要你做的
 
@@ -73,10 +73,10 @@ git log --format='%an <%ae>' | sort -u
 ### 4. 域名 WHOIS
 
 ```bash
-whois boobank.com | grep -i "registrant\|admin\|email\|phone" | head
+whois sushigamelab.com | grep -i "registrant\|admin\|email\|phone" | head
 ```
 
-确认注册商的隐私保护是开着的。推广会把 `game.boobank.com` 推到很多人面前，其中有人会顺手查 WHOIS。
+确认注册商的隐私保护是开着的。推广会把 `sushigamelab.com` 推到很多人面前，其中有人会顺手查 WHOIS。
 
 ### 5. 发行包再确认
 

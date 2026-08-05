@@ -49,7 +49,7 @@ const portal = itch.replace(MP_ANCHOR,
 // report's domain watermark, the PWA manifest link, and the Open Graph tags (which
 // point at our own domain and are meaningless in an embed).
 let crazygames = portal
-  .replace("'⚓ IRON TIDE · game.boobank.com/irontide'", "'⚓ IRON TIDE'")
+  .replace("'⚓ IRON TIDE · sushigamelab.com/irontide'", "'⚓ IRON TIDE'")
   .replace(/\n<link rel="manifest" href="manifest\.json">/, '')
   .replace(/\n<!-- Link previews:[\s\S]*?<meta name="twitter:image"[^>]*>/, '');
 for (const [what, before, after] of [

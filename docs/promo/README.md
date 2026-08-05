@@ -123,7 +123,7 @@ node tools/verify-copy-claims.js
 ## 上线前必做的三件事
 
 1. **压测**：Show HN 上首页 = 几小时内几万次访问。提前确认 Vultr VPS + Cloudflare tunnel 扛得住，建议给 `/irontide/*` 的静态资源加 Cloudflare cache-everything 规则。
-2. **隐私体检**：两个仓库的 commit 历史、README、GitHub profile 里如果有真名/邮箱/地理位置痕迹，在游戏被人关注之前清理掉。`boobank.com` 的 WHOIS 确认开了隐私保护。
+2. **隐私体检**：两个仓库的 commit 历史、README、GitHub profile 里如果有真名/邮箱/地理位置痕迹，在游戏被人关注之前清理掉。`sushigamelab.com` 的 WHOIS 确认开了隐私保护（2026-08-05 已查：Cloudflare Registrar，姓名/街道/城市/邮编/电话均 REDACTED；但注册局强制公开 `State/Province: BC` + `Country: CA`，这一项无法隐藏，属于省级粒度）。
 3. **给 Andy 的预期管理**：先说清楚"中位数结果很小"——itch.io 中位数游戏一辈子只有约 600 次游玩，Reddit 帖子拿几个赞是常态。**陌生人认真玩过之后写的每一条评论，才是这件事的奖励。** 尖锐评论由家长先过滤再转述。
 
 ---
