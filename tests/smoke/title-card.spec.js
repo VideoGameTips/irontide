@@ -19,7 +19,7 @@ test('the title card shows the game and its author, and asks for a review', asyn
     };
   });
   expect(r.title).toBe('IRON TIDE');
-  expect(r.by).toMatch(/VideoGameTips/i);
+  expect(r.by).toMatch(/IronTideDev/i);
   expect(r.stars).toBe(5);
   expect(r.ask).toMatch(/5-star|五星/);
   expect(r.cta).toMatch(/REVIEW|好评/);

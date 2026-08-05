@@ -380,7 +380,7 @@
 <div id="splash">
   <div class="anchor">&#9875;</div>
   <div class="title sweep" id="splashTitle">IRON TIDE</div>
-  <div class="by" id="splashBy">by <b>VideoGameTips</b></div>
+  <div class="by" id="splashBy">by <b>IronTideDev</b></div>
   <div class="rule"></div>
   <div class="stars" id="splashStars"></div>
   <div class="ask" id="splashAsk">Enjoying it? A 5-star review really helps.</div>
@@ -11507,7 +11507,7 @@ function initSplash(){
   const stars=document.getElementById('splashStars');
   for(let i=0;i<5;i++){ const st=document.createElement('span'); st.textContent='\u2605';
     st.style.animationDelay=(1.15+i*0.11)+'s'; stars.appendChild(st); }
-  document.getElementById('splashBy').innerHTML=t('by <b>VideoGameTips</b>','作者 <b>VideoGameTips</b>');
+  document.getElementById('splashBy').innerHTML=t('by <b>IronTideDev</b>','作者 <b>IronTideDev</b>');
   const tgt=reviewTarget();
   document.getElementById('splashAsk').textContent = tgt.kind==='onpage'
     ? t('Having fun? Give it 5 stars on this page — it really helps.','玩得开心的话，在这个页面给它五星吧——真的很有用。')
