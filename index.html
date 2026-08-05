@@ -4967,6 +4967,10 @@ addEventListener('keydown',e=>{
     if(buildOpen){ toggleBuild(); return; }
     if(tacticalOpen){ toggleTacticalMap(false); return; }
     if(settingsOpen){ toggleSettings(); return; }
+    // a weapon still held ready is the next thing Esc should put down: the mount ghost is a
+    // panel of a sort, it just happens to live on the deck instead of over it
+    if(selectedWeapon){ selectedWeapon=null; refreshShop();
+      flashPrompt(T('Weapon put back — mount marker off','已放回武器——绿色标记关掉了')); return; }
     if(tutIdx>=0&&phase==='play') skipTutorial();
   }
   keys[e.code]=1; if(e.code==='Tab'){ e.preventDefault(); toggleShop(); } if(e.code==='Space') e.preventDefault();
@@ -7348,6 +7352,11 @@ function buildShopUI(){
     d.innerHTML=`<div class="wn"><span>${catTr(typeof WEAPONS_ZH!=='undefined'?WEAPONS_ZH:null,id,'name',w.name)}</span><span class="wc">$${priceOf(w.cost)}</span></div>
       <div class="wd">${describe(w)}</div><div class="st">${T('✓ SELECTED','✓ 已选中')}</div>`;
     d.onclick=()=>{ const c=priceOf(w.cost), nm=trName(w.name);
+      // Click the one already selected to put it back down. selectedWeapon was set here and
+      // NEVER cleared anywhere in the game, so once you picked a gun the green mount ghost
+      // followed you for the rest of the battle — including long after you had installed it.
+      if(selectedWeapon===id){ selectedWeapon=null; refreshShop(); sfxClick();
+        shopMsg(T('Put back — the green mount marker is gone','已放回——甲板上的绿色标记没了'),'ok'); return; }
       if(marketBlocked('weapon',id,w))return;
       if(money<c){ shopMsg(T('❌ Not enough funds — '+w.name+' costs $'+c+', you have $'+money,'❌ 资金不足——'+nm+' 要 $'+c+'，你只有 $'+money),'bad'); return; }
       selectedWeapon=id; refreshShop(); sfxClick();
@@ -10735,7 +10744,7 @@ function updatePrompt(){
     else if(tu) msg=T('Press E to man '+tu.def.name+'   ·   X to scrap it','按 E 操作 '+trName(tu.def.name)+'   ·   X 拆除');
     else if(pa) msg=T('Press E to fly the '+pa.def.name+'   ·   Y to send it up under AI','按 E 驾驶 '+trName(pa.def.name)+'   ·   Y 让 AI 飞行员出击');
     else if(placed.length>=player.def.mounts) msg=T('Gun limit reached ('+placed.length+'/'+player.def.mounts+') — a bigger ship mounts more','火炮已装满（'+placed.length+'/'+player.def.mounts+'）——更大的船能装更多炮');
-    else msg= selectedWeapon? T('Press F to install '+WEAPONS[selectedWeapon].name+' ($'+priceOf(WEAPONS[selectedWeapon].cost)+')  ['+placed.length+'/'+player.def.mounts+' guns]   ·   H: harbor upgrades','按 F 安装 '+trName(WEAPONS[selectedWeapon].name)+'（$'+priceOf(WEAPONS[selectedWeapon].cost)+'）  [火炮 '+placed.length+'/'+player.def.mounts+']   ·   H 海港升级') : T('Pick a weapon in the Armory (Tab) · H for harbor upgrades','按 Tab 打开军械库选一门炮 · 按 H 升级海港');
+    else msg= selectedWeapon? T('Press F to install '+WEAPONS[selectedWeapon].name+' ($'+priceOf(WEAPONS[selectedWeapon].cost)+')  ['+placed.length+'/'+player.def.mounts+' guns]   ·   Esc to put it back   ·   H: harbor upgrades','按 F 安装 '+trName(WEAPONS[selectedWeapon].name)+'（$'+priceOf(WEAPONS[selectedWeapon].cost)+'）  [火炮 '+placed.length+'/'+player.def.mounts+']   ·   Esc 放回   ·   H 海港升级') : T('Pick a weapon in the Armory (Tab) · H for harbor upgrades','按 Tab 打开军械库选一门炮 · 按 H 升级海港');
   } else if(manning){ msg=T('Fire: Left Click   ·   T view   ·   E to leave turret','开火：鼠标左键   ·   T 视角   ·   E 离开炮位'); }
   el.style.display=msg?'block':'none'; el.textContent=trText(msg);
 }

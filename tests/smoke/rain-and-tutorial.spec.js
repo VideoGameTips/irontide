@@ -79,14 +79,19 @@ test('the bow wash sounds like water, not like rain', async ({ page }) => {
       if (i % 6 === 0) curve.push({ v: player.vel ? +player.vel.length().toFixed(2) : 0,
                                     g: +SFX.washGain.gain.value.toFixed(6) });
     }
-    const full = SFX.washGain.gain.value;
-    const top = Math.max(...curve.map(c => c.v));
-    // the sample closest to half speed
-    const half = curve.reduce((b, c) => Math.abs(c.v - top / 2) < Math.abs(b.v - top / 2) ? c : b, curve[0]);
+    // Use only the ACCELERATING run-up. The ship is under real physics for these four seconds and
+    // can turn, foul something or slow at the end; when it did, "the last sample" was no longer
+    // "the fastest sample" and the readings came out inverted. Clipping at the peak makes the
+    // curve monotonic by construction. The _ramp glide also lags behind a rising speed, which
+    // biases the half-speed reading DOWN — i.e. toward passing — so this cannot mask a real fault.
+    const topIdx = curve.reduce((bi, c, i) => c.v > curve[bi].v ? i : bi, 0);
+    const climb = curve.slice(0, topIdx + 1);
+    const top = climb[climb.length - 1].v, full = climb[climb.length - 1].g;
+    const half = climb.reduce((b, c) => Math.abs(c.v - top / 2) < Math.abs(b.v - top / 2) ? c : b, climb[0]);
 
     return { idle: +idle.toFixed(5), full: +full.toFixed(6), idleSpeed: +idleSpeed.toFixed(1),
              topSpeed: +top.toFixed(1), halfSpeed: half.v, halfGain: half.g,
-             speed: player.vel ? +player.vel.length().toFixed(1) : 0,
+             speed: +top.toFixed(1),
              washTopHz: SFX.washFilt ? SFX.washFilt.frequency.value : null,
              washIsLowpass: SFX.washFilt ? SFX.washFilt.type : null,
              rainTopHz: SFX.rainFilt ? SFX.rainFilt.frequency.value : null,
