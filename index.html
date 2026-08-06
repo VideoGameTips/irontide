@@ -6845,6 +6845,8 @@ function syncNPCDeck(s){
   while(b.npcTurrets.length < s.loadout.length && b.npcTurrets.length < b.mounts.length){
     const i=b.npcTurrets.length, t=buildTurret(s.loadout[i]);
     t.position.copy(b.mounts[i]); b.group.add(t); b.npcTurrets.push(t);
+    // a gun you already shot off stays off when her model comes back into view
+    shipGunState(s); if(s._gunKo[i]) markTurretKO(t);
   }
   // ...and a small ranged air wing on the flight deck, slanted the way the player's is
   if(!b.deckSpots && b.ext){
@@ -6853,6 +6855,71 @@ function syncNPCDeck(s){
     b.deckSpots=[];
     for(let i=0;i<n;i++) b.deckSpots.push(new THREE.Vector3(cx, s.def.deckY+0.3, n>1 ? z0+(z1-z0)*(i/(n-1)) : z0));
     for(let i=0;i<n;i++) addNPCDeckPlane(s, PLANES[NPC_PLANE_MODELS[i%NPC_PLANE_MODELS.length]]);
+  }
+}
+// ===== SHIP DEFENCES ======================================================================
+// A ship's turrets used to be scenery: syncNPCDeck built one per weapon purely to look at, and
+// nothing could touch them. They are now the thing you have to beat to take a hull.
+//
+// Each gun carries its own hp, scaled off what it is — a 16-inch battery is a much harder thing
+// to silence than an Oerlikon. Shells that hit the ship spill onto the NEAREST gun to the impact,
+// so raking her upperworks really does knock her batteries out one at a time, and a ship whose
+// guns are all dead stops shooting back. That is the whole gate on boarding her.
+const TURRET_HP_BASE=55;
+function turretMaxHp(w){ return Math.round(TURRET_HP_BASE*(0.6+(w&&w.size?w.size:1)*0.9)); }
+function shipTurrets(s){ return (s&&s.build&&s.build.npcTurrets)||[]; }
+// Gun damage lives on the SHIP, not on the turret meshes. Ships beyond a certain range have their
+// models deleted and rebuilt when they come back, and the first version stored hp on the mesh —
+// so shooting every gun off a ship was undone the moment she sailed out of view and returned.
+// Measured: silenced, proxied, back again = one gun alive and firing. Keyed by loadout index, so
+// it also answers correctly while she has no model at all.
+function shipGunState(s){
+  const n=(s.loadout&&s.loadout.length)||0;
+  if(!s._gunKo || s._gunKo.length!==n){
+    const ko=new Array(n).fill(false), hp=new Array(n).fill(0);
+    for(let i=0;i<n;i++){ hp[i]=turretMaxHp(s.loadout[i]); if(s._gunKo&&s._gunKo[i]!=null){ ko[i]=s._gunKo[i]; hp[i]=s._gunHp[i]; } }
+    s._gunKo=ko; s._gunHp=hp;
+  }
+  return s;
+}
+function shipGunsAlive(s){ if(!s||!s.loadout) return 0; shipGunState(s);
+  let n=0; for(const dead of s._gunKo) if(!dead) n++; return n; }
+// Silenced = she still floats, but nothing aboard can shoot. A ship with no guns in her loadout
+// does NOT count as silenced, or an unarmed hull would be free to take the moment it spawned.
+function shipSilenced(s){
+  if(!s||s.team!==1||(s.sinkT||0)>0||s.hp<=0) return false;
+  if(!s.loadout||!s.loadout.length) return false;
+  return shipGunsAlive(s)===0;
+}
+// Paint a wrecked gun. Called on knockout and again whenever the model is rebuilt.
+function markTurretKO(t){
+  if(!t||t.userData._koPainted) return; t.userData._koPainted=true; t.userData.ko=true;
+  if(t.userData.pitchG) t.userData.pitchG.rotation.x=0.42;
+  t.traverse(o=>{ if(o.isMesh&&o.material&&o.material.color){ o.material=o.material.clone(); o.material.color.multiplyScalar(0.45); } });
+}
+// Spill part of a hit onto whichever gun was closest to it.
+function damageShipTurret(s,dmg,hitPos){
+  const ts=shipTurrets(s); if(!ts.length||!hitPos||!s.build||!s.build.group) return;
+  shipGunState(s);
+  let best=-1,bd=1e9;
+  const wp=new THREE.Vector3();
+  for(let i=0;i<ts.length;i++){ if(s._gunKo[i]) continue;
+    ts[i].getWorldPosition(wp); const d=wp.distanceTo(hitPos);
+    if(d<bd){ bd=d; best=i; } }
+  if(best<0 || bd>26) return;                      // a hit down aft does not kill a gun forward
+  s._gunHp[best]-=dmg*0.55;
+  if(s._gunHp[best]<=0){
+    s._gunKo[best]=true;
+    markTurretKO(ts[best]);
+    ts[best].getWorldPosition(wp); boom(wp.clone(),0.8);
+    // A ship whose last gun you just shot off must not immediately buy another one. growLoadout
+    // runs all battle long, and without this she grew a fresh battery seconds after striking —
+    // measured: two shells back out of a "silenced" hull. Once she is out of the fight she stays
+    // out of it until she is taken or she sinks.
+    if(shipGunsAlive(s)===0) s.upgT=1e9;
+    if(shipSilenced(s)&&typeof flashPrompt==='function')
+      flashPrompt(T('\u2691 '+(s.def.name||'ENEMY').toUpperCase()+' IS SILENCED — board her: press G to go over the side, swim across and press E',
+                    '\u2691 '+trName(s.def.name||'\u654c\u8230')+' \u7684\u70ae\u5168\u54d1\u4e86\u2014\u2014\u53bb\u593a\u8230\uff1a\u6309 G \u4e0b\u6c34\uff0c\u6e38\u8fc7\u53bb\u518d\u6309 E'),'ok');
   }
 }
 // Range one aircraft on the first free deck spot. Used at spawn, and again every time one of
@@ -7913,7 +7980,11 @@ function updateAITaxi(pa, dt){
 // text you had to be standing next to her to see. Now she runs up a white flag you can read
 // from across the water: keep shooting until it appears, then go and take her.
 const SURRENDER_FRAC=0.28;
-function hasStruckColours(s){ return !!(s && s.team===1 && (s.sinkT||0)===0 && s.hp>0 && s.hp<=s.maxhp*SURRENDER_FRAC); }
+// The white flag no longer means "low on health" — health stopped being the gate. It now means
+// SILENCED: every gun aboard is wrecked and she can be taken. Same flag, same "she strikes her
+// colours" moment, but now it marks the ship you can actually board, which is the one thing a
+// player needs to be able to spot across a battle.
+function hasStruckColours(s){ return shipSilenced(s); }
 function updateSurrenderFlags(){
   enemies.forEach(e=>{
     if(!e.build||!e.build.group) return;
@@ -7928,8 +7999,11 @@ function updateSurrenderFlags(){
       g.scale.setScalar(Math.max(1,(e.def.beam||10)/14));
       e.build.group.add(g); e._whiteFlag=g;
       if(typeof comms==='function') comms(e.callsign||'ENEMY','We strike our colours! Hold your fire!','#e8e8e8');
-      flashPrompt(T('🏳 '+e.def.name.toUpperCase()+' HAS STRUCK HER COLOURS — board her before she sinks',
-                    '🏳 '+trName(e.def.name)+' 升起白旗投降了——趁它没沉过去接收'),'ok');
+      // A first-time player read "board her" and had no idea that meant leaving their own ship
+      // and swimming. Spell out the whole move — that missing sentence was the entire reason
+      // the deepest system in the game went undiscovered.
+      flashPrompt(T('🏳 '+e.def.name.toUpperCase()+' IS SILENCED — take her! Press G to go over the side, or fly/drive alongside, then press E',
+                    '🏳 '+trName(e.def.name)+' 的炮全哑了——去夺舰！按 G 下水，或者开飞机/坦克靠上去，然后按 E'),'ok');
     } else if(!want && e._whiteFlag){ destroyObject3D(e._whiteFlag); e._whiteFlag=null; }
     if(e._whiteFlag) e._whiteFlag.rotation.y=Math.sin(t2*1.7+e.pos.x*0.1)*0.25;   // luffing in the wind
   });
@@ -7944,11 +8018,41 @@ function boardableFriendlyShip(){
     if(d<reach+16&&d<bd){ bd=d; best=a; } });
   return best;
 }
+// Health is no longer the gate — her GUNS are. Board a full-health battleship if you can shoot
+// every turret off her first; a crippled hull with one working gun still fights you off.
+//
+// And you can arrive any way you like. Where "you" are depends on what you are driving, which is
+// the only thing that changes between boarding on foot, in a tank, or out of an aircraft.
+function boarderPos(){
+  if(onFoot) return footPos;
+  if(drivingTank&&drivingTank.pos) return drivingTank.pos;
+  if(piloting&&piloting.pos) return piloting.pos;
+  return null;
+}
+function boarderReachBonus(){
+  // An aircraft is moving fast and lands ON her, so it gets a little more room than a swimmer.
+  if(piloting) return 26;
+  if(drivingTank) return 18;
+  return 14;
+}
 function boardableEnemyShip(){
-  if(!onFoot||!player||!player.def)return null;
+  const from=boarderPos(); if(!from||!player||!player.def) return null;
+  // An aircraft has to actually be down at deck height, not passing overhead at altitude
+  if(piloting && (piloting.pos.y||0) > 34) return null;
   let best=null,bd=1e9;
-  enemies.forEach(e=>{if(!hasStruckColours(e))return;const d=footPos.distanceTo(e.pos),reach=e.def.halfLen||e.def.len*.5;
-    if(d<reach+14&&d<bd){bd=d;best=e;}});
+  enemies.forEach(e=>{ if((e.sinkT||0)>0||e.hp<=0) return;
+    if(!shipSilenced(e)) return;                     // her guns must all be dead first
+    const d=from.distanceTo(e.pos), reach=(e.def.halfLen||e.def.len*.5)+boarderReachBonus();
+    if(d<reach&&d<bd){ bd=d; best=e; } });
+  return best;
+}
+// What is stopping you, so the prompt can say something more useful than nothing.
+function boardBlockedBy(){
+  const from=boarderPos(); if(!from) return null;
+  let best=null,bd=1e9;
+  enemies.forEach(e=>{ if((e.sinkT||0)>0||e.hp<=0) return;
+    const d=from.distanceTo(e.pos), reach=(e.def.halfLen||e.def.len*.5)+boarderReachBonus();
+    if(d<reach&&d<bd&&!shipSilenced(e)){ bd=d; best=e; } });
   return best;
 }
 // ===== CONTESTED BOARDING — capturing a crippled hull is no longer a free instant win: her
@@ -8064,12 +8168,13 @@ function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot 
 }
 function toggleMan(){
   if(phase!=='play'||panelOpen()) return;   // no state changes while a panel has the screen
-  if(drivingTank){ dismountTank(); return; }
+  if(drivingTank){ const prize=boardableEnemyShip(); if(prize){ startBoarding(prize); return; } dismountTank(); return; }
   if(onFoot){ const prize=boardableEnemyShip();if(prize){startBoarding(prize);return;}
     const friend=boardableFriendlyShip(); if(friend){ takeCommandOf(friend); return; }
     const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
     flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
-  if(piloting){ if(piloting.plane.def.uav){returnFromUAV(false,'UAV recovered');return;} if(playerShipLost&&piloting.phase==='fly'){ flashPrompt('No deck left to land on — press P to parachute, then reach harbor.'); return; }
+  if(piloting){ const prize=boardableEnemyShip(); if(prize){ startBoarding(prize); return; }
+    if(piloting.plane.def.uav){returnFromUAV(false,'UAV recovered');return;} if(playerShipLost&&piloting.phase==='fly'){ flashPrompt('No deck left to land on — press P to parachute, then reach harbor.'); return; }
     if(piloting.phase==='fly'){ const site=foreignLandingSite();
       if(site && setDownAt(site)) return;                 // another deck, or an airstrip ashore
       startLanding(); }
@@ -9294,6 +9399,7 @@ function damageTarget(t,dmg,owner,hitPos){
   if(byPlayer)creditPlayerHit(t);
   if(byPlayer){ showDamageNumber(hitPos||t.pos,dmg,t,willSink);
     if(t.build&&t.build.group&&t.build.group.visible)flashHitTarget(t.build.group); }   // whose shot it was, not merely whose side
+  if(t.team===1) damageShipTurret(t,dmg,hitPos);   // rake her upperworks and the guns go first
   t.hp-=dmg; damageCompartment(t,dmg,hitPos); applyCrit(t,dmg); calledShot(t,dmg,hitPos,friendlyHit); if(t.hp<=0 && t.sinkT===0){ t.hp=0; t.sinkT=0.001; if(catastrophic&&!t.proxy){ if(t.build&&t.build.group)t.build.group.visible=false; spawnCatastrophicWreck(t,hitPos,1.2); } spawnSalvage(t.pos.clone());
     if(byPlayer)showHit(t.def.name||'ENEMY SHIP',true);
     const bounty=t.def.boss?30000:t.def.hp>400?700:t.def.hp>250?500:350;
@@ -9767,7 +9873,14 @@ function updateEnemy(e,dt){
     e.build.group.position.set(e.pos.x, Math.sin(t2*0.8+e.pos.x)*0.3*(0.6+sea*0.6), e.pos.z);
     e.build.group.rotation.set(Math.sin(t2*0.7+e.pos.x)*0.018*sea, e.heading, Math.sin(t2*1.1+e.pos.z)*0.02*sea + e._heel); setShipWake(e.build,sp); }
   // fire the whole loadout at any blue target in reach (damaged guns reload slower)
-  e.fireT-=dt; if(e.fireT<=0){ e.fireT=(2.8+Math.random()*2.4)*(1+0.4*(e.crit?e.crit.guns:0)); e.proxy?proxyShipFire(e):aiShipFire(e); }
+  // Guns you have shot off do not come back: a ship reloads more slowly as she loses batteries,
+  // and one with none left is silent. Without this, "destroy her defences" was cosmetic.
+  const _n=(e.loadout&&e.loadout.length)||0;
+  if(_n && shipGunsAlive(e)===0){ e.fireT=1.5; }
+  else {
+    const _fr=_n?shipGunsAlive(e)/_n:1;
+    e.fireT-=dt; if(e.fireT<=0){ e.fireT=(2.8+Math.random()*2.4)*(1+0.4*(e.crit?e.crit.guns:0))/Math.max(0.25,_fr); e.proxy?proxyShipFire(e):aiShipFire(e); }
+  }
 }
 let t2=0;
 function detonateNuclearShell(s){
@@ -10875,7 +10988,9 @@ function updatePrompt(){
   else if(drivingTank){ const t=drivingTank; msg=T('Tank ','坦克 ')+Math.max(0,Math.ceil(t.hp/t.maxhp*100))+T('% — W/S drive · Click fire · R repair · ','% — W/S 驾驶 · 点击开火 · R 修理 · ')+(t.onDeck?T('G land ashore','G 开上岸'):(playerShipLost?T('Ship lost','船已沉没'):T('G re-embark','G 回到船上')))+T(' · T view · E dismount',' · T 视角 · E 下车')+tankPartSummary(t); }
   else if(onFoot){ const near=!landCampaignMode&&Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<boardRange(), hp=' · HP '+Math.ceil(footHP)+'%', ftk=nearestFieldTank(), prize=boardableEnemyShip();
     const gunNm=trName((HANDHELD[equippedGun]||HANDHELD.pistol).name);
-    if(prize) msg=T('⚓ CRIPPLED '+prize.def.name.toUpperCase()+' — PRESS E TO BOARD','⚓ 瘫痪的'+trName(prize.def.name)+'——按 E 强行登舰')+hp+T(' · Claim it before it sinks.',' · 趁它没沉赶紧拿下。');
+    const blocked=prize?null:boardBlockedBy();
+    if(prize) msg=T('⚓ '+prize.def.name.toUpperCase()+' IS SILENCED — PRESS E TO BOARD','⚓ '+trName(prize.def.name)+' 的炮哑了——按 E 登舰夺船')+hp+T(' · Claim it before it sinks.',' · 趁它没沉赶紧拿下。')
+    else if(blocked) msg=T('⚔ '+blocked.def.name.toUpperCase()+' STILL HAS '+shipGunsAlive(blocked)+' GUN(S) FIRING — knock them all out to board her','⚔ '+trName(blocked.def.name)+' 还有 '+shipGunsAlive(blocked)+' 门炮在开火——全打掉才能登舰')+hp;
     else if(playerShipLost) msg=(nearFriendlyHarborForReplacement()?T('Harbor reached — press P for a replacement ship','已到海港——按 P 领取新船'):T('Ship lost — swim/walk back to your harbor','船沉了——游泳/走路回到我方海港'))+hp+' · WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm;
     else msg=(ftk?T('Press E to crew '+(ftk.name||'tank')+' · ','按 E 进入'+trName(ftk.name||'坦克')+' · '):'')+(landCampaignMode?T('Airborne assault','空降突击'):(footLand?T('Ashore','登岸'):T('Swimming','游泳中')))+hp+' — WASD '+(footLand?T('walk','行走'):T('swim','游泳'))+T(' · Click: ',' · 点击开枪: ')+gunNm+T(' · Q switch',' · Q 换枪')+(footLand?T(' · B build',' · B 建造'):'') + shipWayback(near) + (capIsl?'   ·   '+capMsg():''); }
   else if(driving){ msg=steerHint() + (player.def.kind==='sub'?T('   ·   C dive/surface','   ·   C 下潜/上浮'):'') + (selectedWeapon?T('   ·   '+installHint()+' '+WEAPONS[selectedWeapon].name,'   ·   '+installHint()+trName(WEAPONS[selectedWeapon].name)):'') + helmExitHint(); }
