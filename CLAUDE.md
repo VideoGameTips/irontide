@@ -59,13 +59,26 @@ git 历史里的邮箱清理干净了，隐私文档却把它明文登记在仓�
 ## 部署
 
 ```bash
-ssh irontide-vps 'cd /opt/games/sushigamelab && ./update-games.sh irontide'
+ssh irontide-vps '/opt/games/sushigamelab/deploy-irontide.sh'
 ```
+
+**Andy 也能自己部署了**（2026-08-16 起）。给孩子看的完整教程在
+[`docs/DEPLOY.md`](docs/DEPLOY.md)——包括怎么检查 `irontide-vps` 别名存不存在、不存在怎么加、
+以及部署完怎么验证真的上线了。他用 `kid` 账号，**只对 irontide 一个目录有写权限**，
+其余九个游戏碰不了（跑不带参数的 `update-games.sh` 会看到那九个全部「更新失败」，这是对的）。
+
+⚠️ **两个人都要走 `deploy-irontide.sh`，别直接调 `update-games.sh`**。这个包装脚本只多做一件事：
+`umask 002`。没有它，谁部署谁写出来的新文件就是 644（组只读），于是**上一个部署的人会把下一个
+部署的人锁在外面**——这台机器没有 `setfacl`，所以只能靠 umask 解决。已双向验证：
+root 写完 kid 还能改，kid 写完 root 也能改，两边产出都是 `rw-rw-r--`。
 
 ⚠️ **路径变了**：搬到 sushigamelab.com 之后旧的 `/opt/games/irontide` 已经不存在，
 checkout 在 `/opt/games/sushigamelab/irontide`。别再手写 `git reset --hard`——
-`update-games.sh` 是这台机器上九个游戏统一的更新入口，它还会顺带重启 pvp 服务端。
-只更新一个游戏就带上名字：`./update-games.sh irontide`，不带参数则全部更新。
+底层是 `update-games.sh`，这台机器上九个游戏统一的更新入口（它还会在更新 pvp 时重启服务端）。
+
+⚠️ **推送成功 ≠ 已上线**。2026-08-16 就踩过：push 成功之后部署才失败（旧路径已不存在），
+GitHub 上一切正常而线上还是旧代码——这是最容易误判的失败形态。部署完务必验证线上内容本身，
+别只看 `sw.js` 的版本号（那次版本号恰好是对的，页面却是旧的）。
 
 `irontide-vps` 是本机 `~/.ssh/config` 里的别名，**真实地址和用户名不写进这个仓库**——
 这是公开仓库，写进来等于把 root 登录目标广播给全网扫描器。本机加一段即可：

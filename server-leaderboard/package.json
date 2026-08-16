@@ -1,0 +1,17 @@
+{
+  "name": "iron-tide-leaderboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Anti-cheat leaderboard service for Iron Tide. SQLite, no framework, no accounts.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js && node --check db.js && node --check scoring.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0"
+  }
+}

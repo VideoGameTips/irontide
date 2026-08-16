@@ -501,6 +501,7 @@
 <script src="vendor/postprocessing/LuminosityHighPassShader.js"></script>
 <script src="vendor/postprocessing/UnrealBloomPass.js"></script>
 <script src="js/terrain.js"></script>
+<script src="js/callsigns.js"></script>
 <script>
 // =====================================================================
 //  IRON TIDE — first-person battleship command (single-file Three.js)
@@ -4761,6 +4762,10 @@ const _radar=[0,0];                                                       // isl
 function controlledIslandCount(team){ return islands.reduce((n,i)=>n+(i.capturable&&i.owner===team?1:0),0); }
 // ===== WAR PACING — escalating enemy offensives, rotating bonus objectives, deck rearm =====
 let offensiveT=160+Math.random()*80, offensiveN=0, sessPlanes=0;
+// Per-war tallies for the leaderboard. `career` counts these for life; the board scores
+// one battle, so it needs this war's numbers on their own. Reset in startGame() with the
+// rest of the per-war state.
+let sessBosses=0, sessIslands=0;
 let sideOb=null, sideObT=25;
 let _eventT=45, _eventCount=0;   // dynamic mid-battle events ticker
 // ===== LIVING BATTLES — occasional dramatic events that keep a fight from going flat =====
@@ -5058,7 +5063,15 @@ let backslashMoneyPresses=[];
 function backslashMoneyCode(){
   if(phase!=='play')return;
   const now=Date.now();backslashMoneyPresses=backslashMoneyPresses.filter(t=>now-t<=1000);backslashMoneyPresses.push(now);
-  if(backslashMoneyPresses.length>=3){backslashMoneyPresses.length=0;money+=10000;updateHUD();refreshShop();refreshBuild();sfxClick();flashPrompt('💰 SECRET FUNDS: +$10,000');}
+  if(backslashMoneyPresses.length>=3){backslashMoneyPresses.length=0;money+=10000;updateHUD();refreshShop();refreshBuild();sfxClick();
+    // The secret stays. It just turns this battle into a practice run, and says so at
+    // the moment of the choice rather than sandbagging the player at the results screen.
+    // The run is still submitted (marked practice) so the career total stays continuous —
+    // dropping it would make the NEXT honest battle look like a suspicious jump.
+    LB.practice=true;
+    flashPrompt(LB.consent===true
+      ? T('💰 SECRET FUNDS: +$10,000 — practice run, not ranked','💰 秘密资金：+$10,000——本局转为练习局，不计入排行榜')
+      : '💰 '+T('SECRET FUNDS: +$10,000','秘密资金：+$10,000'));}
 }
 
 let chatOpen=false,chatWelcomed=false,_chatOpenAt=0;
@@ -5791,12 +5804,14 @@ function buildMenu(){
     log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">'+T('📖 WAR LOG','📖 战争日志')+'</span>'+
       ' <span id="almanacBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('⚓ SHIP ALMANAC','⚓ 舰船图鉴')+'</span>'+
       ' <span id="medalsBtn" style="cursor:pointer;color:#ffd060;font-size:11px;letter-spacing:2px;border:1px solid #4e3f21;border-radius:20px;padding:5px 15px;margin-left:8px">🎖 '+T('MEDALS','奖章墙')+' '+((career.achievements||[]).length)+'/'+ACHIEVEMENTS.length+'</span>'+
-      ' <span id="mpBtn" style="cursor:pointer;color:#8fd0a0;font-size:11px;letter-spacing:2px;border:1px solid #214e2e;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('🌐 MULTIPLAYER','🌐 联机对战')+'</span>';
+      ' <span id="mpBtn" style="cursor:pointer;color:#8fd0a0;font-size:11px;letter-spacing:2px;border:1px solid #214e2e;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('🌐 MULTIPLAYER','🌐 联机对战')+'</span>'+
+      ' <span id="lbBtn" style="cursor:pointer;color:#ffd060;font-size:11px;letter-spacing:2px;border:1px solid #4e3f21;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('🏆 LEADERBOARD','🏆 排行榜')+'</span>';
     d.after(log);
     log.querySelector('#warlogBtn').onclick=showWarLog;
     log.querySelector('#almanacBtn').onclick=buildAlmanac;
     log.querySelector('#medalsBtn').onclick=showMedals;
     log.querySelector('#mpBtn').onclick=openMultiplayer;
+    log.querySelector('#lbBtn').onclick=openLeaderboard;
   }
   // ⏱ quick battle button — one click, straight into a five-minute skirmish with your usual ship
   if(!document.getElementById('quickBtn')){
@@ -6135,7 +6150,8 @@ function startGame(shipId){
   // load, so every count carried into the next battle — and since a quick battle ends at
   // `sunk >= QUICK_KILL_GOAL`, starting one after any other battle declared victory within
   // three seconds, medal and all. Side objectives baselined off the same stale numbers.
-  sunk=0; sessPlanes=0; sideOb=null; sideObT=25;
+  sunk=0; sessPlanes=0; sessBosses=0; sessIslands=0; sideOb=null; sideObT=25;
+  lbStartRun();   // opens the leaderboard handshake for this war (no-op unless the player opted in)
   offensiveT=160+Math.random()*80; offensiveN=0;   // war pacing starts over, not mid-escalation
   fleetOrder=-1; _callsignN=0;                     // orders and callsigns start from the top
   _yardsPinned=false;                              // else a fresh battle opens by announcing the pressure came off
@@ -6416,7 +6432,7 @@ function setIslandOwner(isl,team,silent){
     buildAndPushLand('command',team,cp,2,isl);
   }
   if(silent||!isl.capturable||old===team) return;
-  if(team===0){ money+=150; warRecord('islands'); flashPrompt('🏝 '+isl.name.toUpperCase()+' SECURED — command post established; construction unlocked'); sfxClick(); }
+  if(team===0){ money+=150; warRecord('islands'); sessIslands++; flashPrompt('🏝 '+isl.name.toUpperCase()+' SECURED — command post established; construction unlocked'); sfxClick(); }
   else if(old===0) flashPrompt('⚠ '+isl.name.toUpperCase()+' LOST — enemy forces captured the outpost');
 }
 function islandCaptureForce(isl,team){
@@ -9409,7 +9425,7 @@ function damageTarget(t,dmg,owner,hitPos){
     // the moment a new player most needs to be told they did it.
     if(byPlayer && gameSettings.cameraShake) cameraShake=Math.min(1.35,Math.max(cameraShake,t.def.boss?1.05:0.4));
     const _paid=(byPlayer||playerCredited(t))?bounty:Math.round(bounty*0.25);
-    sunk++;warRecord('sunk');money+=_paid;if(t.def.boss){warRecord('bosses');flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');
+    sunk++;warRecord('sunk');money+=_paid;if(t.def.boss){warRecord('bosses');sessBosses++;flashPrompt('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY');
       if(t.team===1){ rivalAdvance('angry'); rivalSpeak(career.rivalPhase); } }
     if(t.nemesis){ const n=t.nemesis; if(!t.def.boss){ money+=n.bounty||1500; flashPrompt('☠ '+n.name.toUpperCase()+' DEFEATED — $'+(n.bounty||1500)+' BOUNTY'); }
       else flashPrompt('☠ '+n.name.toUpperCase()+' DEFEATED'); if(typeof comms==='function') comms(n.name.toUpperCase(),n.defeat,'#ffd060'); }
@@ -11354,6 +11370,367 @@ function startQuickBattle(){
 function trainingCourseRunning(){
   return !!(window._MAP && window._MAP.training && typeof tutIdx!=='undefined' && tutIdx>=0);
 }
+// =====================================================================
+//  LEADERBOARD — five boards, one anonymous captain per device
+// ---------------------------------------------------------------------
+//  WHAT LEAVES THIS BROWSER: a random id generated here, two indexes into the
+//  wordlist in js/callsigns.js, and the numbers from a battle. No account, no
+//  email, no typed name — there is no name field to type into, which is why
+//  there is also no profanity filter and no way to leak a real name.
+//
+//  Nothing is sent until the player says yes. The prompt appears on the results
+//  screen after their first battle (asking mid-menu would interrupt someone who
+//  just wants to play), so that first result is not submitted — from the next
+//  battle on, it is. Declining is permanent until they change it in the panel.
+//
+//  ANTI-CHEAT: the honest work happens on the server (see server-leaderboard/).
+//  This side's job is to hand over the facts and sign them: every war opens with
+//  a handshake that returns a single-use nonce, and the results are HMAC'd with
+//  it. Fast times are expensive to fake because the server times the handshake.
+//
+//  Everything here fails silently. No network, no server, an old browser without
+//  crypto.subtle — the game plays exactly as it did before, minus the board.
+// =====================================================================
+const LB_CLIENT_VER='lb1';
+let lbOpen=false;
+let LB={ id:null, callsign:null, consent:null, session:null, practice:false, supported:false,
+         busy:false, lastRanks:null,
+         view:{ type:'theater', diff:'easy', map:0, window:'all' } };
+
+function lbBase(){
+  // Same origin in production (Caddy proxies /irontide-api to the service); the dev
+  // server runs on its own port, mirroring what defaultRelayUrl() does for multiplayer.
+  try{ if(location.hostname==='localhost'||location.hostname==='127.0.0.1') return 'http://127.0.0.1:7781'; }catch(e){}
+  return '/irontide-api';
+}
+function lbSupported(){
+  try{ return !!(window.fetch && window.crypto && crypto.subtle && crypto.subtle.importKey && window.TextEncoder); }
+  catch(e){ return false; }
+}
+function lbNewId(){
+  try{ if(crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+  let s=''; const abc='abcdefghijklmnopqrstuvwxyz0123456789';
+  for(let i=0;i<24;i++) s+=abc[Math.floor(Math.random()*abc.length)];
+  return s;
+}
+function lbLoad(){
+  LB.supported=lbSupported();
+  if(!LB.supported) return;
+  try{
+    LB.id=localStorage.getItem('ironTideLbId')||'';
+    if(!/^[a-zA-Z0-9_-]{8,64}$/.test(LB.id)){ LB.id=lbNewId(); localStorage.setItem('ironTideLbId',LB.id); }
+    let c=null; try{ c=JSON.parse(localStorage.getItem('ironTideLbCallsign')||'null'); }catch(e){}
+    if(!c||!callsignValid(c.a,c.b)){ c=randomCallsign(); localStorage.setItem('ironTideLbCallsign',JSON.stringify(c)); }
+    LB.callsign=c;
+    const k=localStorage.getItem('ironTideLbConsent');
+    LB.consent = k==='1' ? true : k==='0' ? false : null;
+    LB.view.diff=difficulty;
+  }catch(e){ LB.supported=false; }   // storage blocked (private mode) — stay offline, keep playing
+}
+function lbSetConsent(v){
+  LB.consent=!!v;
+  try{ localStorage.setItem('ironTideLbConsent', v?'1':'0'); }catch(e){}
+}
+function lbReroll(){
+  LB.callsign=randomCallsign();
+  try{ localStorage.setItem('ironTideLbCallsign',JSON.stringify(LB.callsign)); }catch(e){}
+}
+function lbMyName(){ return LB.callsign?callsignText(LB.callsign.a,LB.callsign.b,isZh(),LB.id):''; }
+function lbMode(){ return quickMode?'quick':(currentSandboxIdx>=0?'sandbox':'campaign'); }
+function lbStarsTotal(){ let n=0; const t=career.theaters||{}; for(const k in t) n+=t[k].stars||0; return n; }
+
+async function lbSign(nonce,bodyStr){
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey('raw',enc.encode(nonce),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const mac=await crypto.subtle.sign('HMAC',key,enc.encode(bodyStr));
+  return Array.from(new Uint8Array(mac)).map(b=>('0'+b.toString(16)).slice(-2)).join('');
+}
+
+// Opens a war. Fire-and-forget: if the handshake never lands there is simply no
+// session at the end and nothing gets submitted.
+async function lbStartRun(){
+  LB.session=null; LB.practice=false;
+  if(!LB.supported||LB.consent!==true) return;
+  if(MP.active||MP.everJoined) return;                 // a shared arena is not the campaign
+  const mode=lbMode();
+  try{
+    const res=await fetch(lbBase()+'/run/start',{ method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ player_id:LB.id, callsign:LB.callsign, mode,
+        map_idx: mode==='campaign'?currentMapIdx:-1, difficulty }) });
+    if(res.ok) LB.session=await res.json();
+  }catch(e){ /* offline — play on */ }
+}
+
+// Closes a war. `durS` and the tallies are the same numbers the results screen shows.
+// The star rating is deliberately NOT sent: the server derives it from these facts.
+async function lbFinishRun(win,mpMatch,durS){
+  const sess=LB.session; LB.session=null;
+  if(!LB.supported||mpMatch||!sess) return null;
+  const body={ session_id:sess.session_id, player_id:LB.id,
+    won:!!win, duration_s:Math.max(0,Math.round(durS)),
+    sunk:sunk|0, planes:sessPlanes|0, islands:sessIslands|0, bosses:sessBosses|0,
+    ships_lost:shipsLostThisWar|0,
+    career:{ sunk:career.sunk||0, planes:career.planes||0, islands:career.islands||0,
+             wins:career.wins||0, bosses:career.bosses||0, score:careerScore() },
+    stars_total:lbStarsTotal(), medals:(career.achievements||[]).length,
+    completed:!!career.completed, practice:!!LB.practice, client_ver:LB_CLIENT_VER };
+  try{
+    const str=JSON.stringify(body);
+    const sig=await lbSign(sess.nonce,str);
+    const res=await fetch(lbBase()+'/run/finish',{ method:'POST',
+      headers:{'Content-Type':'application/json','X-IT-Sig':sig}, body:str });
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(e){ return null; }
+}
+
+// Called at the end of endGame(), once every career counter has been updated.
+function lbAfterBattle(win,mpMatch,durS){
+  if(!LB.supported||mpMatch) return;
+  if(MP.active||MP.everJoined) return;
+  if(LB.consent===null){ lbShowConsent(); return; }     // first battle: ask, do not send
+  if(LB.consent!==true) return;
+  lbFinishRun(win,mpMatch,durS).then(r=>{ if(r) lbShowResult(r); });
+}
+
+// ---- the one-time question, asked on the results screen -------------------------
+function lbShowConsent(){
+  const over=document.getElementById('over'); if(!over) return;
+  let box=document.getElementById('lbConsent');
+  if(box) box.remove();
+  box=document.createElement('div'); box.id='lbConsent';
+  box.style.cssText='margin:14px auto 0;max-width:560px;padding:14px 18px;border:1px solid #21384e;'+
+    'border-radius:10px;background:rgba(255,255,255,0.03);font-size:13px;line-height:1.7;color:#cfe0ee';
+  box.innerHTML=
+    '<div style="color:#ffd060;letter-spacing:2px;font-size:12px;margin-bottom:8px">'+T('🏆 JOIN THE LEADERBOARD?','🏆 要上排行榜吗？')+'</div>'+
+    '<div style="color:#9fc6e8">'+T('Your battles can be ranked against other captains. You would go on the board as '+
+        '<b>'+lbMyName()+'</b> — a callsign picked from a word list, not your real name. No account, no email, nothing typed in.',
+      '你的战绩可以和其他舰长比一比。你在榜上的名字是 <b>'+lbMyName()+'</b>——从词表里抽的呼号，不是真名。不用注册，不填邮箱，什么都不用输入。')+'</div>'+
+    '<div style="color:#6b7d92;font-size:11px;margin-top:6px">'+T('You can change your mind any time in the leaderboard panel. This battle stays private either way — the board starts with your next one.',
+      '随时可以在排行榜面板里改主意。这一场无论如何都不会上传——从下一场开始才计入。')+'</div>'+
+    '<div style="margin-top:11px;display:flex;gap:9px;justify-content:center;flex-wrap:wrap">'+
+      '<button id="lbYes" style="cursor:pointer;background:#13283a;color:#cfe6fb;border:1px solid #3579a8;border-radius:8px;padding:8px 20px;font-size:12px;letter-spacing:2px">'+T('YES, RANK ME','好，给我排名')+'</button>'+
+      '<button id="lbNo" style="cursor:pointer;background:#1a1a1a;color:#9fb3c6;border:1px solid #333;border-radius:8px;padding:8px 20px;font-size:12px;letter-spacing:2px">'+T('NO THANKS','不用了')+'</button>'+
+    '</div>';
+  const txt=document.getElementById('overText');
+  if(txt&&txt.parentNode) txt.parentNode.insertBefore(box,txt.nextSibling); else over.appendChild(box);
+  box.querySelector('#lbYes').onclick=()=>{ lbSetConsent(true); sfxClick();
+    box.innerHTML='<div style="text-align:center;color:#7ff0a8;font-size:13px">'+
+      T('⚓ You are on the board as <b>'+lbMyName()+'</b>. Your next battle counts.',
+        '⚓ 你的呼号是 <b>'+lbMyName()+'</b>，下一场战斗就开始计入排行榜。')+'</div>'; };
+  box.querySelector('#lbNo').onclick=()=>{ lbSetConsent(false); sfxClick(); box.remove(); };
+}
+
+// ---- "you placed 3rd" on the results screen -------------------------------------
+function lbShowResult(r){
+  if(!r||!r.ranks) return;
+  const parts=[];
+  const label={ theater:T('theater speedrun','战区速通'), war:T('best battle','单场战功'),
+                career:T('career','生涯总分'), mastery:T('mastery','精通') };
+  for(const k of ['theater','war','career','mastery']){
+    const v=r.ranks[k]; if(v&&v.rank) parts.push(T('#'+v.rank+' '+label[k],'第 '+v.rank+' 名 · '+label[k]));
+  }
+  if(r.practice){ parts.length=0; parts.push(T('practice run — not ranked','练习局——不计入排行榜')); }
+  if(!parts.length) return;
+  const txt=document.getElementById('overText'); if(!txt) return;
+  const line=document.createElement('div');
+  line.style.cssText='margin-top:10px;color:#ffd060;font-size:12px;letter-spacing:1px;text-align:center';
+  line.innerHTML='🏆 '+parts.join(' &nbsp;·&nbsp; ')+
+    ' &nbsp;<span id="lbOpenFromOver" style="cursor:pointer;color:#8fb8d8;border:1px solid #21384e;border-radius:20px;padding:3px 12px;font-size:11px">'+
+    T('VIEW BOARD','查看排行榜')+'</span>';
+  txt.parentNode.insertBefore(line,txt.nextSibling);
+  const b=line.querySelector('#lbOpenFromOver'); if(b) b.onclick=openLeaderboard;
+}
+
+// ---- the board panel ------------------------------------------------------------
+const LB_TABS=[
+  { k:'theater', en:'THEATER SPEEDRUN', zh:'战区速通' },
+  { k:'war',     en:'BEST BATTLE',      zh:'单场战功' },
+  { k:'career',  en:'CAREER',           zh:'生涯总分' },
+  { k:'mastery', en:'MASTERY',          zh:'精通' },
+];
+function lbFmtTime(s){ const m=Math.floor(s/60), ss=Math.floor(s%60); return m+':'+String(ss).padStart(2,'0'); }
+function lbChip(on){
+  return 'cursor:pointer;font-size:11px;letter-spacing:1px;border-radius:20px;padding:5px 13px;margin:0 4px 5px 0;'+
+    (on?'color:#ffd060;border:1px solid #4e3f21;background:rgba(255,208,96,.08)':'color:#8fb8d8;border:1px solid #21384e');
+}
+function lbPanel(){
+  let o=document.getElementById('lbPanel');
+  if(o) return o;
+  o=document.createElement('div'); o.id='lbPanel';
+  o.style.cssText='display:none;position:fixed;inset:0;z-index:215;background:rgba(4,10,16,.92);align-items:center;justify-content:center;padding:20px;';
+  o.innerHTML='<div style="max-width:720px;width:100%;max-height:88vh;overflow:auto;background:linear-gradient(180deg,#0e1a24,#0a121a);'+
+      'border:1px solid #26425c;border-radius:14px;box-shadow:0 24px 90px rgba(0,0,0,.65);padding:22px 26px;">'+
+    '<div style="color:#ffd060;letter-spacing:3px;font-size:14px;text-align:center;margin-bottom:14px">'+T('🏆 LEADERBOARD','🏆 排行榜')+'</div>'+
+    '<div id="lbTabs" style="text-align:center;margin-bottom:8px"></div>'+
+    '<div id="lbFilters" style="text-align:center;margin-bottom:12px"></div>'+
+    '<div id="lbBody" style="min-height:180px"></div>'+
+    '<div id="lbFoot" style="margin-top:16px;padding-top:13px;border-top:1px solid #21384e;font-size:11px;color:#6b7d92;line-height:1.8"></div>'+
+    '<div style="text-align:center;margin-top:14px"><button id="lbCloseBtn" style="cursor:pointer;background:#1a1a1a;color:#cfe6fb;border:1px solid #333;border-radius:8px;padding:8px 24px;font-size:12px;letter-spacing:2px">'+T('CLOSE','关闭')+'</button></div>'+
+  '</div>';
+  document.body.appendChild(o);
+  o.querySelector('#lbCloseBtn').onclick=closeLeaderboard;
+  o.addEventListener('click',(e)=>{ if(e.target===o) closeLeaderboard(); });
+  return o;
+}
+function openLeaderboard(){
+  if(!LB.supported){ flashPrompt(T('The leaderboard needs a newer browser.','排行榜需要更新一点的浏览器。')); return; }
+  const o=lbPanel();
+  if(LB.view.type==='theater'){
+    // Default to the theater they are on, but never past what they have unlocked —
+    // the map list should not spoil the names of battles they have not reached.
+    LB.view.map=Math.max(0,Math.min(mapsUnlocked()-1,currentMapIdx));
+  }
+  LB.view.diff=difficulty;
+  lbOpen=true; o.style.display='flex';
+  if(document.pointerLockElement) document.exitPointerLock();
+  lbRender();
+}
+function closeLeaderboard(){
+  lbOpen=false;
+  const o=document.getElementById('lbPanel'); if(o) o.style.display='none';
+}
+function lbRenderChrome(){
+  const o=document.getElementById('lbPanel'); if(!o) return;
+  const tabs=o.querySelector('#lbTabs'); tabs.innerHTML='';
+  LB_TABS.forEach(t=>{
+    const s=document.createElement('span');
+    s.textContent=T(t.en,t.zh); s.style.cssText=lbChip(LB.view.type===t.k);
+    s.onclick=()=>{ LB.view.type=t.k; sfxClick(); lbRender(); };
+    tabs.appendChild(s);
+  });
+
+  const f=o.querySelector('#lbFilters'); f.innerHTML='';
+  const add=(label,on,fn)=>{ const s=document.createElement('span'); s.textContent=label;
+    s.style.cssText=lbChip(on); s.onclick=()=>{ fn(); sfxClick(); lbRender(); }; f.appendChild(s); };
+
+  if(LB.view.type==='theater'||LB.view.type==='war'){
+    [['easy',T('EASY','简单')],['normal',T('NORMAL','普通')],['hard',T('HARD','困难')]]
+      .forEach(([k,lab])=>add(lab,LB.view.diff===k,()=>{ LB.view.diff=k; }));
+  }
+  add(T('ALL TIME','历史'),LB.view.window==='all',()=>{ LB.view.window='all'; });
+  add(T('THIS WEEK','本周'),LB.view.window==='week',()=>{ LB.view.window='week'; });
+
+  if(LB.view.type==='theater'){
+    const sel=document.createElement('select');
+    sel.style.cssText='background:#0e1922;border:1px solid #21384e;color:#cfe6fb;padding:5px 8px;border-radius:6px;font-size:11px;margin-left:6px;max-width:210px';
+    for(let i=0;i<mapsUnlocked();i++){
+      const op=document.createElement('option'); op.value=i;
+      op.textContent=(i+1)+'. '+(isZh()?campaignName(i):CAMPAIGN[i].name);
+      if(i===LB.view.map) op.selected=true;
+      sel.appendChild(op);
+    }
+    sel.onchange=()=>{ LB.view.map=Number(sel.value); lbRender(); };
+    f.appendChild(sel);
+  }
+}
+function lbRenderFoot(){
+  const o=document.getElementById('lbPanel'); if(!o) return;
+  const foot=o.querySelector('#lbFoot'); foot.innerHTML='';
+
+  if(LB.consent!==true){
+    foot.innerHTML='<div style="color:#9fc6e8;font-size:12px">'+
+      T('You are not on the board yet. Join as <b>'+lbMyName()+'</b> — a callsign from a word list, no account, no name to type.',
+        '你还没上榜。以 <b>'+lbMyName()+'</b> 的身份加入——词表抽的呼号，不用注册，不用输入任何名字。')+'</div>'+
+      '<div style="margin-top:9px"><span id="lbJoin" style="'+lbChip(true)+'">'+T('JOIN THE BOARD','加入排行榜')+'</span>'+
+      '<span id="lbRoll" style="'+lbChip(false)+'">'+T('NEW CALLSIGN','换个呼号')+'</span></div>';
+    foot.querySelector('#lbJoin').onclick=()=>{ lbSetConsent(true); sfxClick(); lbRender(); };
+    foot.querySelector('#lbRoll').onclick=()=>{ lbReroll(); sfxClick(); lbRenderFoot(); };
+    return;
+  }
+
+  foot.innerHTML='<div>'+T('You sail as <b style="color:#cfe0ee">'+lbMyName()+'</b>','你的呼号：<b style="color:#cfe0ee">'+lbMyName()+'</b>')+'</div>'+
+    '<div style="margin-top:8px"><span id="lbRoll" style="'+lbChip(false)+'">'+T('NEW CALLSIGN','换个呼号')+'</span>'+
+    '<span id="lbForget" style="'+lbChip(false)+'">'+T('TAKE ME OFF THE BOARD','把我从榜上撤下来')+'</span></div>'+
+    '<div style="margin-top:9px;color:#55697d">'+
+      T('Stored: a random id made on this device, your callsign, and battle results. No account, no email, no real name. Clearing this browser\'s data starts a new captain.',
+        '存下来的东西：这台设备上随机生成的一个 id、你的呼号、战斗成绩。没有账号，没有邮箱，没有真名。清掉浏览器数据就换成一个新舰长。')+'</div>';
+  foot.querySelector('#lbRoll').onclick=()=>{ lbReroll(); sfxClick(); lbRender(); };
+  foot.querySelector('#lbForget').onclick=async()=>{
+    sfxClick();
+    try{
+      await fetch(lbBase()+'/forget',{ method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({player_id:LB.id}) });
+    }catch(e){}
+    lbSetConsent(false);
+    lbRender();
+  };
+}
+async function lbRender(){
+  const o=document.getElementById('lbPanel'); if(!o) return;
+  lbRenderChrome(); lbRenderFoot();
+  const body=o.querySelector('#lbBody');
+  const v=LB.view;
+  body.innerHTML='<div style="text-align:center;color:#6b7d92;padding:40px 0;font-size:12px">'+trText('Loading…')+'</div>';
+
+  let data=null;
+  try{
+    const q=new URLSearchParams({ type:v.type, diff:v.diff, window:v.window, limit:'10' });
+    if(v.type==='theater') q.set('map',String(v.map));
+    if(LB.consent===true&&LB.id) q.set('player',LB.id);
+    const res=await fetch(lbBase()+'/board?'+q.toString());
+    if(res.ok) data=await res.json();
+  }catch(e){ /* handled below */ }
+
+  if(!data){
+    // Offline is the normal case for this game — it is installable and plays with no
+    // network at all. Show what we know locally rather than an error the player can do
+    // nothing about.
+    body.innerHTML='<div style="text-align:center;color:#6b7d92;padding:26px 0;font-size:12px;line-height:1.9">'+
+      T('The board is offline right now.','现在连不上排行榜。')+'<br>'+
+      T('Your own best times are still here:','你自己的最好成绩还在：')+'</div>'+lbLocalBest();
+    return;
+  }
+  if(!data.rows.length){
+    body.innerHTML='<div style="text-align:center;color:#6b7d92;padding:34px 0;font-size:12px;line-height:1.9">'+
+      T('No captain has posted a time here yet.','这里还没有舰长留下成绩。')+'<br>'+
+      T('Win this one and the top spot is yours.','打赢这一场，第一名就是你的。')+'</div>';
+    return;
+  }
+
+  const row=(r,me)=>{
+    let val='', extra='';
+    if(v.type==='theater'){ val=lbFmtTime(r.value); extra='★'.repeat(r.stars||0)+(r.shipsLost===0?T(' · no loss',' · 未损舰'):''); }
+    else if(v.type==='war'){ val=String(r.value); extra=(r.map!=null&&r.map>=0&&CAMPAIGN[r.map])?(isZh()?campaignName(r.map):CAMPAIGN[r.map].name):''; }
+    else if(v.type==='career'){ val=String(r.value); }
+    else { val=String(r.value); extra=(r.starsTotal||0)+'★ · '+(r.medals||0)+'🎖'+(r.completed?T(' · cleared',' · 通关'):''); }
+    const medal=r.rank===1?'🥇':r.rank===2?'🥈':r.rank===3?'🥉':'';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 11px;margin-bottom:4px;border-radius:8px;'+
+      (me?'background:rgba(255,208,96,.09);border:1px solid #4e3f21':'background:rgba(255,255,255,0.02);border:1px solid #16283a')+'">'+
+      '<span style="width:38px;color:'+(me?'#ffd060':'#6b7d92')+';font-size:12px">'+(medal||('#'+r.rank))+'</span>'+
+      '<span style="flex:1;color:'+(me?'#ffd060':'#cfe0ee')+';font-size:12px">'+callsignText(r.a,r.b,isZh())+
+        '<span style="color:#55697d"> #'+r.tag+'</span></span>'+
+      '<span style="color:#9fc6e8;font-size:12px;min-width:52px;text-align:right">'+val+'</span>'+
+      '<span style="color:#6b7d92;font-size:10px;min-width:96px;text-align:right">'+extra+'</span>'+
+    '</div>';
+  };
+
+  let html=data.rows.map(r=>row(r,LB.consent===true&&data.me&&data.me.rank===r.rank)).join('');
+  if(data.me&&data.me.rank>data.rows.length){
+    html+='<div style="text-align:center;color:#55697d;font-size:11px;margin:6px 0">···</div>'+row(data.me,true);
+  }
+  html+='<div style="text-align:center;color:#55697d;font-size:11px;margin-top:9px">'+
+    T(data.total+' captain'+(data.total===1?'':'s')+' ranked','共 '+data.total+' 位舰长上榜')+'</div>';
+  body.innerHTML=html;
+}
+// Offline fallback: the theater bests the game already keeps in `career`.
+function lbLocalBest(){
+  const t=career.theaters||{}; const keys=Object.keys(t).sort((a,b)=>a-b);
+  if(!keys.length) return '<div style="text-align:center;color:#55697d;font-size:11px">'+T('No wins recorded yet.','还没有胜利记录。')+'</div>';
+  return keys.map(k=>{
+    const rec=t[k]||{};
+    return '<div style="display:flex;gap:10px;padding:7px 11px;margin-bottom:4px;border-radius:8px;background:rgba(255,255,255,0.02);border:1px solid #16283a;font-size:12px">'+
+      '<span style="flex:1;color:#cfe0ee">'+(isZh()?campaignName(Number(k)):(CAMPAIGN[k]||{}).name||'')+'</span>'+
+      '<span style="color:#ffd060">'+'★'.repeat(rec.stars||0)+'</span>'+
+      '<span style="color:#9fc6e8;min-width:52px;text-align:right">'+(rec.bestT!=null?lbFmtTime(rec.bestT):'—')+'</span>'+
+    '</div>';
+  }).join('');
+}
+
+// Runs here rather than beside loadCareer(): `LB` is a `let`, so calling lbLoad()
+// from earlier in the file would hit the temporal dead zone and throw at boot.
+lbLoad();
+
 function endGame(win,msg){
   if(win && trainingCourseRunning()){
     flashPrompt(T('Not yet — finish the training first. There is still more to learn.',
@@ -11426,6 +11803,9 @@ function endGame(win,msg){
   }
   _lastReport={ win, sunk, money, rankName:r.name, stars:earnedStars,
     theater: quickMode ? T('Quick Battle','快速战斗') : currentSandboxIdx>=0 ? (SANDBOX_MAPS[currentSandboxIdx]||{}).name||'' : campaignName(currentMapIdx) };
+  // Last, so every career counter and theater star above is already saved: the board
+  // submission is a snapshot of the state this screen is showing.
+  lbAfterBattle(win,mpMatch,Math.max(0,t2-warStartT2-armoryT));
 }
 // #35: draw the summary onto a canvas and download it — a battle report worth showing someone
 let _lastReport=null;
@@ -11930,7 +12310,7 @@ function updateTutorial(dt){
 //   gamePaused() — the SIMULATION is frozen. Only loop(), audio and quality adaption care.
 // They used to be one thing. The armory split them: the fight carries on behind it by
 // default, opt back in via the K panel → "Pause the war in the armory".
-function freezingPanelOpen(){ return harborOpen||buildOpen||tacticalOpen||chatOpen||settingsOpen; }
+function freezingPanelOpen(){ return harborOpen||buildOpen||tacticalOpen||chatOpen||settingsOpen||lbOpen; }
 // Being sunk or winning with a panel open was impossible until the armory stopped pausing the
 // war; now it happens mid-purchase. Close directly — every toggle*() refuses once phase leaves
 // 'play', which would strand the panel open (and panelOpen() true) into the next life.

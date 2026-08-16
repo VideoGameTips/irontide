@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Iron Tide · Leaderboard Admin</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; padding:20px; background:#0b141c; color:#cfe6fb;
+         font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  h1 { font-size:16px; letter-spacing:2px; color:#9fc6e8; margin:0 0 14px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  input, button, select { background:#0e1922; border:1px solid #21384e; color:#cfe6fb;
+         padding:7px 10px; border-radius:6px; font:inherit; }
+  button { cursor:pointer; }
+  button:hover { border-color:#3d6a95; }
+  .stats { color:#6b7d92; margin-bottom:12px; }
+  .wrap { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; min-width:900px; }
+  th, td { text-align:left; padding:6px 9px; border-bottom:1px solid #16283a; white-space:nowrap; }
+  th { color:#6b7d92; font-weight:normal; position:sticky; top:0; background:#0b141c; }
+  tr.flagged td { background:#2a1a16; }
+  tr.hidden  td { opacity:.45; }
+  tr.practice td { color:#8a9bb0; }
+  .flags { color:#ff9a6a; }
+  .ok { color:#7ff0a8; }
+  .msg { margin:10px 0; color:#ffd060; }
+</style>
+</head>
+<body>
+<h1>⚓ IRON TIDE · LEADERBOARD ADMIN</h1>
+
+<div class="bar">
+  <input id="tok" type="password" placeholder="admin token" size="34" autocomplete="off">
+  <select id="which">
+    <option value="recent">Recent runs</option>
+    <option value="flagged">Flagged / hidden only</option>
+  </select>
+  <button id="load">Load</button>
+</div>
+
+<div class="stats" id="stats"></div>
+<div class="msg" id="msg"></div>
+<div class="wrap"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+
+<script>
+// The token is typed here and sent as a header, never as a query parameter — a token
+// in a URL ends up in the reverse proxy's access log, which is exactly the mistake
+// this project already made once with a password on a GET endpoint.
+const $ = (id) => document.getElementById(id);
+const tokEl = $('tok');
+tokEl.value = sessionStorage.getItem('itAdminTok') || '';
+
+function headers() { return { 'X-Admin-Token': tokEl.value }; }
+function say(t, bad) { $('msg').textContent = t; $('msg').style.color = bad ? '#ff7a6a' : '#ffd060'; }
+
+async function load() {
+  sessionStorage.setItem('itAdminTok', tokEl.value);
+  say('loading…');
+  let res;
+  try {
+    res = await fetch('admin/data?which=' + encodeURIComponent($('which').value), { headers: headers() });
+  } catch (e) { return say('network error: ' + e.message, true); }
+  if (res.status === 401) return say('bad token', true);
+  if (!res.ok) return say('error ' + res.status, true);
+  const data = await res.json();
+  say('');
+  render(data);
+}
+
+function render(data) {
+  const s = data.stats;
+  $('stats').textContent =
+    `${s.runs} runs · ${s.ok_runs} counted · ${s.flagged} flagged · ${s.practice} practice · ` +
+    `${s.players} captains · ${s.banned} banned`;
+
+  const cols = ['id', 'when', 'captain', 'mode', 'map', 'diff', 'won', 'time', 'sunk', 'war', 'career', 'status', 'flags', 'actions'];
+  $('tbl').tHead.innerHTML = '<tr>' + cols.map((c) => `<th>${c}</th>`).join('') + '</tr>';
+
+  const body = $('tbl').tBodies[0];
+  body.innerHTML = '';
+  for (const r of data.rows) {
+    const tr = document.createElement('tr');
+    tr.className = r.status !== 'ok' ? r.status : '';
+    const when = new Date(r.created_at * 1000).toISOString().replace('T', ' ').slice(0, 16);
+    const cells = [
+      r.id, when,
+      `${r.callsign_en} / ${r.callsign_zh}`,
+      r.mode, r.map_idx === null ? '—' : r.map_idx, r.difficulty,
+      r.won ? '✔' : '—',
+      r.duration_s + 's', r.sunk, r.war_score, r.career_score,
+      `<span class="${r.status === 'ok' ? 'ok' : 'flags'}">${r.status}</span>`,
+      `<span class="flags">${r.flags || ''}</span>`,
+      `<button data-act="status" data-id="${r.id}" data-status="${r.status === 'hidden' ? 'ok' : 'hidden'}">${r.status === 'hidden' ? 'show' : 'hide'}</button>
+       <button data-act="ban" data-player="${r.player_id}" data-banned="${r.banned ? 0 : 1}">${r.banned ? 'unban' : 'ban'}</button>`,
+    ];
+    tr.innerHTML = cells.map((c) => `<td>${c}</td>`).join('');
+    body.appendChild(tr);
+  }
+}
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const payload = btn.dataset.act === 'status'
+    ? { action: 'status', id: Number(btn.dataset.id), status: btn.dataset.status }
+    : { action: 'ban', player_id: btn.dataset.player, banned: Number(btn.dataset.banned) };
+  const res = await fetch('admin/action', {
+    method: 'POST',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, headers()),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) return say('action failed: ' + res.status, true);
+  load();
+});
+
+$('load').addEventListener('click', load);
+tokEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+if (tokEl.value) load();
+</script>
+</body>
+</html>

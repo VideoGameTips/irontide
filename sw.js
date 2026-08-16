@@ -3,12 +3,13 @@
 // UPDATE CONVENTION: this is a single-file game with no build step, so whenever
 // index.html or any vendored script changes, bump the version suffix below —
 // the old cache is deleted on activate and clients pick up the new one.
-const CACHE = 'irontide-v85';
+const CACHE = 'irontide-v86';
 const ASSETS = [
   './',
   'manifest.json',
   'vendor/three.min.js',
   'js/terrain.js',
+  'js/callsigns.js',
   'vendor/postprocessing/CopyShader.js',
   'vendor/postprocessing/EffectComposer.js',
   'vendor/postprocessing/LuminosityHighPassShader.js',
@@ -36,6 +37,9 @@ self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   // the multiplayer relay is live data — never serve it from cache
   if (u.pathname.endsWith('/play') || u.pathname.endsWith('/servers') || u.pathname.endsWith('/health')) return;
+  // ...and neither are the leaderboard standings. Without this, cache-first would hand
+  // the player yesterday's board and never correct it.
+  if (u.pathname.includes('/irontide-api/')) return;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(hit => {
       const net = fetch(e.request).then(res => {

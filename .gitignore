@@ -3,6 +3,11 @@ node_modules
 test-results/
 tests/sim/results-pilot.json
 
+# Local leaderboard database when running the server outside the VPS. In production
+# the data lives in /var/lib/irontide-leaderboard, deliberately outside the checkout —
+# the deploy path is `git reset --hard` and would take the database with it.
+server-leaderboard/.data/
+
 # Promotion assets and build artifacts. Not in version control — regenerate with
 # tools/. In each worktree, promo/ is a symlink to a single shared directory beside
 # the checkouts, so a tool run from any worktree lands its output in the same place

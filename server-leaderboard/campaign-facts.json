@@ -1,0 +1,294 @@
+{
+  "_generated_by": "tools/extract-campaign.js — do not edit by hand; run the tool",
+  "_source": "index.html",
+  "spawnSlow": 1.5,
+  "quickKillGoal": 5,
+  "eventMinInterval": 55,
+  "eventMaxHulls": 2,
+  "offensiveFirstMin": 160,
+  "offensiveRepeatMin": 170,
+  "offensiveMaxHulls": 6,
+  "parBase": 240,
+  "parPerEnemy": 80,
+  "theaters": [
+    {
+      "idx": 0,
+      "name": "Training Bay",
+      "enemies": 2,
+      "isles": 2,
+      "reinforce": 0.4,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 1,
+      "name": "The Landing",
+      "enemies": 0,
+      "isles": 6,
+      "reinforce": 0,
+      "boss": false,
+      "ground": true
+    },
+    {
+      "idx": 2,
+      "name": "Coastal Skirmish",
+      "enemies": 3,
+      "isles": 3,
+      "reinforce": 0.6,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 3,
+      "name": "Southhaven Shoals",
+      "enemies": 5,
+      "isles": 5,
+      "reinforce": 0.8,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 4,
+      "name": "The Broken Reef",
+      "enemies": 6,
+      "isles": 7,
+      "reinforce": 1,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 5,
+      "name": "Iron Straits",
+      "enemies": 7,
+      "isles": 4,
+      "reinforce": 1.2,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 6,
+      "name": "Nightfall Passage",
+      "enemies": 7,
+      "isles": 5,
+      "reinforce": 1.3,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 7,
+      "name": "Fogbound Marches",
+      "enemies": 8,
+      "isles": 6,
+      "reinforce": 1.4,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 8,
+      "name": "Leviathan's Grave",
+      "enemies": 8,
+      "isles": 6,
+      "reinforce": 1.6,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 9,
+      "name": "Dawn Patrol",
+      "enemies": 6,
+      "isles": 5,
+      "reinforce": 0.9,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 10,
+      "name": "The Gauntlet",
+      "enemies": 9,
+      "isles": 4,
+      "reinforce": 1.1,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 11,
+      "name": "Typhoon Run",
+      "enemies": 7,
+      "isles": 5,
+      "reinforce": 1.1,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 12,
+      "name": "Blackwater Ambush",
+      "enemies": 8,
+      "isles": 6,
+      "reinforce": 1.2,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 13,
+      "name": "Island Hopping",
+      "enemies": 0,
+      "isles": 8,
+      "reinforce": 0,
+      "boss": false,
+      "ground": true
+    },
+    {
+      "idx": 14,
+      "name": "Midnight Raid",
+      "enemies": 7,
+      "isles": 5,
+      "reinforce": 1.2,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 15,
+      "name": "The Iron Armada",
+      "enemies": 11,
+      "isles": 6,
+      "reinforce": 1.4,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 16,
+      "name": "Shattered Coast",
+      "enemies": 8,
+      "isles": 7,
+      "reinforce": 1.2,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 17,
+      "name": "Frozen Straits",
+      "enemies": 8,
+      "isles": 4,
+      "reinforce": 1.3,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 18,
+      "name": "The Reckoning",
+      "enemies": 9,
+      "isles": 6,
+      "reinforce": 1.4,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 19,
+      "name": "Ghost Fleet",
+      "enemies": 9,
+      "isles": 5,
+      "reinforce": 1.4,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 20,
+      "name": "Volcano Bay",
+      "enemies": 8,
+      "isles": 8,
+      "reinforce": 1.3,
+      "boss": false,
+      "ground": false
+    },
+    {
+      "idx": 21,
+      "name": "Last Bastion",
+      "enemies": 0,
+      "isles": 10,
+      "reinforce": 0,
+      "boss": false,
+      "ground": true
+    },
+    {
+      "idx": 22,
+      "name": "The Long Night",
+      "enemies": 10,
+      "isles": 5,
+      "reinforce": 1.4,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 23,
+      "name": "Hurricane Alley",
+      "enemies": 9,
+      "isles": 5,
+      "reinforce": 1.5,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 24,
+      "name": "Twin Leviathans",
+      "enemies": 10,
+      "isles": 6,
+      "reinforce": 1.5,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 25,
+      "name": "The Crucible",
+      "enemies": 11,
+      "isles": 6,
+      "reinforce": 1.6,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 26,
+      "name": "Steel Rain",
+      "enemies": 12,
+      "isles": 6,
+      "reinforce": 1.7,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 27,
+      "name": "Endless Horizon",
+      "enemies": 10,
+      "isles": 7,
+      "reinforce": 1.5,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 28,
+      "name": "The Final Blockade",
+      "enemies": 12,
+      "isles": 6,
+      "reinforce": 1.8,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 29,
+      "name": "Ragnarök Reef",
+      "enemies": 12,
+      "isles": 8,
+      "reinforce": 1.9,
+      "boss": true,
+      "ground": false
+    },
+    {
+      "idx": 30,
+      "name": "The Last Tide",
+      "enemies": 12,
+      "isles": 6,
+      "reinforce": 2,
+      "boss": true,
+      "ground": false
+    }
+  ]
+}
