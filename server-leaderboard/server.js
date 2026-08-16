@@ -353,7 +353,7 @@ async function handleFinish(req, res, ipHash) {
   });
 }
 
-function handleBoard(res, url) {
+function handleBoard(req, res, url) {
   const q = url.searchParams;
   const type = q.get('type') || 'theater';
   if (!['theater', 'war', 'career', 'mastery'].includes(type)) return json(res, 400, { error: 'bad-type' });
@@ -366,7 +366,12 @@ function handleBoard(res, url) {
 
   const window = q.get('window') === 'week' ? 'week' : 'all';
   const limit = Math.min(50, Math.max(1, Number(q.get('limit')) || 10));
-  const player = q.get('player') || '';
+
+  // The device id travels in a header, NEVER in the query string. Caddy logs full
+  // request URIs, so a `?player=` parameter would write this pseudonymous identifier
+  // into the access log next to the client IP — precisely the pairing that hashing the
+  // IP in our own database was meant to prevent.
+  const player = String(req.headers['x-it-player'] || '');
 
   const rows = runBoard(type, { map, diff, window });
   const me = rankOf(rows, player);
@@ -449,7 +454,10 @@ const server = http.createServer((req, res) => {
 
   if (DEV_CORS) {
     res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-IT-Sig, X-Admin-Token');
+    // Every custom header the client sends must be listed, or the browser's preflight
+    // rejects the request before it is ever made. Production is same-origin and never
+    // preflights, so a gap here only ever shows up in local development.
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-IT-Sig, X-IT-Player, X-Admin-Token');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   }
@@ -468,7 +476,7 @@ const server = http.createServer((req, res) => {
 
       if (req.method === 'GET' && url.pathname === '/board') {
         if (!rateLimit(`board:ip:${ipHash}`, 240, 300)) return json(res, 429, { error: 'rate' });
-        return handleBoard(res, url);
+        return handleBoard(req, res, url);
       }
       return json(res, 404, { error: 'not-found' });
     })

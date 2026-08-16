@@ -51,8 +51,8 @@ async function post(url, obj, headers) {
   return { status: res.status, json: await res.json().catch(() => null) };
 }
 
-async function get(url) {
-  const res = await fetch(base + url);
+async function get(url, player) {
+  const res = await fetch(base + url, { headers: player ? { 'X-IT-Player': player } : {} });
   return { status: res.status, json: await res.json().catch(() => null) };
 }
 
@@ -130,7 +130,7 @@ suite('a real run is accepted, scored on the server, and reaches the board', asy
   assert.equal(res.json.war_score, 40 + 6 + 15 + 100 + 50 + Math.round((400 - 300) / 400 * 100));
   assert.equal(res.json.ranks.theater.rank, 1);
 
-  const board = await get('/board?type=theater&map=0&diff=normal&player=' + PLAYER);
+  const board = await get('/board?type=theater&map=0&diff=normal', PLAYER);
   assert.equal(board.status, 200);
   assert.equal(board.json.rows.length, 1);
   assert.equal(board.json.rows[0].value, 300);
@@ -288,7 +288,7 @@ suite('a career score that does not add up is kept off the career board', async 
   assert.equal(row.career_ok, 0);
   assert.match(row.flags, /career-inconsistent/);
 
-  const board = await get('/board?type=career&player=' + p);
+  const board = await get('/board?type=career', p);
   assert.ok(!board.json.rows.some((r) => r.value === 1000000), 'the faked total is not on the board');
 });
 
@@ -345,7 +345,7 @@ suite('a practice run is recorded but never shown', async () => {
   assert.equal(res.json.counted, false);
   assert.equal(runBySession(s.session_id).status, 'practice');
 
-  const board = await get('/board?type=theater&map=0&diff=normal&player=' + p);
+  const board = await get('/board?type=theater&map=0&diff=normal', p);
   assert.equal(board.json.me, null, 'a practice run puts nobody on the board');
 });
 
@@ -355,14 +355,14 @@ suite('forget hides every run a device ever submitted', async () => {
   backdate(s.session_id, 400);
   await finish(s, goodRun(), { player: p });
 
-  let board = await get('/board?type=theater&map=0&diff=normal&player=' + p);
+  let board = await get('/board?type=theater&map=0&diff=normal', p);
   assert.ok(board.json.me, 'on the board first');
 
   const res = await post('/forget', { player_id: p });
   assert.equal(res.status, 200);
   assert.ok(res.json.hidden >= 1);
 
-  board = await get('/board?type=theater&map=0&diff=normal&player=' + p);
+  board = await get('/board?type=theater&map=0&diff=normal', p);
   assert.equal(board.json.me, null, 'gone afterwards');
 });
 
@@ -416,6 +416,43 @@ suite('oversized and malformed bodies are refused', async () => {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'not json',
   });
   assert.equal(junk.status, 400);
+});
+
+suite('the device id is read from a header and ignored in the query string', async () => {
+  const p = 'headeronly-0001';
+  const s = await startRun({ player: p });
+  backdate(s.session_id, 400);
+  await finish(s, goodRun({ duration_s: 111 }), { player: p });
+
+  // Sent the way the client sends it: identified.
+  const viaHeader = await get('/board?type=theater&map=0&diff=normal', p);
+  assert.ok(viaHeader.json.me, 'the header identifies the player');
+
+  // Sent the old way: NOT identified. Caddy logs full URIs, so if the server ever
+  // honoured this again the device id would start appearing in the access log beside
+  // the client IP — the exact pairing the hashed-IP design exists to avoid.
+  const viaQuery = await get('/board?type=theater&map=0&diff=normal&player=' + p);
+  assert.equal(viaQuery.json.me, null, 'a player id in the query string must not work');
+});
+
+suite('the best-battle board compares campaign fights only', async () => {
+  const p = 'modemix-0001';
+  // A sandbox run with a huge score...
+  const sb = await startRun({ player: p, mode: 'sandbox', map: -1 });
+  backdate(sb.session_id, 1200);
+  await finish(sb, goodRun({ duration_s: 1100, sunk: 40, planes: 20, islands: 6,
+    career: { sunk: 40, planes: 20, islands: 6, wins: 1, bosses: 0, score: 80 + 20 + 30 + 40 } }), { player: p });
+
+  // ...must not turn up ranked against campaign battles.
+  const board = await get('/board?type=war&diff=normal', p);
+  assert.equal(board.json.me, null, 'sandbox runs do not belong on the battle board');
+
+  // ...but the same player's campaign run does.
+  const camp = await startRun({ player: p, mode: 'campaign', map: 0 });
+  backdate(camp.session_id, 400);
+  await finish(camp, goodRun(), { player: p });
+  const after = await get('/board?type=war&diff=normal', p);
+  assert.ok(after.json.me, 'campaign runs are ranked');
 });
 
 suite('board queries reject junk parameters', async () => {

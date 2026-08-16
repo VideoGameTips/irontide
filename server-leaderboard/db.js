@@ -159,12 +159,16 @@ function prepare(db) {
       ORDER BY value ASC, r.created_at ASC
       LIMIT @limit
     `),
+    // Campaign only. A sandbox test range and a five-kill quick battle are not the same
+    // kind of fight as a campaign theater, and putting all three on one score board
+    // would rank them against each other as though they were. Those modes still count
+    // toward the career and mastery boards, which measure the player rather than a fight.
     boardWar: db.prepare(`
       SELECT r.player_id, p.callsign_a, p.callsign_b,
              MAX(r.war_score) AS value, r.map_idx, r.sunk, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
-      WHERE r.status = 'ok' AND p.banned = 0 AND r.difficulty = @diff
-        AND r.created_at >= @since
+      WHERE r.status = 'ok' AND p.banned = 0 AND r.mode = 'campaign'
+        AND r.difficulty = @diff AND r.created_at >= @since
       GROUP BY r.player_id
       ORDER BY value DESC, r.created_at ASC
       LIMIT @limit

@@ -11486,6 +11486,10 @@ async function lbFinishRun(win,mpMatch,durS){
 
 // Called at the end of endGame(), once every career counter has been updated.
 function lbAfterBattle(win,mpMatch,durS){
+  // #over is reused for every battle, so anything this feature added to the last one is
+  // still sitting there. Clear it first or the results screen accumulates a stack of
+  // stale rank lines and an already-answered consent box.
+  ['lbConsent','lbRankLine'].forEach(id=>{ const e=document.getElementById(id); if(e) e.remove(); });
   if(!LB.supported||mpMatch) return;
   if(MP.active||MP.everJoined) return;
   if(LB.consent===null){ lbShowConsent(); return; }     // first battle: ask, do not send
@@ -11533,7 +11537,8 @@ function lbShowResult(r){
   if(r.practice){ parts.length=0; parts.push(T('practice run — not ranked','练习局——不计入排行榜')); }
   if(!parts.length) return;
   const txt=document.getElementById('overText'); if(!txt) return;
-  const line=document.createElement('div');
+  const old=document.getElementById('lbRankLine'); if(old) old.remove();
+  const line=document.createElement('div'); line.id='lbRankLine';
   line.style.cssText='margin-top:10px;color:#ffd060;font-size:12px;letter-spacing:1px;text-align:center';
   line.innerHTML='🏆 '+parts.join(' &nbsp;·&nbsp; ')+
     ' &nbsp;<span id="lbOpenFromOver" style="cursor:pointer;color:#8fb8d8;border:1px solid #21384e;border-radius:20px;padding:3px 12px;font-size:11px">'+
@@ -11556,8 +11561,11 @@ function lbChip(on){
 }
 function lbPanel(){
   let o=document.getElementById('lbPanel');
-  if(o) return o;
-  o=document.createElement('div'); o.id='lbPanel';
+  // The chrome below is built with T() once. Cache it, but throw it away when the
+  // player has switched languages since — otherwise the title and the close button
+  // keep whichever language the panel happened to be created in.
+  if(o){ if(o.dataset.lang===I18N.lang) return o; o.remove(); }
+  o=document.createElement('div'); o.id='lbPanel'; o.dataset.lang=I18N.lang;
   o.style.cssText='display:none;position:fixed;inset:0;z-index:215;background:rgba(4,10,16,.92);align-items:center;justify-content:center;padding:20px;';
   o.innerHTML='<div style="max-width:720px;width:100%;max-height:88vh;overflow:auto;background:linear-gradient(180deg,#0e1a24,#0a121a);'+
       'border:1px solid #26425c;border-radius:14px;box-shadow:0 24px 90px rgba(0,0,0,.65);padding:22px 26px;">'+
@@ -11656,8 +11664,13 @@ function lbRenderFoot(){
     lbRender();
   };
 }
+let _lbRenderSeq=0;
 async function lbRender(){
   const o=document.getElementById('lbPanel'); if(!o) return;
+  // Clicking through the tabs fires overlapping requests, and they do not necessarily
+  // come back in order. Only the newest one is allowed to paint, or a slow reply for
+  // the career board lands under the theater tab the player has already switched to.
+  const seq=++_lbRenderSeq;
   lbRenderChrome(); lbRenderFoot();
   const body=o.querySelector('#lbBody');
   const v=LB.view;
@@ -11667,10 +11680,15 @@ async function lbRender(){
   try{
     const q=new URLSearchParams({ type:v.type, diff:v.diff, window:v.window, limit:'10' });
     if(v.type==='theater') q.set('map',String(v.map));
-    if(LB.consent===true&&LB.id) q.set('player',LB.id);
-    const res=await fetch(lbBase()+'/board?'+q.toString());
+    // The device id goes in a header, not the query string: the reverse proxy logs whole
+    // URIs, and this id next to a client IP in an access log is exactly what we promised
+    // not to keep.
+    const h={};
+    if(LB.consent===true&&LB.id) h['X-IT-Player']=LB.id;
+    const res=await fetch(lbBase()+'/board?'+q.toString(),{headers:h});
     if(res.ok) data=await res.json();
   }catch(e){ /* handled below */ }
+  if(seq!==_lbRenderSeq) return;              // a newer view is already on screen
 
   if(!data){
     // Offline is the normal case for this game — it is installable and plays with no
