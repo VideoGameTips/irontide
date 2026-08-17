@@ -144,11 +144,17 @@ sudo systemctl restart irontide-leaderboard
 
 ### 备份
 
-每天 04:17 由 cron 跑 `sqlite3 .backup`，保留 14 份：
+两个库各有一份每日在线备份，都用 `sqlite3 .backup`（**不能用 cp 复制活着的 SQLite**，
+WAL 里的数据会漏），备完跑 `PRAGMA integrity_check`，校验失败就改名成 `.CORRUPT`
+而不是假装成功。各保留 14 份。
 
 ```bash
-/usr/local/bin/irontide-lb-backup.sh      # 备份到 /var/backups/irontide-leaderboard/
+/usr/local/bin/irontide-leaderboard-backup.sh   # 排行榜库，cron 每天 04:31
+/usr/local/bin/sushigamelab-api-backup.sh       # 账号库，  cron 每天 04:23
 ```
+
+⚠️ **两份都只在这台 VPS 上，挡不住磁盘损坏。异地副本还没做。**
+这里存的是孩子们的成绩和最佳时间——丢了没有任何办法重算出来。
 
 ---
 
