@@ -5427,10 +5427,8 @@ function buildCampaignPicker(){
   box.appendChild(sr);
   renderDiffRow(); renderSettingsRow();
   // --- sandbox battlefields (always unlocked, never advance the campaign) ---
-  const sbh=document.createElement('div'); sbh.textContent=T('SANDBOX BATTLEFIELDS — ALWAYS UNLOCKED','沙盒战场——永久解锁');
-  sbh.style.cssText='width:100%;text-align:center;color:#ffd060;font-size:12px;letter-spacing:3px;margin:14px 0 8px;';
-  box.appendChild(sbh);
-  const sbRow=document.createElement('div'); sbRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;';
+  const sbRow=menuSection(box, T('SANDBOX BATTLEFIELDS — ALWAYS UNLOCKED','沙盒战场——永久解锁'), '#ffd060',
+    SANDBOX_MAPS.length+T(' arenas',' 张地图'), 'sandbox', 'display:flex;flex-wrap:wrap;gap:10px;justify-content:center;').row;
   // training ground first in the picker, everything else in declaration order
   SANDBOX_MAPS.map((M,i)=>({M,i})).sort((a,b)=>(b.M.training?1:0)-(a.M.training?1:0))
     .forEach(({M,i})=>{ const sel=i===currentSandboxIdx;
@@ -5449,13 +5447,10 @@ function buildCampaignPicker(){
 
     sbRow.appendChild(c);
   });
-  box.appendChild(sbRow);
   // --- campaign market: permanent blueprints bought with meta-credits ---
-  const mh=document.createElement('div');
-  mh.style.cssText='width:100%;text-align:center;color:#c7a8ff;font-size:12px;letter-spacing:3px;margin:14px 0 8px;';
-  mh.textContent=T('CAMPAIGN MARKET — PERMANENT BLUEPRINTS · BANK ◈','战役市场——永久蓝图 · 信用 ◈')+(career.credits||0);
-  box.appendChild(mh);
-  const mRow=document.createElement('div'); mRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;';
+  const mRow=menuSection(box, T('CAMPAIGN MARKET — PERMANENT BLUEPRINTS · BANK ◈','战役市场——永久蓝图 · 信用 ◈')+(career.credits||0), '#c7a8ff',
+    (career.credits||0)>0 ? MARKET_CATALOG.length+T(' blueprints',' 件蓝图')
+                          : T('earn credits by winning a theater','打完战区赚信用后解锁'), 'market', 'display:flex;flex-wrap:wrap;gap:10px;justify-content:center;').row;
   MARKET_CATALOG.forEach(item=>{
     const def=marketDef(item), key=marketKey(item.cat,item.id), owned=ownsMarketItem(item.cat,item.id), unlocked=mapsUnlocked()>=unlockLevel(item.level);
     const c=document.createElement('div');
@@ -5468,7 +5463,39 @@ function buildCampaignPicker(){
     if(unlocked&&!owned)c.onclick=()=>buyCampaignMarketItem(key);
     mRow.appendChild(c);
   });
-  box.appendChild(mRow);
+}
+// A collapsible block in the main menu.
+//
+// The menu was 2132px — 2.7 screens — and half of that was the campaign market: fifty
+// blueprints a brand-new captain has ◈0 credits for and cannot buy one of, sitting
+// between "pick a difficulty" and "pick your ship". Everything a first-time player needs
+// is now above the fold; the rest is one line each until they have a reason to open it.
+//
+// Auto-collapsed only while the section is genuinely useless (no credits, or no battles
+// fought yet). Once opened by hand it stays open for the session, because re-rendering
+// the picker on every difficulty click must not keep snapping it shut.
+let menuOpenSections={};
+function menuSection(box, title, colour, hint, key, rowCss){
+  const auto = key==='market' ? (career.credits||0)>0
+             : key==='sandbox' ? (career.wins+career.losses)>0 || currentSandboxIdx>=0
+             : true;
+  const open = menuOpenSections[key]!==undefined ? menuOpenSections[key] : auto;
+
+  const head=document.createElement('div');
+  head.style.cssText='width:100%;text-align:center;color:'+colour+';font-size:12px;letter-spacing:3px;'+
+    'margin:14px 0 8px;cursor:pointer;user-select:none;';
+  head.innerHTML=title+' <span style="opacity:.75">'+(open?'▴':'▾')+'</span>'+
+    (open?'':'<div style="letter-spacing:1px;font-size:10px;color:#7d8a97;margin-top:3px">'+hint+'</div>');
+  box.appendChild(head);
+
+  // The row's styling is set here rather than by the caller: assigning cssText after the
+  // fact would wipe the display:none that keeps the section shut.
+  const row=document.createElement('div');
+  row.style.cssText=(rowCss||'')+(open?'':';display:none');
+  box.appendChild(row);
+
+  head.onclick=()=>{ menuOpenSections[key]=!open; sfxClick(); buildCampaignPicker(); };
+  return { head, row };
 }
 function renderDiffRow(){
   const dr=document.getElementById('diffRow'); if(!dr) return;
@@ -5872,7 +5899,12 @@ function buildMenu(){
         <div class="row"><span>${T('Hull','船体')}</span>${bar(s.hp,700)}</div>
         <div class="row"><span>${T('Size','尺寸')}</span>${bar(s.len,100)}</div>
         <div class="row"><span>${T('Mounts','炮位')}</span>${bar(s.mounts,15)}</div>
-      </div>`;
+      </div>
+      ${career.wins+career.losses===0?`<div style="margin-top:9px;text-align:center;color:#7fd0a0;font-size:11px;letter-spacing:1px">${T('⚓ CLICK TO SET SAIL','⚓ 点这张卡就出击')}</div>`:''}`;
+    // Clicking a card starts the battle immediately — no separate launch button, because
+    // the fastest way in is one click. It just has to SAY so: without the line above, a
+    // first-time captain reads three cards as things to compare and starts three wars
+    // finding out. Shown only until they have played once; after that it is noise.
     div.onclick=()=>chooseShip(id);
     wrap.appendChild(div);
   });
