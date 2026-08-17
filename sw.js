@@ -3,7 +3,7 @@
 // UPDATE CONVENTION: this is a single-file game with no build step, so whenever
 // index.html or any vendored script changes, bump the version suffix below —
 // the old cache is deleted on activate and clients pick up the new one.
-const CACHE = 'irontide-v86';
+const CACHE = 'irontide-v87';
 const ASSETS = [
   './',
   'manifest.json',
@@ -37,9 +37,13 @@ self.addEventListener('fetch', e => {
   const u = new URL(e.request.url);
   // the multiplayer relay is live data — never serve it from cache
   if (u.pathname.endsWith('/play') || u.pathname.endsWith('/servers') || u.pathname.endsWith('/health')) return;
-  // ...and neither are the leaderboard standings. Without this, cache-first would hand
-  // the player yesterday's board and never correct it.
+  // ...and neither are the leaderboard standings or the account state. Both APIs live at
+  // the SITE root while this worker is registered at /irontide/, so its scope does not
+  // currently reach them and these two lines change nothing today. They are here for the
+  // day the game is served from somewhere else: cache-first on /auth/me would remember
+  // that you were signed in long after you signed out, and the boards would be yesterday's.
   if (u.pathname.includes('/irontide-api/')) return;
+  if (u.pathname.includes('/sushi-api/')) return;
   e.respondWith(
     caches.match(e.request, { ignoreSearch: true }).then(hit => {
       const net = fetch(e.request).then(res => {

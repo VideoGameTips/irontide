@@ -8,12 +8,15 @@ Full design and operations notes: [`../docs/LEADERBOARD.md`](../docs/LEADERBOARD
 
 ```bash
 npm install
-DEV_CORS=1 ADMIN_TOKEN=devtoken npm start
+ADMIN_TOKEN=devtoken npm start
+node ../tools/dev-proxy.js          # in another terminal
 ```
 
-`DEV_CORS=1` is only needed when the game is served from a different port than this
-service (the usual local setup: game on `:3000`, this on `:7781`). In production both
-sit behind the same hostname and no CORS headers are involved.
+Then play at <http://localhost:8080/irontide/>. Go through the proxy rather than
+hitting :7781 directly — everything is same-origin in production, the accounts
+service refuses cross-site POSTs, and a local setup that differs from the server
+is a local setup that cannot reproduce its bugs. There is deliberately no CORS
+handling here at all.
 
 ## Endpoints
 
