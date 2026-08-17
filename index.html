@@ -11395,14 +11395,68 @@ const LB_CLIENT_VER='lb1';
 let lbOpen=false;
 let LB={ id:null, callsign:null, consent:null, session:null, practice:false, supported:false,
          busy:false, lastRanks:null,
+         // Sushi ID is the site-wide account service. Signing in is entirely optional:
+         // an anonymous captain gets every board in this game. What an account adds is a
+         // name that survives clearing the browser, and a place on the site-wide board
+         // across all nine games — nothing here is gated behind it.
+         sushi:{ user:null, csrf:'', run:null },
          view:{ type:'theater', diff:'easy', map:0, window:'all' } };
 
-function lbBase(){
-  // Same origin in production (Caddy proxies /irontide-api to the service); the dev
-  // server runs on its own port, mirroring what defaultRelayUrl() does for multiplayer.
-  try{ if(location.hostname==='localhost'||location.hostname==='127.0.0.1') return 'http://127.0.0.1:7781'; }catch(e){}
-  return '/irontide-api';
+function lbSushiBase(){ return '/sushi-api'; }
+
+// Who is signed in, if anyone. Silent on every failure: no accounts service, no network,
+// or simply signed out all land in the same place — play anonymously.
+async function lbSushiMe(){
+  if(!LB.supported) return null;
+  try{
+    const res=await fetch(lbSushiBase()+'/auth/me',{credentials:'same-origin'});
+    if(!res.ok) return null;
+    const d=await res.json();
+    LB.sushi.user=d.user||null; LB.sushi.csrf=d.csrfToken||'';
+    return LB.sushi.user;
+  }catch(e){ LB.sushi.user=null; return null; }
 }
+
+// Open a ranked run on the site-wide board. Only the campaign score is published there:
+// the site board holds one number per game, and a theatre time is not comparable across
+// theatres — the fastest run on the smallest map would win it forever.
+async function lbSushiStartRun(){
+  LB.sushi.run=null;
+  if(!LB.sushi.user||!LB.sushi.csrf) return null;
+  try{
+    const res=await fetch(lbSushiBase()+'/runs/start',{
+      method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':LB.sushi.csrf},
+      body:JSON.stringify({ gameSlug:'irontide', modeSlug:'campaign', clientVersion:LB_CLIENT_VER }) });
+    if(!res.ok) return null;
+    LB.sushi.run=await res.json();
+    return LB.sushi.run;
+  }catch(e){ return null; }
+}
+
+// Hand the site board the score our own server computed, together with the signature it
+// produced. We never hold that key, so the worst a modified client can do here is post a
+// score that stays labelled 'community'.
+async function lbSushiFinish(att){
+  const run=LB.sushi.run; LB.sushi.run=null;
+  if(!run||!att||!LB.sushi.csrf) return null;
+  try{
+    const res=await fetch(lbSushiBase()+'/runs/'+encodeURIComponent(run.runId)+'/finish',{
+      method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json','X-CSRF-Token':LB.sushi.csrf},
+      body:JSON.stringify({ runToken:run.runToken, value:att.value, metadata:{ attestation:att.attestation } }) });
+    if(!res.ok) return null;
+    return await res.json();
+  }catch(e){ return null; }
+}
+
+// Both services are same-origin, in production and in development alike: Caddy routes
+// them on the server, tools/dev-proxy.js routes them locally. This used to carry a
+// localhost special case pointing straight at the service port, which made local runs
+// cross-origin — and cross-origin is exactly what the accounts service refuses. Keeping
+// one shape everywhere is what lets the same cookie, CSRF and origin logic be exercised
+// locally instead of only discovered in production.
+function lbBase(){ return '/irontide-api'; }
 function lbSupported(){
   try{ return !!(window.fetch && window.crypto && crypto.subtle && crypto.subtle.importKey && window.TextEncoder); }
   catch(e){ return false; }
@@ -11449,14 +11503,22 @@ async function lbSign(nonce,bodyStr){
 // Opens a war. Fire-and-forget: if the handshake never lands there is simply no
 // session at the end and nothing gets submitted.
 async function lbStartRun(){
-  LB.session=null; LB.practice=false;
+  LB.session=null; LB.practice=false; LB.sushi.run=null;
   if(!LB.supported||LB.consent!==true) return;
   if(MP.active||MP.everJoined) return;                 // a shared arena is not the campaign
   const mode=lbMode();
+
+  // If an account is signed in, open a run on the site-wide board first and hand its id
+  // to our own server, which resolves who owns it rather than believing this page. Only
+  // campaign wars are published there; a sandbox or quick battle is this game's business.
+  await lbSushiMe();
+  const sushiRun = mode==='campaign' ? await lbSushiStartRun() : null;
+
   try{
     const res=await fetch(lbBase()+'/run/start',{ method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ player_id:LB.id, callsign:LB.callsign, mode,
-        map_idx: mode==='campaign'?currentMapIdx:-1, difficulty }) });
+        map_idx: mode==='campaign'?currentMapIdx:-1, difficulty,
+        sushi_run_id: sushiRun ? sushiRun.runId : undefined }) });
     if(res.ok) LB.session=await res.json();
   }catch(e){ /* offline — play on */ }
 }
@@ -11466,7 +11528,10 @@ async function lbStartRun(){
 async function lbFinishRun(win,mpMatch,durS){
   const sess=LB.session; LB.session=null;
   if(!LB.supported||mpMatch||!sess) return null;
-  const body={ session_id:sess.session_id, player_id:LB.id,
+  // The identity the handshake settled on, which is 'sushi:<account>' when signing in
+  // was honoured and our own local id otherwise. Echo it back rather than re-asserting
+  // what this page thinks it is.
+  const body={ session_id:sess.session_id, player_id:sess.player_id||LB.id,
     won:!!win, duration_s:Math.max(0,Math.round(durS)),
     sunk:sunk|0, planes:sessPlanes|0, islands:sessIslands|0, bosses:sessBosses|0,
     ships_lost:shipsLostThisWar|0,
@@ -11494,7 +11559,13 @@ function lbAfterBattle(win,mpMatch,durS){
   if(MP.active||MP.everJoined) return;
   if(LB.consent===null){ lbShowConsent(); return; }     // first battle: ask, do not send
   if(LB.consent!==true) return;
-  lbFinishRun(win,mpMatch,durS).then(r=>{ if(r) lbShowResult(r); });
+  lbFinishRun(win,mpMatch,durS).then(async r=>{
+    if(!r) return;
+    // Relay the signature to the site-wide board. Only ever present on a run that passed
+    // our own checks, so a practice or flagged war simply never gets this far.
+    const site = r.sushi ? await lbSushiFinish(r.sushi) : null;
+    lbShowResult(r, site);
+  });
 }
 
 // ---- the one-time question, asked on the results screen -------------------------
@@ -11526,13 +11597,18 @@ function lbShowConsent(){
 }
 
 // ---- "you placed 3rd" on the results screen -------------------------------------
-function lbShowResult(r){
+function lbShowResult(r,site){
   if(!r||!r.ranks) return;
   const parts=[];
   const label={ theater:T('theater speedrun','战区速通'), war:T('best battle','单场战功'),
                 career:T('career','生涯总分'), mastery:T('mastery','精通') };
   for(const k of ['theater','war','career','mastery']){
     const v=r.ranks[k]; if(v&&v.rank) parts.push(T('#'+v.rank+' '+label[k],'第 '+v.rank+' 名 · '+label[k]));
+  }
+  if(site&&site.accepted){
+    parts.push(site.verification==='verified'
+      ? T('✔ verified on the Sushi Game Lab board','✔ 已计入寿司游戏实验室全站榜（已验证）')
+      : T('posted to the Sushi Game Lab board','已发到寿司游戏实验室全站榜'));
   }
   if(r.practice){ parts.length=0; parts.push(T('practice run — not ranked','练习局——不计入排行榜')); }
   if(!parts.length) return;
@@ -11647,12 +11723,27 @@ function lbRenderFoot(){
     return;
   }
 
+  // Signed in: say so, and stop offering the anonymous callsign controls that no longer
+  // apply. Signed out: mention the account once, as an extra rather than a requirement —
+  // every board in this game already works without one.
+  if(LB.sushi.user){
+    foot.innerHTML='<div>'+T('You sail as <b style="color:#cfe0ee">⚓ '+LB.sushi.user.displayName+'</b> — a Sushi Game Lab account, so this name follows you to any device, and your campaign scores also reach the site-wide board.',
+        '你的名字：<b style="color:#cfe0ee">⚓ '+LB.sushi.user.displayName+'</b>——寿司游戏实验室账号，换设备也还是你，战役成绩还会进全站榜。')+'</div>'+
+      '<div style="margin-top:9px;color:#55697d">'+
+        T('Stored: your account id and battle results. Your login name is never shown on any board.',
+          '存下来的东西：账号 id 和战斗成绩。登录用的名字永远不会出现在任何榜上。')+'</div>';
+    return;
+  }
+
   foot.innerHTML='<div>'+T('You sail as <b style="color:#cfe0ee">'+lbMyName()+'</b>','你的呼号：<b style="color:#cfe0ee">'+lbMyName()+'</b>')+'</div>'+
     '<div style="margin-top:8px"><span id="lbRoll" style="'+lbChip(false)+'">'+T('NEW CALLSIGN','换个呼号')+'</span>'+
     '<span id="lbForget" style="'+lbChip(false)+'">'+T('TAKE ME OFF THE BOARD','把我从榜上撤下来')+'</span></div>'+
     '<div style="margin-top:9px;color:#55697d">'+
       T('Stored: a random id made on this device, your callsign, and battle results. No account, no email, no real name. Clearing this browser\'s data starts a new captain.',
-        '存下来的东西：这台设备上随机生成的一个 id、你的呼号、战斗成绩。没有账号，没有邮箱，没有真名。清掉浏览器数据就换成一个新舰长。')+'</div>';
+        '存下来的东西：这台设备上随机生成的一个 id、你的呼号、战斗成绩。没有账号，没有邮箱，没有真名。清掉浏览器数据就换成一个新舰长。')+'</div>'+
+    '<div style="margin-top:7px;color:#55697d">'+
+      T('Every board here works exactly like this, with no account. A <a href="/" style="color:#8fb8d8">Sushi Game Lab account</a> is optional — it keeps your name across devices and puts your campaign scores on the site-wide board too.',
+        '这里所有的榜，不登录也是这样用，功能一点不少。<a href="/" style="color:#8fb8d8">寿司游戏实验室账号</a>是可选的——换设备名字还在，战役成绩还会进全站榜。')+'</div>';
   foot.querySelector('#lbRoll').onclick=()=>{ lbReroll(); sfxClick(); lbRender(); };
   foot.querySelector('#lbForget').onclick=async()=>{
     sfxClick();
@@ -11716,8 +11807,12 @@ async function lbRender(){
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 11px;margin-bottom:4px;border-radius:8px;'+
       (me?'background:rgba(255,208,96,.09);border:1px solid #4e3f21':'background:rgba(255,255,255,0.02);border:1px solid #16283a')+'">'+
       '<span style="width:38px;color:'+(me?'#ffd060':'#6b7d92')+';font-size:12px">'+(medal||('#'+r.rank))+'</span>'+
-      '<span style="flex:1;color:'+(me?'#ffd060':'#cfe0ee')+';font-size:12px">'+callsignText(r.a,r.b,isZh())+
-        '<span style="color:#55697d"> #'+r.tag+'</span></span>'+
+      // A signed-in captain shows the name the whole site knows them by; an anonymous one
+      // is rendered from the wordlist in the player's own language. Neither is "better" —
+      // the anchor just marks which names carry across devices.
+      '<span style="flex:1;color:'+(me?'#ffd060':'#cfe0ee')+';font-size:12px">'+
+        (r.name ? ('<span title="'+trText('Sushi ID account')+'">⚓ </span>'+r.name)
+                : (callsignText(r.a,r.b,isZh())+'<span style="color:#55697d"> #'+r.tag+'</span>'))+'</span>'+
       '<span style="color:#9fc6e8;font-size:12px;min-width:52px;text-align:right">'+val+'</span>'+
       '<span style="color:#6b7d92;font-size:10px;min-width:96px;text-align:right">'+extra+'</span>'+
     '</div>';

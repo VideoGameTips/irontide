@@ -45,7 +45,6 @@ const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const IP_SALT = process.env.IP_SALT || 'dev-only-salt-change-me';
 const WEEK_TZ_OFFSET_MIN = Number(process.env.WEEK_TZ_OFFSET_MIN || -480);  // Pacific
 const IP_RETENTION_DAYS = Number(process.env.IP_RETENTION_DAYS || 30);
-const DEV_CORS = process.env.DEV_CORS === '1';
 
 // Sushi ID, the site-wide account service. Optional: with these unset the leaderboard
 // runs exactly as it did before — anonymous captains only, no site-wide board.
@@ -524,15 +523,11 @@ const server = http.createServer((req, res) => {
   // URLs work whether you go through the proxy or hit the port directly.
   if (url.pathname.startsWith(API_PREFIX)) url.pathname = url.pathname.slice(API_PREFIX.length) || '/';
 
-  if (DEV_CORS) {
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    // Every custom header the client sends must be listed, or the browser's preflight
-    // rejects the request before it is ever made. Production is same-origin and never
-    // preflights, so a gap here only ever shows up in local development.
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-IT-Sig, X-IT-Player, X-Admin-Token');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-  }
+  // No CORS handling, deliberately. Everything reaches this service same-origin —
+  // through Caddy in production, through tools/dev-proxy.js locally — so there is no
+  // preflight to satisfy and no allow-list to fall behind. The previous dev-only
+  // allow-list had already gone stale once, silently breaking local work while
+  // production was fine, which is the whole argument for not having one.
 
   const ipHash = hashIp(clientIp(req));
 
