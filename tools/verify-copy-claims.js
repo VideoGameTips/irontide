@@ -36,7 +36,10 @@ const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
       starRatings: /career\.theaters/.test(src) && /stars/.test(src),
       contentFilter: typeof contentFilterOn === 'function',
       // features the copy must NOT claim
-      leaderboard: /highScore|high[- ]score|leaderboard|scoreboard/i.test(src),
+      // Was a "must NOT exist" guard while docs/DIRECTION.md ruled online boards out.
+      // The board shipped 2026-08-17, so this now asserts the opposite: if the feature
+      // is ever pulled, the promo copy that promises it has to change with it.
+      leaderboard: /function openLeaderboard\s*\(/.test(src) && /id="lbPanel"|'lbPanel'/.test(src),
       // one bad keybind in a "tips" comment is worse than a wrong number
       shopIsTab: /e\.code==='Tab'[^\n]*toggleShop/.test(src),
       placeIsF: /e\.code==='KeyF'\) tryPlace/.test(src),
@@ -61,7 +64,7 @@ const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
     ['quick battle exists',             g.quickBattle,            g.quickBattle],
     ['per-theater star ratings exist',  g.starRatings,            g.starRatings],
     ['kid-safe content toggle exists',  g.contentFilter,          g.contentFilter],
-    ['NO leaderboard (copy must not claim one)', !g.leaderboard,  g.leaderboard ? 'found one — copy may now claim it' : 'absent'],
+    ['leaderboard exists',              g.leaderboard,            g.leaderboard ? 'present' : 'gone — copy must stop claiming one'],
     ['Tab opens the shop',              g.shopIsTab,              g.shopIsTab],
     ['F places a bought gun',           g.placeIsF,               g.placeIsF],
     ['E mans a gun',                    g.manIsE,                 g.manIsE],

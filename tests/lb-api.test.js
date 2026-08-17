@@ -12,6 +12,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const http = require('node:http');
 
 // better-sqlite3 is a native module installed under server-leaderboard/. A fresh clone
 // that has not run `npm install` there should skip rather than fail the whole suite.
@@ -31,8 +32,10 @@ const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'it-lb-test-'));
 process.env.DATA_DIR = DATA_DIR;
 process.env.ADMIN_TOKEN = 'test-token';
 process.env.IP_SALT = 'test-salt';
+process.env.SUSHI_SERVICE_TOKEN = 'test-service-token';
 
 let srv, db, S, base;
+let sushiStub, sushiRuns = new Map();
 
 const CLIENT_VER = 'test';
 const PLAYER = 'test-player-0001';
@@ -51,8 +54,8 @@ async function post(url, obj, headers) {
   return { status: res.status, json: await res.json().catch(() => null) };
 }
 
-async function get(url) {
-  const res = await fetch(base + url);
+async function get(url, player) {
+  const res = await fetch(base + url, { headers: player ? { 'X-IT-Player': player } : {} });
   return { status: res.status, json: await res.json().catch(() => null) };
 }
 
@@ -105,6 +108,20 @@ function runBySession(sid) {
 
 test.before(async () => {
   if (!available) return;
+
+  // A stand-in for Sushi ID. The scoring server resolves run ownership over HTTP, so the
+  // only honest way to test that path is to answer it — and starting the stub BEFORE
+  // requiring the server matters: SUSHI_API_BASE is read once at module load.
+  sushiStub = http.createServer((req, res) => {
+    const id = decodeURIComponent(req.url.split('/').pop());
+    if (req.headers['x-service-token'] !== 'test-service-token') { res.writeHead(404); return res.end('{}'); }
+    const run = sushiRuns.get(id);
+    res.writeHead(run ? 200 : 404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(run || { error: 'not found' }));
+  });
+  await new Promise((r) => sushiStub.listen(0, '127.0.0.1', r));
+  process.env.SUSHI_API_BASE = `http://127.0.0.1:${sushiStub.address().port}/sushi-api`;
+
   const mod = require('../server-leaderboard/server.js');
   srv = mod.server; db = mod.db; S = mod.S;
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
@@ -112,6 +129,7 @@ test.before(async () => {
 });
 
 test.after(() => {
+  if (sushiStub) sushiStub.close();
   if (srv) srv.close();
   if (db) db.close();
   fs.rmSync(DATA_DIR, { recursive: true, force: true });
@@ -130,7 +148,7 @@ suite('a real run is accepted, scored on the server, and reaches the board', asy
   assert.equal(res.json.war_score, 40 + 6 + 15 + 100 + 50 + Math.round((400 - 300) / 400 * 100));
   assert.equal(res.json.ranks.theater.rank, 1);
 
-  const board = await get('/board?type=theater&map=0&diff=normal&player=' + PLAYER);
+  const board = await get('/board?type=theater&map=0&diff=normal', PLAYER);
   assert.equal(board.status, 200);
   assert.equal(board.json.rows.length, 1);
   assert.equal(board.json.rows[0].value, 300);
@@ -288,7 +306,7 @@ suite('a career score that does not add up is kept off the career board', async 
   assert.equal(row.career_ok, 0);
   assert.match(row.flags, /career-inconsistent/);
 
-  const board = await get('/board?type=career&player=' + p);
+  const board = await get('/board?type=career', p);
   assert.ok(!board.json.rows.some((r) => r.value === 1000000), 'the faked total is not on the board');
 });
 
@@ -345,7 +363,7 @@ suite('a practice run is recorded but never shown', async () => {
   assert.equal(res.json.counted, false);
   assert.equal(runBySession(s.session_id).status, 'practice');
 
-  const board = await get('/board?type=theater&map=0&diff=normal&player=' + p);
+  const board = await get('/board?type=theater&map=0&diff=normal', p);
   assert.equal(board.json.me, null, 'a practice run puts nobody on the board');
 });
 
@@ -355,14 +373,14 @@ suite('forget hides every run a device ever submitted', async () => {
   backdate(s.session_id, 400);
   await finish(s, goodRun(), { player: p });
 
-  let board = await get('/board?type=theater&map=0&diff=normal&player=' + p);
+  let board = await get('/board?type=theater&map=0&diff=normal', p);
   assert.ok(board.json.me, 'on the board first');
 
   const res = await post('/forget', { player_id: p });
   assert.equal(res.status, 200);
   assert.ok(res.json.hidden >= 1);
 
-  board = await get('/board?type=theater&map=0&diff=normal&player=' + p);
+  board = await get('/board?type=theater&map=0&diff=normal', p);
   assert.equal(board.json.me, null, 'gone afterwards');
 });
 
@@ -418,8 +436,144 @@ suite('oversized and malformed bodies are refused', async () => {
   assert.equal(junk.status, 400);
 });
 
+suite('the device id is read from a header and ignored in the query string', async () => {
+  const p = 'headeronly-0001';
+  const s = await startRun({ player: p });
+  backdate(s.session_id, 400);
+  await finish(s, goodRun({ duration_s: 111 }), { player: p });
+
+  // Sent the way the client sends it: identified.
+  const viaHeader = await get('/board?type=theater&map=0&diff=normal', p);
+  assert.ok(viaHeader.json.me, 'the header identifies the player');
+
+  // Sent the old way: NOT identified. Caddy logs full URIs, so if the server ever
+  // honoured this again the device id would start appearing in the access log beside
+  // the client IP — the exact pairing the hashed-IP design exists to avoid.
+  const viaQuery = await get('/board?type=theater&map=0&diff=normal&player=' + p);
+  assert.equal(viaQuery.json.me, null, 'a player id in the query string must not work');
+});
+
+suite('the best-battle board compares campaign fights only', async () => {
+  const p = 'modemix-0001';
+  // A sandbox run with a huge score...
+  const sb = await startRun({ player: p, mode: 'sandbox', map: -1 });
+  backdate(sb.session_id, 1200);
+  await finish(sb, goodRun({ duration_s: 1100, sunk: 40, planes: 20, islands: 6,
+    career: { sunk: 40, planes: 20, islands: 6, wins: 1, bosses: 0, score: 80 + 20 + 30 + 40 } }), { player: p });
+
+  // ...must not turn up ranked against campaign battles.
+  const board = await get('/board?type=war&diff=normal', p);
+  assert.equal(board.json.me, null, 'sandbox runs do not belong on the battle board');
+
+  // ...but the same player's campaign run does.
+  const camp = await startRun({ player: p, mode: 'campaign', map: 0 });
+  backdate(camp.session_id, 400);
+  await finish(camp, goodRun(), { player: p });
+  const after = await get('/board?type=war&diff=normal', p);
+  assert.ok(after.json.me, 'campaign runs are ranked');
+});
+
 suite('board queries reject junk parameters', async () => {
   assert.equal((await get('/board?type=nope')).status, 400);
   assert.equal((await get('/board?type=theater&map=999&diff=normal')).status, 400);
   assert.equal((await get('/board?type=war&diff=impossible')).status, 400);
+});
+
+// ---- the two tiers -----------------------------------------------------------------
+//
+// Anonymous play stays first-class: a nine year old should be able to see their own time
+// on a board without holding a password. Signing in adds a durable name and a route to
+// the site-wide board — it is not the price of entry.
+
+async function startSignedIn(sushiRunId, opts = {}) {
+  sushiRuns.set(sushiRunId, {
+    runId: sushiRunId, gameSlug: 'irontide', modeSlug: opts.mode || 'campaign',
+    status: 'open', userId: opts.userId || 'acct-1', displayName: opts.displayName || 'Cosmic Turtle 78485',
+    disabled: !!opts.disabled,
+  });
+  return post('/run/start', {
+    player_id: opts.player || 'anon-device-9999', callsign: { a: 0, b: 0 },
+    mode: 'campaign', map_idx: 0, difficulty: 'normal', sushi_run_id: sushiRunId,
+  });
+}
+
+suite('signing in replaces the anonymous identity, and the board shows that name', async () => {
+  const r = await startSignedIn('sushi-run-A', { userId: 'acct-A', displayName: 'Iron Otter 00123' });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.signed_in, true);
+  assert.equal(r.json.player_id, 'sushi:acct-A', 'identity comes from Sushi ID, not the browser');
+
+  backdate(r.json.session_id, 400);
+  const done = await finish(r.json, goodRun(), { player: 'sushi:acct-A' });
+  assert.equal(done.status, 200);
+  assert.equal(done.json.counted, true);
+
+  const board = await get('/board?type=theater&map=0&diff=normal', 'sushi:acct-A');
+  const mine = board.json.rows.find((row) => row.name === 'Iron Otter 00123');
+  assert.ok(mine, 'the Sushi ID display name is what appears');
+  assert.equal(mine.signedIn, true);
+});
+
+suite('an unknown or disabled Sushi run falls back to anonymous rather than failing', async () => {
+  // Sushi ID does not know this run — the war must still be playable and rankable.
+  const unknown = await post('/run/start', {
+    player_id: 'anon-fallback-01', callsign: { a: 1, b: 1 },
+    mode: 'campaign', map_idx: 0, difficulty: 'normal', sushi_run_id: 'never-issued',
+  });
+  assert.equal(unknown.status, 200);
+  assert.equal(unknown.json.signed_in, false);
+  assert.equal(unknown.json.player_id, 'anon-fallback-01');
+
+  // A disabled account is not honoured either, and also does not break the war.
+  const banned = await startSignedIn('sushi-run-banned', { player: 'anon-fallback-02', userId: 'acct-B', disabled: true });
+  assert.equal(banned.json.signed_in, false);
+  assert.equal(banned.json.player_id, 'anon-fallback-02');
+});
+
+suite('an anonymous captain still reaches the board with no account at all', async () => {
+  const r = await post('/run/start', {
+    player_id: 'anon-pure-0001', callsign: { a: 2, b: 3 },
+    mode: 'campaign', map_idx: 0, difficulty: 'normal',
+  });
+  assert.equal(r.json.signed_in, false);
+  backdate(r.json.session_id, 400);
+  const done = await finish(r.json, goodRun(), { player: 'anon-pure-0001' });
+  assert.equal(done.json.counted, true);
+  assert.equal(done.json.sushi, null, 'nothing to attest without an account');
+
+  const board = await get('/board?type=theater&map=0&diff=normal', 'anon-pure-0001');
+  assert.ok(board.json.me, 'ranked all the same');
+  assert.equal(board.json.me.signedIn, false);
+  assert.equal(board.json.me.name, null, 'rendered from the wordlist instead');
+});
+
+suite('the attestation this server produces is the one Sushi ID would accept', async () => {
+  // The signature is built independently on both sides. If the two constructions ever
+  // drift, nothing throws — scores just silently stay 'community' forever. So compute it
+  // the way Sushi ID's security.js does and require the bytes to match.
+  const r = await startSignedIn('sushi-run-C', { userId: 'acct-C' });
+  backdate(r.json.session_id, 400);
+  const done = await finish(r.json, goodRun(), { player: 'sushi:acct-C' });
+
+  assert.ok(done.json.sushi, 'a signed-in run comes back with something to relay');
+  assert.equal(done.json.sushi.run_id, 'sushi-run-C');
+  assert.equal(done.json.sushi.value, done.json.war_score, 'the server-computed score is what gets signed');
+
+  const expected = crypto.createHmac('sha256', 'test-service-token')
+    .update(`${done.json.sushi.run_id}.${done.json.sushi.mode}.${done.json.sushi.value}`)
+    .digest('hex');
+  assert.equal(done.json.sushi.attestation, expected);
+});
+
+suite('nothing is attested for a practice or a flagged run', async () => {
+  const practice = await startSignedIn('sushi-run-D', { userId: 'acct-D' });
+  backdate(practice.json.session_id, 400);
+  const p = await finish(practice.json, goodRun({ practice: true }), { player: 'sushi:acct-D' });
+  assert.equal(p.json.sushi, null, 'a practice war has nothing to vouch for');
+
+  const flagged = await startSignedIn('sushi-run-E', { userId: 'acct-E' });
+  // no backdating: the claimed duration beats the wall clock
+  const f = await finish(flagged.json, goodRun(), { player: 'sushi:acct-E' });
+  assert.equal(f.json.counted, false);
+  assert.equal(f.json.sushi, null, 'a flagged war is never promoted to the site board');
 });
