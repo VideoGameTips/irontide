@@ -11919,6 +11919,14 @@ function loadSave(){ try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); re
 function clearSave(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
 function resumeWar(){
   const s=loadSave(); if(!s) return;
+  // A resumed war does not go on the leaderboard: the server times a war from its
+  // handshake, and a fight spread across sittings cannot be bounded that way.
+  // Today this is already true by accident — LB.session lives in memory, and the only
+  // route here is the menu after a page load — but "accidentally safe" stops being
+  // safe the moment somebody adds a quit-to-menu button. Then a resumed save would be
+  // submitted under the PREVIOUS war's handshake, landing a hard-theater result on an
+  // easy theater's board. One line makes it a rule instead of a coincidence.
+  LB.session=null; LB.practice=false;
   currentMapIdx=Math.max(0,Math.min(CAMPAIGN.length-1,s.mapIdx|0));
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';

@@ -187,3 +187,30 @@ test('the board panel follows the language switch', async ({ page }) => {
   expect(r.en).toBe('CLOSE');
   expect(r.zh).toBe('关闭');      // the cached panel is rebuilt, not left in the old language
 });
+
+test('a resumed save is never submitted, even if a war handshake is still open', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof LB !== 'undefined' && typeof resumeWar === 'function');
+
+  const r = await page.evaluate(() => {
+    const b = document.getElementById('storyBtn'), s = document.getElementById('story');
+    if (b && s && s.style.display === 'flex') b.click();
+
+    // Fight a war, save it, and fake an open handshake for THAT war.
+    lbSetConsent(true);
+    startGame('destroyer'); skipBanner();
+    LB.session = { session_id: 'war-A-session', nonce: 'deadbeef' };
+    LB.practice = true;
+    saveWar();
+    const hadSession = !!LB.session;
+
+    // Resuming must drop it. Otherwise the resumed fight would be submitted under the
+    // handshake of a different war — wrong theater and difficulty on the board.
+    resumeWar();
+    return { hadSession, sessionAfterResume: LB.session, practiceAfterResume: LB.practice };
+  });
+
+  expect(r.hadSession).toBe(true);
+  expect(r.sessionAfterResume).toBe(null);
+  expect(r.practiceAfterResume).toBe(false);
+});

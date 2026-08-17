@@ -180,7 +180,8 @@ function shapeRows(rows, offset) {
     starsTotal: r.stars_total,
     medals: r.medals,
     completed: r.completed,
-    at: r.created_at,
+    // Deliberately no timestamp. The UI never showed one, and /board is public, so
+    // including it would publish when each child sits down to play.
   }));
 }
 
