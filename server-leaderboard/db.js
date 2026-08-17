@@ -232,14 +232,14 @@ function prepare(db) {
     adminRecent: db.prepare(`
       SELECT r.id, r.player_id, r.status, r.flags, r.mode, r.map_idx, r.difficulty,
              r.won, r.duration_s, r.sunk, r.war_score, r.career_score, r.created_at,
-             p.callsign_a, p.callsign_b, p.kind, p.display_name, p.banned
+             p.callsign_a, p.callsign_b, p.display_name, p.kind, p.display_name, p.banned
       FROM runs r LEFT JOIN players p ON p.player_id = r.player_id
       ORDER BY r.created_at DESC LIMIT ?
     `),
     adminFlagged: db.prepare(`
       SELECT r.id, r.player_id, r.status, r.flags, r.mode, r.map_idx, r.difficulty,
              r.won, r.duration_s, r.sunk, r.war_score, r.career_score, r.created_at,
-             p.callsign_a, p.callsign_b, p.kind, p.display_name, p.banned
+             p.callsign_a, p.callsign_b, p.display_name, p.kind, p.display_name, p.banned
       FROM runs r LEFT JOIN players p ON p.player_id = r.player_id
       WHERE r.status != 'ok' ORDER BY r.created_at DESC LIMIT ?
     `),

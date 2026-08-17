@@ -485,9 +485,12 @@ async function handleAdmin(req, res, url) {
 
   if (req.method === 'GET' && url.pathname === '/admin/data') {
     const which = url.searchParams.get('which') === 'flagged' ? 'adminFlagged' : 'adminRecent';
+    // Show a signed-in captain under the name the boards actually display. Rendering
+    // their unused wordlist callsign instead means a parent moderating the board is
+    // looking at a different name from the one they are trying to act on.
     const rows = S[which].all(200).map((r) => Object.assign({}, r, {
-      callsign_en: CS.callsignText(r.callsign_a, r.callsign_b, false, r.player_id),
-      callsign_zh: CS.callsignText(r.callsign_a, r.callsign_b, true, r.player_id),
+      callsign_en: r.display_name || CS.callsignText(r.callsign_a, r.callsign_b, false, r.player_id),
+      callsign_zh: r.display_name || CS.callsignText(r.callsign_a, r.callsign_b, true, r.player_id),
     }));
     return json(res, 200, { rows, stats: S.stats.get() });
   }
