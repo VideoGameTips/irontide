@@ -47,6 +47,11 @@ const WEEK_TZ_OFFSET_MIN = Number(process.env.WEEK_TZ_OFFSET_MIN || -480);  // P
 const IP_RETENTION_DAYS = Number(process.env.IP_RETENTION_DAYS || 30);
 const DEV_CORS = process.env.DEV_CORS === '1';
 
+// Sushi ID, the site-wide account service. Optional: with these unset the leaderboard
+// runs exactly as it did before — anonymous captains only, no site-wide board.
+const SUSHI_BASE = process.env.SUSHI_API_BASE || 'http://127.0.0.1:3030/sushi-api';
+const SUSHI_SERVICE_TOKEN = process.env.SUSHI_SERVICE_TOKEN || '';
+
 const MAX_BODY = 8 * 1024;
 const SESSION_MAX_AGE_S = 4 * 3600;      // a war left open longer than this is abandoned
 const BOARD_SCAN_LIMIT = 5000;           // rows pulled to compute "your rank"
@@ -152,6 +157,37 @@ function runRetention() {
 runRetention();
 setInterval(runRetention, 6 * 3600 * 1000).unref();
 
+// ---- Sushi ID ---------------------------------------------------------------------
+
+// Who owns this ranked run? Asked of Sushi ID rather than of the browser, because the
+// browser only hands us a run id and a run id can be copied off somebody else. Without
+// this step the detailed boards would be ranking whoever the page claimed to be.
+async function sushiRunOwner(runId) {
+  if (!SUSHI_SERVICE_TOKEN) return null;
+  try {
+    const res = await fetch(`${SUSHI_BASE}/internal/runs/${encodeURIComponent(runId)}`, {
+      headers: { 'X-Service-Token': SUSHI_SERVICE_TOKEN },
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const owner = await res.json();
+    return (owner && owner.userId && !owner.disabled) ? owner : null;
+  } catch (e) {
+    // Sushi ID being down must not stop anyone playing or lose their war: they simply
+    // land on these boards as an anonymous captain instead.
+    console.error('[sushi]', e.message);
+    return null;
+  }
+}
+
+// The signature that lets Sushi ID mark the score 'verified'. Same construction as its
+// own verifyAttestation(); the client relays it but never holds the key.
+function sushiAttestation(runId, modeSlug, value) {
+  if (!SUSHI_SERVICE_TOKEN) return null;
+  return crypto.createHmac('sha256', SUSHI_SERVICE_TOKEN)
+    .update(`${runId}.${modeSlug}.${value}`).digest('hex');
+}
+
 // ---- board helpers ---------------------------------------------------------------
 
 function sinceFor(window) {
@@ -170,8 +206,13 @@ function runBoard(type, opts) {
 function shapeRows(rows, offset) {
   return rows.map((r, i) => ({
     rank: offset + i + 1,
+    // A signed-in captain shows the name Sushi ID knows them by; an anonymous one gets
+    // rendered from the wordlist in whichever language the player is reading. Both are
+    // sent so the client can label the row without a second request.
     a: r.callsign_a, b: r.callsign_b,
     tag: CS.callsignTag(r.player_id),
+    name: r.kind === 'sushi' ? r.display_name : null,
+    signedIn: r.kind === 'sushi',
     value: r.value,
     stars: r.stars,
     shipsLost: r.ships_lost,
@@ -198,7 +239,8 @@ async function handleStart(req, res, ipHash) {
   const body = parseJson(await readBody(req));
   if (!body) return json(res, 400, { error: 'bad-json' });
 
-  const playerId = String(body.player_id || '');
+  // Reassigned below when Sushi ID vouches for a signed-in account.
+  let playerId = String(body.player_id || '');
   if (!/^[a-zA-Z0-9_-]{8,64}$/.test(playerId)) return json(res, 400, { error: 'bad-player-id' });
 
   const a = intOr(body.callsign && body.callsign.a, -1);
@@ -212,17 +254,34 @@ async function handleStart(req, res, ipHash) {
   if (!rateLimit(`start:${playerId}`, 40, 3600)) return json(res, 429, { error: 'rate' });
   if (!rateLimit(`start:ip:${ipHash}`, 120, 3600)) return json(res, 429, { error: 'rate' });
 
+  // If the player was signed in when the war began, they gave us the Sushi ID run they
+  // opened. Resolve it server-to-server; a run id we cannot verify simply means this war
+  // is recorded anonymously, which is a full-featured way to play, not a failure.
+  let kind = 'anon', displayName = null, sushiRunId = null, sushiMode = null;
+  const claimedRun = String(body.sushi_run_id || '');
+  if (claimedRun) {
+    const owner = await sushiRunOwner(claimedRun);
+    if (owner) {
+      kind = 'sushi';
+      playerId = `sushi:${owner.userId}`;
+      displayName = String(owner.displayName || '').slice(0, 64) || null;
+      sushiRunId = claimedRun;
+      sushiMode = owner.modeSlug;
+    }
+  }
+
   const t = nowSec();
-  S.upsertPlayer.run({ player_id: playerId, a, b, now: t });
+  S.upsertPlayer.run({ player_id: playerId, kind, a, b, display_name: displayName, now: t });
 
   const id = crypto.randomUUID();
   const nonce = crypto.randomBytes(16).toString('hex');
   S.insertSession.run({
     id, player_id: playerId, nonce,
     map_idx: mapIdx, mode: body.mode, difficulty: body.difficulty, started_at: t,
+    sushi_run_id: sushiRunId, sushi_mode: sushiMode,
   });
 
-  return json(res, 200, { session_id: id, nonce, server_time: t });
+  return json(res, 200, { session_id: id, nonce, server_time: t, player_id: playerId, signed_in: kind === 'sushi' });
 }
 
 async function handleFinish(req, res, ipHash) {
@@ -345,12 +404,24 @@ async function handleFinish(req, res, ipHash) {
     }
   }
 
+  // If the war began signed in, hand back the signature Sushi ID needs to record this
+  // as 'verified' on the site-wide board. Only for runs that actually passed: a flagged
+  // or practice run has nothing to vouch for, and this is the one place in the system
+  // that claims more than "the client said so".
+  let sushi = null;
+  if (status === 'ok' && sess.sushi_run_id) {
+    const value = row.war_score;
+    const attestation = sushiAttestation(sess.sushi_run_id, sess.sushi_mode || 'campaign', value);
+    if (attestation) sushi = { run_id: sess.sushi_run_id, mode: sess.sushi_mode || 'campaign', value, attestation };
+  }
+
   return json(res, 200, {
     ok: true,
     counted: status === 'ok',
     practice: status === 'practice',
     war_score: row.war_score,
     ranks,
+    sushi,
   });
 }
 

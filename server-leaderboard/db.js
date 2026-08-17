@@ -13,7 +13,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const Database = require('better-sqlite3');
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;   // v2: signed-in captains alongside anonymous ones
 
 function open(dataDir) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -30,15 +30,27 @@ function migrate(db) {
   if (have >= SCHEMA_VERSION) return;
 
   db.exec(`
+    -- Two kinds of captain share these boards, and the difference is who vouches for
+    -- the name:
+    --   kind='anon'  player_id is a random id this browser made up. The callsign comes
+    --                from the wordlist. Nobody vouches for it; clearing site data makes
+    --                a new captain. Costs nothing to start, which is the point — a nine
+    --                year old should not have to hold a password to see their own time.
+    --   kind='sushi' player_id is 'sushi:<account id>' and display_name came from Sushi
+    --                ID's own records, fetched server-to-server. Durable across devices,
+    --                and the only kind that can also reach the site-wide board.
+    -- The anti-cheat does not care which: it checks the RUN, not the name on it.
     CREATE TABLE IF NOT EXISTS players (
-      player_id   TEXT PRIMARY KEY,
-      callsign_a  INTEGER NOT NULL,
-      callsign_b  INTEGER NOT NULL,
-      banned      INTEGER NOT NULL DEFAULT 0,
-      first_seen  INTEGER NOT NULL,
-      last_seen   INTEGER NOT NULL,
-      last_run_at INTEGER,
-      best_career INTEGER NOT NULL DEFAULT 0
+      player_id    TEXT PRIMARY KEY,
+      kind         TEXT NOT NULL DEFAULT 'anon' CHECK(kind IN ('anon','sushi')),
+      callsign_a   INTEGER NOT NULL,
+      callsign_b   INTEGER NOT NULL,
+      display_name TEXT,
+      banned       INTEGER NOT NULL DEFAULT 0,
+      first_seen   INTEGER NOT NULL,
+      last_seen    INTEGER NOT NULL,
+      last_run_at  INTEGER,
+      best_career  INTEGER NOT NULL DEFAULT 0
     );
 
     -- One row per handshake. The server's own timestamp here is what makes a fast
@@ -51,7 +63,13 @@ function migrate(db) {
       mode        TEXT NOT NULL,
       difficulty  TEXT NOT NULL,
       started_at  INTEGER NOT NULL,
-      used        INTEGER NOT NULL DEFAULT 0
+      used        INTEGER NOT NULL DEFAULT 0,
+      -- Set when the player was signed in when the war began: the Sushi ID run this
+      -- result should also be attested for. Recorded at the handshake rather than taken
+      -- from the finish body, so the client cannot point a finished war at a different
+      -- account's run afterwards.
+      sushi_run_id TEXT,
+      sushi_mode   TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at);
 
@@ -89,6 +107,18 @@ function migrate(db) {
     CREATE INDEX IF NOT EXISTS idx_runs_player  ON runs(player_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_runs_created ON runs(created_at);
   `);
+  // v1 -> v2 added the signed-in tier. CREATE TABLE IF NOT EXISTS above does nothing to
+  // a table that already exists, so the new columns have to be added explicitly. Guarded
+  // on the column list rather than on user_version: a database that was hand-repaired,
+  // or created by a build somewhere between versions, still ends up in the right shape.
+  const cols = (table) => new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+  const playerCols = cols('players');
+  if (!playerCols.has('kind')) db.exec("ALTER TABLE players ADD COLUMN kind TEXT NOT NULL DEFAULT 'anon'");
+  if (!playerCols.has('display_name')) db.exec('ALTER TABLE players ADD COLUMN display_name TEXT');
+  const sessionCols = cols('sessions');
+  if (!sessionCols.has('sushi_run_id')) db.exec('ALTER TABLE sessions ADD COLUMN sushi_run_id TEXT');
+  if (!sessionCols.has('sushi_mode')) db.exec('ALTER TABLE sessions ADD COLUMN sushi_mode TEXT');
+
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -96,18 +126,22 @@ function migrate(db) {
 
 function prepare(db) {
   const S = {
+    // display_name is only ever written from what Sushi ID reported, so COALESCE keeps
+    // the stored one when a later handshake has nothing to say about it.
     upsertPlayer: db.prepare(`
-      INSERT INTO players (player_id, callsign_a, callsign_b, first_seen, last_seen)
-      VALUES (@player_id, @a, @b, @now, @now)
+      INSERT INTO players (player_id, kind, callsign_a, callsign_b, display_name, first_seen, last_seen)
+      VALUES (@player_id, @kind, @a, @b, @display_name, @now, @now)
       ON CONFLICT(player_id) DO UPDATE SET
-        callsign_a = @a, callsign_b = @b, last_seen = @now
+        kind = @kind, callsign_a = @a, callsign_b = @b,
+        display_name = COALESCE(@display_name, display_name),
+        last_seen = @now
     `),
     getPlayer: db.prepare(`SELECT * FROM players WHERE player_id = ?`),
     banPlayer: db.prepare(`UPDATE players SET banned = ? WHERE player_id = ?`),
 
     insertSession: db.prepare(`
-      INSERT INTO sessions (id, player_id, nonce, map_idx, mode, difficulty, started_at)
-      VALUES (@id, @player_id, @nonce, @map_idx, @mode, @difficulty, @started_at)
+      INSERT INTO sessions (id, player_id, nonce, map_idx, mode, difficulty, started_at, sushi_run_id, sushi_mode)
+      VALUES (@id, @player_id, @nonce, @map_idx, @mode, @difficulty, @started_at, @sushi_run_id, @sushi_mode)
     `),
     getSession: db.prepare(`SELECT * FROM sessions WHERE id = ?`),
     useSession: db.prepare(`UPDATE sessions SET used = 1 WHERE id = ? AND used = 0`),
@@ -149,7 +183,7 @@ function prepare(db) {
     // row that produced the extreme value. The callsign deliberately comes from players
     // rather than the run, so renaming your captain updates the whole board.
     boardTheater: db.prepare(`
-      SELECT r.player_id, p.callsign_a, p.callsign_b,
+      SELECT r.player_id, p.callsign_a, p.callsign_b, p.kind, p.display_name,
              MIN(r.duration_s) AS value, r.stars, r.ships_lost, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
       WHERE r.status = 'ok' AND p.banned = 0 AND r.mode = 'campaign'
@@ -164,7 +198,7 @@ function prepare(db) {
     // would rank them against each other as though they were. Those modes still count
     // toward the career and mastery boards, which measure the player rather than a fight.
     boardWar: db.prepare(`
-      SELECT r.player_id, p.callsign_a, p.callsign_b,
+      SELECT r.player_id, p.callsign_a, p.callsign_b, p.kind, p.display_name,
              MAX(r.war_score) AS value, r.map_idx, r.sunk, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
       WHERE r.status = 'ok' AND p.banned = 0 AND r.mode = 'campaign'
@@ -174,7 +208,7 @@ function prepare(db) {
       LIMIT @limit
     `),
     boardCareer: db.prepare(`
-      SELECT r.player_id, p.callsign_a, p.callsign_b,
+      SELECT r.player_id, p.callsign_a, p.callsign_b, p.kind, p.display_name,
              MAX(r.career_score) AS value, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
       WHERE r.status = 'ok' AND r.career_ok = 1 AND p.banned = 0
@@ -184,7 +218,7 @@ function prepare(db) {
       LIMIT @limit
     `),
     boardMastery: db.prepare(`
-      SELECT r.player_id, p.callsign_a, p.callsign_b,
+      SELECT r.player_id, p.callsign_a, p.callsign_b, p.kind, p.display_name,
              MAX(r.mastery) AS value, r.stars_total, r.medals, r.completed, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
       WHERE r.status = 'ok' AND r.career_ok = 1 AND p.banned = 0
@@ -198,14 +232,14 @@ function prepare(db) {
     adminRecent: db.prepare(`
       SELECT r.id, r.player_id, r.status, r.flags, r.mode, r.map_idx, r.difficulty,
              r.won, r.duration_s, r.sunk, r.war_score, r.career_score, r.created_at,
-             p.callsign_a, p.callsign_b, p.banned
+             p.callsign_a, p.callsign_b, p.kind, p.display_name, p.banned
       FROM runs r LEFT JOIN players p ON p.player_id = r.player_id
       ORDER BY r.created_at DESC LIMIT ?
     `),
     adminFlagged: db.prepare(`
       SELECT r.id, r.player_id, r.status, r.flags, r.mode, r.map_idx, r.difficulty,
              r.won, r.duration_s, r.sunk, r.war_score, r.career_score, r.created_at,
-             p.callsign_a, p.callsign_b, p.banned
+             p.callsign_a, p.callsign_b, p.kind, p.display_name, p.banned
       FROM runs r LEFT JOIN players p ON p.player_id = r.player_id
       WHERE r.status != 'ok' ORDER BY r.created_at DESC LIMIT ?
     `),
