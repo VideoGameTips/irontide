@@ -3600,14 +3600,14 @@ function updateComms(dt){ if(!_commsLines.length){ const el=document.getElementB
   el.innerHTML=html; }
 function nearestCaptureIsland(pos){ let b=null,bd=1e9; islands.forEach(i=>{ if(!i.capturable||i.owner===0||i.r<70)return; const d=i.pos.distanceTo(pos); if(d<bd){bd=d;b=i;} }); return b; }
 function assignAllyRole(a,role){ if(a.role===role)return; a.role=role;
-  if(role==='capture'){ a.capIsland=nearestCaptureIsland(a.pos); if(a.capIsland&&Math.random()<0.5)comms(a.callsign,'Moving to secure '+(a.capIsland.name||'the island')+'.','#7fd0a0'); }
+  if(role==='capture'){ a.capIsland=nearestCaptureIsland(a.pos); if(a.capIsland&&Math.random()<0.5)comms(a.callsign,T('Moving to secure '+(trName(a.capIsland.name)||'the island')+'.','正在去拿下'+(trName(a.capIsland.name)||'那座岛')+'。'),'#7fd0a0'); }
 }
 function checkDistress(){
   const wounded=[];
   if(player&&player.hp>0&&player.hp<player.maxhp*0.3) wounded.push({s:player,name:'FLAGSHIP',pos:player.pos});
   allies.forEach(a=>{ if(a.sinkT===0&&a.hp<a.maxhp*0.3) wounded.push({s:a,name:a.callsign,pos:a.pos}); });
   wounded.forEach(w=>{ if((w.s._sos||0)>0)return; w.s._sos=20;
-    comms(w.name,'⚠ Taking heavy fire — requesting assistance!','#ff9a6a'); w.s._radioQuiet=8; if(w.s===player)sfxAlarm();
+    comms(trName(w.name),T('⚠ Taking heavy fire — requesting assistance!','⚠ 火力太猛，请求支援！'),'#ff9a6a'); w.s._radioQuiet=8; if(w.s===player)sfxAlarm();
     let best=null,bd=1e9; allies.forEach(a=>{ if(a.sinkT||a.def.support||a===w.s||a.role==='assist'||(a.hp<a.maxhp*0.35))return; const d=a.pos.distanceTo(w.pos); if(d<bd){bd=d;best=a;} });
     if(best){ best.role='assist'; best.assist=w.s; commsShip(best,'Copy — inbound to cover '+w.name+'.','#7fd0a0',8); }
   });
@@ -3622,9 +3622,9 @@ function fleetOrderCmd(){
   // never once touched the only thing that ends the war. Now the order sends them at the HQ,
   // and the captain is the one who decides when the fleet commits.
   if(fleetOrder===0){ combat.forEach(a=>{a.role='strike';a.assist=null;});
-    comms('FLAGSHIP','All ships — strike the enemy HQ!','#ffd060'); flashPrompt('📻 '+T('ORDER: STRIKE THE ENEMY HQ','命令：全舰队打敌方总部')); }
-  else if(fleetOrder===1){ combat.forEach(a=>assignAllyRole(a,'capture')); comms('FLAGSHIP','All ships — take the islands!','#ffd060'); flashPrompt('📻 '+T('ORDER: CAPTURE ISLANDS','命令：去占岛')); }
-  else { combat.forEach(a=>{a.role='regroup';a.assist=null;}); comms('FLAGSHIP','All ships — form on me!','#ffd060'); flashPrompt('📻 '+T('ORDER: REGROUP ON FLAGSHIP','命令：都到我这儿集合')); }
+    comms(T('FLAGSHIP','旗舰'),T('All ships — strike the enemy HQ!','各舰注意——打敌方总部！'),'#ffd060'); flashPrompt('📻 '+T('ORDER: STRIKE THE ENEMY HQ','命令：全舰队打敌方总部')); }
+  else if(fleetOrder===1){ combat.forEach(a=>assignAllyRole(a,'capture')); comms(T('FLAGSHIP','旗舰'),T('All ships — take the islands!','各舰注意——去占岛！'),'#ffd060'); flashPrompt('📻 '+T('ORDER: CAPTURE ISLANDS','命令：去占岛')); }
+  else { combat.forEach(a=>{a.role='regroup';a.assist=null;}); comms(T('FLAGSHIP','旗舰'),T('All ships — form on me!','各舰注意——到我这儿集合！'),'#ffd060'); flashPrompt('📻 '+T('ORDER: REGROUP ON FLAGSHIP','命令：都到我这儿集合')); }
   sfxClick();
 }
 function careerScore(){ return career.sunk*2 + career.planes + career.islands*5 + career.wins*40 + career.bosses*25; }
@@ -4100,7 +4100,7 @@ function turnWeather(){
   const w=opts[Math.floor(Math.random()*opts.length)]; weather.type=w; weather.t=70+Math.random()*40;
   const label={clear:'skies clearing',overcast:'cloud rolling in',fog:'a fog bank closing in',storm:'a storm bearing down'}[w]||w;
   flashPrompt(T('⛅ Weather shifting — ','⛅ 天气变了——')+label);
-  if(typeof comms==='function') comms('WEATHER',label.charAt(0).toUpperCase()+label.slice(1)+' — adjust your gunnery.','#a8c8e0');
+  if(typeof comms==='function') comms(T('WEATHER','气象'),T(label.charAt(0).toUpperCase()+label.slice(1)+' — adjust your gunnery.',trName(label)+'——注意修正射击。'),'#a8c8e0');
 }
 function dropSupplyCrates(){
   if(!player||!player.pos) return;
@@ -4108,7 +4108,7 @@ function dropSupplyCrates(){
   for(let i=0;i<c;i++){ const a=Math.random()*6.28, r=55+Math.random()*80;
     spawnSalvage(player.pos.clone().add(new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r))); }
   flashPrompt(T('📦 Supply drop — salvage crates in the water nearby','📦 空投补给——附近水面上有物资箱'));
-  if(typeof comms==='function') comms('COMMAND','Air-dropped supplies near your position — go collect them.','#8fd0a0');
+  if(typeof comms==='function') comms(T('COMMAND','司令部'),T('Air-dropped supplies near your position — go collect them.','你附近空投了补给——去捡回来。'),'#8fd0a0');
 }
 function fireDynamicEvent(ground){
   const pool=['supply'];
@@ -4118,11 +4118,11 @@ function fireDynamicEvent(ground){
   const ev=pool[Math.floor(Math.random()*pool.length)];
   if(ev==='reinforce'){ const n=1+Math.floor(Math.random()*2); for(let i=0;i<n;i++) spawnEnemy();
     flashPrompt(T('⚠ Dominion reinforcements — '+n+' hull'+(n>1?'s':'')+' inbound!','⚠ 统治联邦增援——'+n+' 条船正在赶来！')); if(typeof sfxAlarm==='function') sfxAlarm();
-    if(typeof comms==='function') comms('RADAR','New surface contacts bearing from the enemy line.','#ff9a6a'); }
+    if(typeof comms==='function') comms(T('RADAR','雷达'),T('New surface contacts bearing from the enemy line.','敌方阵线方向出现新的水面目标。'),'#ff9a6a'); }
   else if(ev==='convoy'){ const a=spawnCargoConvoy();
     flashPrompt(T('📦 CONVOY INBOUND — escort '+a.callsign+' to '+(trName(a.convoyTarget&&a.convoyTarget.name)||'the forward line'),
       '📦 运输船队来了——护送 '+a.callsign+' 到'+(trName(a.convoyTarget&&a.convoyTarget.name)||'前线')));
-    if(typeof comms==='function') comms('COMMAND',a.callsign+' is carrying fuel and ammunition. Escort it through the combat zone.','#8fd0a0'); }
+    if(typeof comms==='function') comms(T('COMMAND','司令部'),T(a.callsign+' is carrying fuel and ammunition. Escort it through the combat zone.',a.callsign+' 载着燃料和弹药，护送它穿过交战区。'),'#8fd0a0'); }
   else if(ev==='weather') turnWeather();
   else dropSupplyCrates();
 }
@@ -4269,7 +4269,7 @@ function newSideObjective(){
   if(!ground && r<0.24){ const a=spawnCargoConvoy();                    // ESCORT — protect a slow freighter to its destination
     sideOb={kind:'escort', goal:1, t:230, pay:1500, convoy:a,
       label:'ESCORT convoy to '+((a.convoyTarget&&a.convoyTarget.name)||'the front')};
-    if(typeof comms==='function') comms(a.callsign,'Cargo run underway — cover me, Admiral!','#8fd0a0'); }
+    if(typeof comms==='function') comms(a.callsign,T('Cargo run underway — cover me, Admiral!','运输开始了——掩护我，司令！'),'#8fd0a0'); }
   else if(r<0.5)  sideOb={kind:'sink',   goal:3, t:150, pay:700, base:sunk,       label:'BONUS: sink 3 warships'};
   else if(r<0.75) sideOb={kind:'planes', goal:3, t:120, pay:500, base:sessPlanes, label:'BONUS: down 3 aircraft'};
   else            sideOb={kind:'capture',goal:1, t:240, pay:900, base:controlledIslandCount(0), label:'BONUS: capture an island'};
@@ -5952,7 +5952,7 @@ function damageFoot(dmg,from){
   if(from) hitSpark(footPos.clone().setY(footPos.y-0.2));
   if(footHP<=0){ footHP=0; onFoot=false; mouseDownFire=false;
     showRespawnMenu('You were killed ashore — choose a replacement ship or redeploy from harbor.'); }
-  else if(dmg>8) flashPrompt(T('⚕ Hit on foot — ','⚕ 步行中中弹——')+Math.ceil(footHP)+'% health');
+  else if(dmg>8) flashPrompt(T('⚕ Hit on foot — '+Math.ceil(footHP)+'% health','⚕ 步行中中弹——生命 '+Math.ceil(footHP)+'%'));
   updateHUD();
 }
 function playerSunk(){
@@ -6098,8 +6098,8 @@ function setIslandOwner(isl,team,silent){
     buildAndPushLand('command',team,cp,2,isl);
   }
   if(silent||!isl.capturable||old===team) return;
-  if(team===0){ money+=150; warRecord('islands'); sessIslands++; flashPrompt('🏝 '+isl.name.toUpperCase()+' SECURED — command post established; construction unlocked'); sfxClick(); }
-  else if(old===0) flashPrompt('⚠ '+isl.name.toUpperCase()+' LOST — enemy forces captured the outpost');
+  if(team===0){ money+=150; warRecord('islands'); sessIslands++; flashPrompt(T('🏝 '+isl.name.toUpperCase()+' SECURED — command post established; construction unlocked','🏝 '+trName(isl.name)+' 已拿下——指挥所建立，可以开始建造了')); sfxClick(); }
+  else if(old===0) flashPrompt(T('⚠ '+isl.name.toUpperCase()+' LOST — enemy forces captured the outpost','⚠ '+trName(isl.name)+' 丢了——敌军占了这个据点'));
 }
 function islandCaptureForce(isl,team){
   let n=0;
@@ -6138,7 +6138,7 @@ function updateIslandAirService(dt){
     const base=(!heli&&piloting.plane.def.shape==='wing')?null:islands.find(i=>i.capturable&&i.owner===0&&piloting.pos.y<70&&insideIslandRange(piloting.pos,i,70)&&
       islandStructures(i,0,heli?'helipad':'airstrip').some(structurePowered));
     if(base){
-      if(piloting.serviceIsland!==base){ piloting.serviceIsland=base; piloting.islandServiceT=0; flashPrompt('🏝 '+base.name+' — refueling and rearming'); }
+      if(piloting.serviceIsland!==base){ piloting.serviceIsland=base; piloting.islandServiceT=0; flashPrompt(T('🏝 '+base.name+' — refueling and rearming','🏝 '+trName(base.name)+' —— 正在加油补弹')); }
       const boost=islandStructures(base,0,'fuel').length?1.7:1;
       piloting.fuel=Math.min(piloting.fuelMax,piloting.fuel+(heli?32:20)*boost*dt);
       piloting.hp=Math.min(piloting.maxhp,piloting.hp+5*boost*dt);
@@ -6235,7 +6235,7 @@ function nearestFieldTank(){ let b=null,bd=8; if(!onFoot)return null;
   playerTanks.forEach(tk=>{ if(tk.onDeck||tk.hp<=0)return; const p=tk.pos||tk.group.position, d=Math.hypot(footPos.x-p.x,footPos.z-p.z); if(d<bd){bd=d;b=tk;} }); return b; }
 function mountTank(tk){ drivingTank=tk; onFoot=false; warRecord('drove');
   camYaw.v = tk.onDeck ? (player.heading + tk.heading) : tk.heading; camPitch.v=0.08;
-  flashPrompt(T('Crewing the ','正在操作 ')+(tk.name||'tank')+' — WASD drive · Mouse aim · Click fire · E to dismount.'); updateMode();
+  flashPrompt(T('Crewing the '+(trName(tk.name)||'tank')+' — WASD drive · Mouse aim · Click fire · E to dismount.','正在操作 '+(trName(tk.name)||'坦克')+' —— WASD 开车 · 鼠标瞄准 · 点击开炮 · 按 E 下车。')); updateMode();
   startTankTutorial(); }
 function dismountTank(){ const tk=drivingTank; drivingTank=null;
   if(tk.onDeck){ walkPos.set(tk.group.position.x, deckEyeY(), tk.group.position.z+3); onFoot=false; }
@@ -6257,7 +6257,7 @@ function tankLandToggle(){
       const isl=best.island; tk.island=isl;
       tk.pos=new THREE.Vector3(wp.x,2.1,wp.z); clampToIsland(tk.pos,isl,0.92); tk.pos.y=2.1;
       tk.heading=Math.atan2(isl.pos.x-tk.pos.x, isl.pos.z-tk.pos.z);                     // face inland
-      flashPrompt(T('🪖 Tank ashore','🪖 坦克已上岸')+(isl.name?' on '+isl.name:'')+' — clear the garrison to capture · G to re-embark');
+      flashPrompt(T('🪖 Tank ashore'+(isl.name?' on '+isl.name:'')+' — clear the garrison to capture · G to re-embark','🪖 坦克已上岸'+(isl.name?'（'+trName(isl.name)+'）':'')+' —— 清掉守军就能占领 · 按 G 回船'));
     } else {
       tk.island=null;
       const side=new THREE.Vector3(Math.sin(player.heading+Math.PI/2),0,Math.cos(player.heading+Math.PI/2));
@@ -6340,7 +6340,7 @@ function destroyPlayerTank(tk,msg){
   destroyObject3D(tk.group); tk.group=null;
   const i=playerTanks.indexOf(tk); if(i>=0) playerTanks.splice(i,1);
   if(wasDriving){ drivingTank=null; onFoot=false; showRespawnMenu((msg||'Tank destroyed!')+' Your crew was lost — pick a replacement from harbor.'); return; }
-  flashPrompt('💥 '+(msg||'Tank destroyed!'));
+  flashPrompt('💥 '+(msg||T('Tank destroyed!','坦克被摧毁了！')));
 }
 function tankFireTick(tk,dt){
   if(tk.cook>0){ tk.cook-=dt; if(tk.cook<=0){ destroyPlayerTank(tk,'Ammunition cook-off!'); return; } }
@@ -6378,9 +6378,9 @@ function updateTank(dt){
   const mv=(L+R)/2, steer=(L-R)/2;                                 // net forward = both tracks; turn = their difference
   // crew repair tracks & fight fires while halted (hold R)
   if(keys['KeyR'] && mv===0){ tk.repT=(tk.repT||0)+dt;
-    if(tk.fire>0){ if(tk.repT>0.8){ tk.repT=0; tk.fire--; flashPrompt(tk.fire>0?'Fighting the fire…':'🧯 Fire out.'); } }
+    if(tk.fire>0){ if(tk.repT>0.8){ tk.repT=0; tk.fire--; flashPrompt(tk.fire>0?T('Fighting the fire…','正在灭火……'):T('🧯 Fire out.','🧯 火扑灭了。')); } }
     else if(tk.repT>2.6){ tk.repT=0; const t=['trackL','trackR'].filter(k=>pr[k]>0).sort((a,b)=>pr[b]-pr[a])[0];
-      if(t){ pr[t]--; flashPrompt('🔧 '+TPART_NAME[t]+' repaired'); } }
+      if(t){ pr[t]--; flashPrompt(T('🔧 '+TPART_NAME[t]+' repaired','🔧 '+trName(TPART_NAME[t])+' 修好了')); } }
   } else tk.repT=0;
   tk.heading -= steer*turn*dt*2.0;                           // differential-track steering — pivots in place when the tracks counter-rotate
   let wp;
@@ -6677,7 +6677,7 @@ function spawnAlly(near){
   // dissolve back into patrol duty as fresh hulls arrive
   a.role=def.support?'support':(fleetOrder===0?'strike':fleetOrder===1?'capture':(Math.random()<0.35?'capture':'attack'));
   a._sos=0; a.commsT=8+Math.random()*22;
-  if(typeof comms==='function'&&!def.support&&Math.random()<0.6) comms(a.callsign,a.role==='capture'?'On station — moving to take an island.':'Reporting for duty — weapons hot.','#a8d4f0');
+  if(typeof comms==='function'&&!def.support&&Math.random()<0.6) comms(a.callsign,a.role==='capture'?T('On station — moving to take an island.','已就位——正去夺岛。'):T('Reporting for duty — weapons hot.','前来报到——武器就绪。'),'#a8d4f0');
   allies.push(a);
 }
 function spawnCargoConvoy(){
@@ -7061,7 +7061,7 @@ function updateAlly(a,dt){
   else if(a.role==='convoy'&&a.convoyTarget){
     objective=a.convoyTarget.pos;stand=(a.convoyTarget.r||a.convoyTarget.rx||80)+42;
     if(a.pos.distanceTo(objective)<stand+18){a.role='support';a.def.support=true;a.hp=Math.min(a.maxhp,a.hp+70);money+=900;updateHUD();refreshShop();
-      flashPrompt('📦 '+a.callsign+' DELIVERED — +$900, fleet resupplied');if(typeof comms==='function')comms(a.callsign,'Cargo delivered. Converting to fleet support duty.','#8fd0a0');}}
+      flashPrompt(T('📦 '+a.callsign+' DELIVERED — +$900, fleet resupplied','📦 '+a.callsign+' 送达——+$900，舰队补给完成'));if(typeof comms==='function')comms(a.callsign,T('Cargo delivered. Converting to fleet support duty.','货送到了。转入舰队支援任务。'),'#8fd0a0');}}
   if(!objective){ if(a.role==='assist'){a.assist=null;a.role='attack';} if(a.role==='regroup')a.role='attack';
     objective=(tgtShip&&tgtShip.pos.distanceTo(a.pos)<340+fleetRange())?tgtShip.pos:(enemyHarbor?enemyHarbor.pos:new THREE.Vector3());
     stand=(tgtShip&&objective===tgtShip.pos)?a.standoff:0; }
@@ -7447,12 +7447,12 @@ function buildStructure(k){
   // Physical footprint, not a slot counter, decides what will fit.
   const fwd=new THREE.Vector3(Math.sin(camYaw.v),0,Math.cos(camYaw.v));
   const p=footPos.clone().add(fwd.multiplyScalar(Math.max(12,s.footprint*.8))); const ground=footPos.y-EYE;
-  if(!insideIslandRange(p,isl,-s.footprint*.7)){flashPrompt(s.name+' is too large for that patch of ground');return;}
+  if(!insideIslandRange(p,isl,-s.footprint*.7)){flashPrompt(T(s.name+' is too large for that patch of ground',trName(s.name)+' 对这块地来说太大了'));return;}
   const blocked=landUnits.some(u=>!u.dead&&u.island===isl&&Math.hypot(u.pos.x-p.x,u.pos.z-p.z)<(s.footprint+(u.footprint||4))*.72);
   if(blocked){flashPrompt(T('Not enough clear ground — move farther from existing buildings','空地不够——离已有建筑远一点'));return;}
   money-=cost; buildAndPushLand(k,0,p,ground,isl);
   refreshBuild(); refreshShop(); updateHUD(); sfxClick();
-  flashPrompt(s.name+' constructed'+(s.power&&!structurePowered(landUnits[landUnits.length-1])?' — OFFLINE until a power station is built':''));
+  flashPrompt(T(s.name+' constructed'+(s.power&&!structurePowered(landUnits[landUnits.length-1])?' — OFFLINE until a power station is built':''),trName(s.name)+' 建好了'+(s.power&&!structurePowered(landUnits[landUnits.length-1])?'——没有发电站之前它是离线的':'')));
 }
 function findIslandBuildPoint(isl,kind){
   const s=STRUCTS[kind];if(!s)return null;
@@ -7680,7 +7680,7 @@ function updateSurrenderFlags(){
       g.position.set(0,(e.def.deckY||4)+2,-(e.build.halfLen||10)*0.15);
       g.scale.setScalar(Math.max(1,(e.def.beam||10)/14));
       e.build.group.add(g); e._whiteFlag=g;
-      if(typeof comms==='function') comms(e.callsign||'ENEMY','We strike our colours! Hold your fire!','#e8e8e8');
+      if(typeof comms==='function') comms(e.callsign||T('ENEMY','敌舰'),T('We strike our colours! Hold your fire!','我们降旗了！别开火！'),'#e8e8e8');
       // A first-time player read "board her" and had no idea that meant leaving their own ship
       // and swimming. Spell out the whole move — that missing sentence was the entire reason
       // the deepest system in the game went undiscovered.
@@ -7743,7 +7743,7 @@ let boarding=null;
 function startBoarding(e){
   if(boarding||!e) return;
   boarding={target:e,t:0,dur:4.5,nextHitT:0.8+Math.random()*0.6};
-  flashPrompt(T('⚔ BOARDING ','⚔ 跳帮登船 ')+e.def.name.toUpperCase()+' — hold your ground, her crew is fighting back!');
+  flashPrompt(T('⚔ BOARDING '+e.def.name.toUpperCase()+' — hold your ground, her crew is fighting back!','⚔ 正在跳帮 '+trName(e.def.name)+' —— 守住，对方船员在反抗！'));
 }
 function updateBoardingAction(dt){
   const b=boarding; if(!b) return;
@@ -7754,7 +7754,7 @@ function updateBoardingAction(dt){
   b.t+=dt; b.nextHitT-=dt;
   if(b.nextHitT<=0){ b.nextHitT=0.75+Math.random()*0.85;
     damageFoot(6+Math.random()*10, true);
-    if(onFoot) flashPrompt(T('⚔ Her crew fights back! ','⚔ 对方船员在反抗！')+Math.ceil(footHP)+'% health — '+Math.max(0,Math.ceil(b.dur-b.t))+'s to secure the deck');
+    if(onFoot) flashPrompt(T('⚔ Her crew fights back! '+Math.ceil(footHP)+'% health — '+Math.max(0,Math.ceil(b.dur-b.t))+'s to secure the deck','⚔ 对方船员在反抗！生命 '+Math.ceil(footHP)+'% —— 还要 '+Math.max(0,Math.ceil(b.dur-b.t))+' 秒才能控制甲板'));
   }
   if(onFoot && footHP>0 && b.t>=b.dur){ boarding=null; captureEnemyShip(b.target); }
 }
@@ -7840,9 +7840,9 @@ function captureEnemyShip(e){
   e.team=0;e.hp=Math.max(e.hp,e.maxhp*.42);e.heading+=Math.PI*.15;e.fireT=2.2;e.turnT=0;e.orbitDir=Math.random()<.5?1:-1;
   e.callsign='PRIZE-'+(_callsignN+1);e.role='attack';e._sos=0;e.commsT=12;e.upgT=1e9;e.planeT=99;
   allies.push(e);money+=750;updateHUD();refreshShop();sfxClick();
-  if(typeof comms==='function')comms(e.callsign,'Prize crew aboard — captured hull joining the fleet.','#8fd0a0');
+  if(typeof comms==='function')comms(e.callsign,T('Prize crew aboard — captured hull joining the fleet.','接管人员已登船——这条船归我们了。'),'#8fd0a0');
   warRecord('captures');
-  flashPrompt(T('⚓ SHIP CAPTURED — ','⚓ 军舰已夺取——')+e.def.name.toUpperCase()+' JOINS YOUR FLEET · +$750');return true;
+  flashPrompt(T('⚓ SHIP CAPTURED — '+e.def.name.toUpperCase()+' JOINS YOUR FLEET · +$750','⚓ 军舰已夺取——'+trName(e.def.name)+' 加入你的舰队 · +$750'));return true;
 }
 function tryDispatchPlane(){   // pressing A next to a parked plane sends a bot up in it
   if(phase!=='play'||onFoot||driving||manning||piloting||drivingTank||shopOpen||harborOpen||buildOpen) return;
@@ -7892,7 +7892,7 @@ function buyPlane(id){
   money-=cost;
   const g=buildPlane(p); g.position.copy(spot.pos); g.rotation.y=parkYaw(spot); player.build.group.add(g);
   planes.push({def:p,group:g,spot,parked:true,bombsLeft:p.bombs||0,gunAmmo:p.gunAmmo==null?null:p.gunAmmo});
-  spot.taken=true; refreshShop(); updateHUD(); sfxClick(); flashPrompt(p.name+' ready on deck — press E aboard it to fly','ok');
+  spot.taken=true; refreshShop(); updateHUD(); sfxClick(); flashPrompt(T(p.name+' ready on deck — press E aboard it to fly',trName(p.name)+' 已在甲板就位——走过去按 E 起飞'),'ok');
 }
 function buyTank(id){
   const TK=TANKS[id]; const cost=priceOf(TK.cost);
@@ -7913,7 +7913,7 @@ function buyTank(id){
   if(!spot){ flashPrompt(T('No free deck slot — a bigger ship carries more tanks','甲板没空位了——换条大船能多带坦克')); return; }
   money-=cost;
   buildDeckTank(spot.pos, id); spot.taken=true;
-  refreshShop(); updateHUD(); sfxClick(); flashPrompt(TK.name+' loaded on deck — walk up and press E to crew it','ok');
+  refreshShop(); updateHUD(); sfxClick(); flashPrompt(T(TK.name+' loaded on deck — walk up and press E to crew it',trName(TK.name)+' 已装上甲板——走过去按 E 上车'),'ok');
 }
 function spinProp(pa,dt){
   const dead = piloting && piloting.plane===pa && !piloting.engineOn;   // engine out → prop windmills / stops
@@ -8381,7 +8381,7 @@ function tickCrit(s,dt){
     c.fireBurn+=dt; if(c.fireBurn>4.5){ c.fireBurn=0; c.fire--; if(c.fire<=0&&s===player){ warRecord('fires'); flashPrompt(T('🧯 Fire out.','🧯 火扑灭了。')); } } }
   // flooding — drains, but damage-control crews steadily bail it out (no longer needs a perfect lull)
   if(c.flood>0){ critHurt(s, c.flood*3*dt);
-    c.floodT+=dt; if(c.floodT>5){ c.floodT=0; c.flood--; if(s===player) flashPrompt(c.flood>0?'Flooding slowing…':'💧 Flooding contained.'); } }
+    c.floodT+=dt; if(c.floodT>5){ c.floodT=0; c.flood--; if(s===player) flashPrompt(c.flood>0?T('Flooding slowing…','进水在减慢……'):T('💧 Flooding contained.','💧 进水堵住了。')); } }
   // SYSTEM REPAIR: crews ALWAYS make progress (slower while still burning/flooding) — you can never soft-lock
   if(c.engine>0||c.guns>0||c.radar>0||c.deck>0){
     c.dcT+=dt*((c.fire>0||c.flood>0)?0.5:1);
@@ -8626,8 +8626,8 @@ function damageTarget(t,dmg,owner,hitPos){
     const _paid=(byPlayer||playerCredited(t))?bounty:Math.round(bounty*0.25);
     sunk++;warRecord('sunk');money+=_paid;if(t.def.boss){warRecord('bosses');sessBosses++;flashPrompt(T('⚓ ENEMY LEVIATHAN DESTROYED — $30,000 BOUNTY','⚓ 敌方利维坦已击沉——赏金 $30,000'));
       if(t.team===1){ rivalAdvance('angry'); rivalSpeak(career.rivalPhase); } }
-    if(t.nemesis){ const n=t.nemesis; if(!t.def.boss){ money+=n.bounty||1500; flashPrompt('☠ '+n.name.toUpperCase()+' DEFEATED — $'+(n.bounty||1500)+' BOUNTY'); }
-      else flashPrompt('☠ '+n.name.toUpperCase()+' DEFEATED'); if(typeof comms==='function') comms(n.name.toUpperCase(),n.defeat,'#ffd060'); }
+    if(t.nemesis){ const n=t.nemesis; if(!t.def.boss){ money+=n.bounty||1500; flashPrompt(T('☠ '+n.name.toUpperCase()+' DEFEATED — $'+(n.bounty||1500)+' BOUNTY','☠ '+trName(n.name)+' 被击败——赏金 $'+(n.bounty||1500))); }
+      else flashPrompt(T('☠ '+n.name.toUpperCase()+' DEFEATED','☠ '+trName(n.name)+' 被击败')); if(typeof comms==='function') comms(n.name.toUpperCase(),n.defeat,'#ffd060'); }
     updateHUD();refreshShop(); }
 }
 function strategicBlastFx(pos,rad){
@@ -8847,13 +8847,13 @@ function parachuteFromAircraft(){
     const mk=teamMarker(0,player.def.boss?24:13);mk.position.set(0,player.def.deckY+(player.def.boss?22:13),0);a.build.group.add(mk);
     allies.push(a); player._convertedToAlly=true; playerShipLost=true; shipsLostThisWar++; player.speed=0; player.throttle=0;
     placed.length=0; manning=null; driving=false; // old player turrets are now decoration; AI uses its own safe loadout
-    if(typeof comms==='function')comms(a.callsign,'Captain has bailed out — assuming autonomous combat patrol.','#a8d4f0');
+    if(typeof comms==='function')comms(a.callsign,T('Captain has bailed out — assuming autonomous combat patrol.','舰长已跳伞——转入自主战斗巡逻。'),'#a8d4f0');
   }
   if(playerShipLost||landCampaignMode) player.pos.copy(footPos).setY(0);   // only the captain/minimap anchor follows the pilot
   const chute=new THREE.Mesh(new THREE.SphereGeometry(5,16,8,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0xf2f2e8,transparent:true,opacity:.82,side:THREE.DoubleSide}));
   chute.position.copy(footPos).add(new THREE.Vector3(0,8,0));scene.add(chute);
   fx.push({mesh:chute,life:2.8,max:2.8,fade:true,op:.82,vel:new THREE.Vector3(0,-1.3,0)});
-  flashPrompt(footLand?'🪂 Parachute deployed — landed safely.':'🪂 Parachute deployed — splashdown! Swim to land or harbor.');
+  flashPrompt(footLand?T('🪂 Parachute deployed — landed safely.','🪂 伞开了——安全落地。'):T('🪂 Parachute deployed — splashdown! Swim to land or harbor.','🪂 伞开了——落水了！游向陆地或海港。'));
   updateMode(); return true;
 }
 function bailoutOrBoard(){
@@ -8887,7 +8887,7 @@ function toggleFoot(){
   if(best && bd<80){
     footLand=best.island||best.harbor||best;
     footPos.copy(player.pos); clampToIsland(footPos,footLand,0.82); footPos.y=groundHeightAt(footPos,footLand)+EYE;
-    flashPrompt(T('Ashore','已登岸')+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.','ok');
+    flashPrompt(T('Ashore'+(footLand.name?' on '+footLand.name:'')+'! WASD to walk · G to re-board near your ship.','已登岸'+(footLand.name?'（'+trName(footLand.name)+'）':'')+'！WASD 走路 · 走到船边按 G 回船。'),'ok');
   } else {
     footLand=null;                                                   // swimming — no ground under you
     const side=new THREE.Vector3(Math.sin(player.heading+Math.PI/2),0,Math.cos(player.heading+Math.PI/2));
@@ -9002,7 +9002,7 @@ function toggleDive(){
   if(player.def.kind!=='sub'){ flashPrompt(T('Only submarines can dive (pick the Attack Submarine)','只有潜艇能下潜（选攻击潜艇）')); return; }
   player.submerged=!player.submerged;
   if(player.submerged) warRecord('dove');
-  flashPrompt(player.submerged?'🌊 DIVE! DIVE! — running silent · torpedoes only':'⬆ Surfacing — all weapons back online');
+  flashPrompt(player.submerged?T('🌊 DIVE! DIVE! — running silent · torpedoes only','🌊 下潜！下潜！——静音航行，只能用鱼雷'):T('⬆ Surfacing — all weapons back online','⬆ 正在上浮——所有武器恢复'));
 }
 function updateSub(dt){
   if(player.air==null) player.air=100;
@@ -9060,7 +9060,7 @@ function updateEnemy(e,dt){
   // captains who break under fire turn tail and run from the fight
   if(!patient && (doc==='coward'&&e.hp<e.maxhp*0.35 || doc==='skirmisher'&&e.hp<e.maxhp*0.16)){
     desired=bearing+Math.PI; fleeing=true;                 // flat-out away from the nearest threat
-    if(!e._fledMsg){ e._fledMsg=1; if(doc==='coward'&&typeof comms==='function'&&enemyDetected(e)) comms('DOMINION','Taking heavy fire — falling back!','#ff9a6a'); }
+    if(!e._fledMsg){ e._fledMsg=1; if(doc==='coward'&&typeof comms==='function'&&enemyDetected(e)) comms(T('DOMINION','统治联邦'),T('Taking heavy fire — falling back!','火力太猛——撤退！'),'#ff9a6a'); }
   }
   else if(dP>stand+45) desired=bearing;                  // too far → close in
   else if(dP<stand-45) desired=bearing+Math.PI;          // too close → back off (no ramming)
@@ -9578,7 +9578,7 @@ function updateAIPlane(p,dt){
         // 34 m from a base whose service radius is 39 m starts hovering a few metres short of a
         // deck it was perfectly placed to land on.
         if(n.home && d2 < n.r+20 && npcRecoverToDeck(p)) return;
-        if(d2<n.r+16){ p.state='service'; p._svcT=0; if(p.team===0&&typeof comms==='function') comms('AIR','Aircraft recovering to rearm — back up shortly.','#8fd0a0'); }
+        if(d2<n.r+16){ p.state='service'; p._svcT=0; if(p.team===0&&typeof comms==='function') comms(T('AIR','航空'),T('Aircraft recovering to rearm — back up shortly.','飞机回收补弹——马上就能再上。'),'#8fd0a0'); }
       } else {                                                 // service: loiter low over the base, top up fuel/hp/ordnance
         if(d2>8) desired=Math.atan2(dx,dz); else desired=p.heading+0.6;
         p.fuel=Math.min(p.fuelMax,(p.fuel||0)+dt*45); p.hp=Math.min(p.maxhp,p.hp+dt*8);
@@ -9711,7 +9711,7 @@ function launchNuclearMissile(u,target){
   spawnShell({dmg:9999,spd:210,splash:900,kind:'missile',homing:true,turn:.62,range:14000,life:90,
     col:0xd6d1b7,strategic:true,nuclear:true,hp:180,targetPos:target.clone().setY(3),spareHarbors:true},from,dir,u.team,u);
   boom(from,3.2);
-  flashPrompt(u.team===0?'☢ R-36M LAUNCHED — WARHEAD IN FLIGHT':'☢ ENEMY R-36M LAUNCH DETECTED — INTERCEPT IT!');
+  flashPrompt(u.team===0?T('☢ R-36M LAUNCHED — WARHEAD IN FLIGHT','☢ R-36M 已发射——弹头飞行中'):T('☢ ENEMY R-36M LAUNCH DETECTED — INTERCEPT IT!','☢ 侦测到敌方 R-36M 发射——拦截它！'));
   return true;
 }
 function updateNuclearSilo(u,dt){
@@ -9889,7 +9889,7 @@ function killLandUnit(u,quiet=false){
   if(u.radar) _radar[u.team]=Math.max(0,_radar[u.team]-1);
   if(!quiet&&(u.ammo||u.fuel)&&u.island){blastAll(u.pos.clone().setY(5),u.ammo?180:145,u.ammo?42:36);}
   if(u.command&&u.island&&u.island.owner===u.team){
-    setIslandOwner(u.island,null,true);flashPrompt('⚠ '+u.island.name.toUpperCase()+' COMMAND POST DESTROYED — ISLAND NEUTRALIZED');
+    setIslandOwner(u.island,null,true);flashPrompt(T('⚠ '+u.island.name.toUpperCase()+' COMMAND POST DESTROYED — ISLAND NEUTRALIZED','⚠ '+trName(u.island.name)+' 的指挥所被摧毁——该岛已中立'));
   }
   destroyObject3D(u.group); u.group=null; const i=landUnits.indexOf(u); if(i>=0) landUnits.splice(i,1);
   if(selectedNukeSilo===u)selectedNukeSilo=null;
@@ -9999,7 +9999,7 @@ function enemyYardsPinned(dt){
   if(pinned!==_yardsPinned){                       // tell the player their pressure is doing something
     _yardsPinned=pinned;
     if(pinned){ flashPrompt('⚓ '+T('Enemy shipyards pinned — no new enemy ships while you hold this close!','敌方船厂被压住了——你顶在这儿，他们就造不出新船！'));
-      if(typeof comms==='function') comms('FLAGSHIP','We\'re on top of their yards — nothing new is coming out!','#ffd060'); }
+      if(typeof comms==='function') comms(T('FLAGSHIP','旗舰'),T('We\'re on top of their yards — nothing new is coming out!','我们压在他们船厂头上——一条新船都出不来！'),'#ffd060'); }
     else flashPrompt('⚓ '+T('Pressure off — enemy shipyards are building again.','压力一松，敌方船厂又开工了。'));
   }
   return pinned;
@@ -10373,7 +10373,7 @@ function tacticalMapClick(e){
   if(picked){selectedNukeSilo=picked;drawTacticalMap();return;}
   const s=selectedNukeSilo;if(!s){flashPrompt(T('Build an R-36M silo before opening strategic fire','先造一座 R-36M 发射井才能进行战略打击'));return;}
   if(!structurePowered(s)){flashPrompt(T('R-36M silo offline — island power required','R-36M 发射井离线——需要岛上供电'));return;}
-  if(s.fireT>0){flashPrompt(T('R-36M reloading — ','R-36M 装填中——')+Math.ceil(s.fireT)+' seconds');return;}
+  if(s.fireT>0){flashPrompt(T('R-36M reloading — '+Math.ceil(s.fireT)+' seconds','R-36M 装填中——还要 '+Math.ceil(s.fireT)+' 秒'));return;}
   const blocked=[friendlyHarbor,enemyHarbor].some(h=>h&&h.pos.distanceTo(world)<1050);
   if(blocked){flashPrompt(T('Nuclear targeting prohibited inside a harbor exclusion zone','海港禁区内禁止核打击'));return;}
   if(launchNuclearMissile(s,world)){toggleTacticalMap(false);}
