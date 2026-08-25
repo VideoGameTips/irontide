@@ -257,3 +257,33 @@ test('the headline and the compass name the real win condition', async ({ page }
   for (const k of ['ground', 'naval', 'quick'])
     expect(r[k].next.length, k + ' left the next-step line empty').toBeGreaterThan(6);
 });
+
+// campaignName()/campaignTheme() read currentMapIdx. A quick battle and a sandbox are not indexed
+// by it, so announcing them through those helpers made a five-minute skirmish open by naming
+// whatever campaign theater happened to be selected — right, plausible, and about a different map.
+test('every mode opens by naming the map it actually is', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(() => {
+    try { localStorage.clear(); } catch (e) {}
+    loadCareer(); career.wins = 6; career.mapsUnlocked = 31; saveCareer();
+    setLang('zh');
+    const seen = [], real = window.flashPrompt;
+    window.flashPrompt = m => { seen.push(String(m)); real(m); };
+    const grab = f => { seen.length = 0; f(); return seen.filter(x => x.startsWith('⚔')).pop() || ''; };
+    const out = {
+      quick:    grab(() => { currentMapIdx = 6; currentSandboxIdx = -1; quickMode = true;  startGame('destroyer'); }),
+      sandbox:  grab(() => { quickMode = false; currentSandboxIdx = 0;  startGame('destroyer'); }),
+      campaign: grab(() => { currentSandboxIdx = -1; currentMapIdx = 6; startGame('destroyer'); }),
+    };
+    window.flashPrompt = real;
+    out.theater6 = campaignName(6);
+    return out;
+  });
+  expect(r.quick, 'a quick battle is not a campaign theater').not.toContain(r.theater6);
+  expect(r.quick).toMatch(/快速战斗|Quick Battle/);
+  expect(r.sandbox, 'a sandbox is not a campaign theater either').not.toContain(r.theater6);
+  expect(r.campaign).toContain(r.theater6);
+  // and none of the three may open in the language the player did not pick
+  for (const k of ['quick', 'sandbox', 'campaign'])
+    expect(r[k], k + ' opened in English with the game set to Chinese').toMatch(/[一-鿿]/);
+});

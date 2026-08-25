@@ -5823,8 +5823,17 @@ function startGame(shipId){
     _introStageT=5; _introStage=0;   // stagger the opening voices: banner first, Varga ~5s, nemesis ~11s
     if(M.boss) spawnBoss(1,true);
     if(shipId==='boss'){friendlyBossUsed=true;warRecord('flagship');}else if(M.boss)spawnBoss(0); // choosing Leviathan uses your side's sole boss allocation
-    flashPrompt('⚔ '+(currentSandboxIdx>=0?trName(M.name):campaignName(currentMapIdx))+' — '+
-      (currentSandboxIdx>=0?trName(M.theme):campaignTheme(currentMapIdx)));
+    // campaignName/Theme read currentMapIdx, which a quick battle or a sandbox is not indexed by:
+    // a five-minute skirmish announced itself as whatever campaign theater was last selected.
+    { const isCampaign = !quickMode && currentSandboxIdx<0;
+      const sz = currentSandboxIdx>=0 && isZh() && typeof SANDBOX_ZH!=='undefined' ? SANDBOX_ZH[M.name] : null;
+      // QUICK_BATTLE is neither a campaign entry nor a sandbox, so it has no translated pair
+      // anywhere — it needs its own, or the one mode a stranger is steered into opens in English.
+      const nm = quickMode ? T('Quick Battle','快速战斗') : isCampaign ? campaignName(currentMapIdx) : (sz?sz.name:trName(M.name));
+      const th = quickMode ? T('Sink '+QUICK_KILL_GOAL+' ships or smash the harbour — whichever comes first.',
+                               '击沉 '+QUICK_KILL_GOAL+' 艘敌舰，或者砸掉敌港——先到先赢。')
+               : isCampaign ? campaignTheme(currentMapIdx) : (sz?sz.theme:trName(M.theme));
+      flashPrompt('⚔ '+nm+' — '+th); }
     startDrive();          // spawn already at the helm: W moves the ship within seconds of clicking a card
     if(onTrainingMap()) startTrainingCourse();   // the training theater teaches the whole game, every time you enter it
     else { tutCeasefire=false; startTutorial(); }   // first-ever battle walks W → mouse → first kill → armory (no-op once done)
@@ -10508,10 +10517,16 @@ function renderActions(){
 let helpOpen=false;
 function toggleHelp(force){
   const el=document.getElementById('help'); if(!el) return;
+  // Battle help, so only in a battle: at the menu it opened over the picker offering to "quit to
+  // the menu" you were already looking at.
+  if(phase!=='play'&&!helpOpen) return;
   helpOpen = force===undefined ? !helpOpen : !!force;
   el.classList.toggle('on', helpOpen);
   if(!helpOpen) return;
   if(document.pointerLockElement) document.exitPointerLock();
+  // Let go of everything first: the keydown that opened this is swallowed from here on, so a held
+  // W would never see its keyup and the ship would sail on while its captain reads.
+  for(const k in keys) keys[k]=0;
   document.getElementById('helpTitle').textContent=T('⚓ WHAT DO I DO NOW?','⚓ 我现在该干什么？');
   document.getElementById('helpNow').textContent=nextStepHint();
   document.getElementById('helpSec').textContent=T('EVERY KEY YOU CAN PRESS RIGHT NOW','此刻你能按的每一个键');

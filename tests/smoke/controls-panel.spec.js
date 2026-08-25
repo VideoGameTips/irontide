@@ -269,3 +269,24 @@ test('? answers what to do now, and Esc puts it away without skipping the tutori
   // Esc skips the tutorial when nothing is over it. Closing help must not do that by accident.
   expect(closed.tutIdx, 'Esc fell through and skipped the lesson').toBe(open.tutIdx);
 });
+
+// ? is battle help. At the menu it opened over the ship picker offering to "quit to the menu"
+// you were already looking at — and while it is up the keydown that opened it is swallowed, so a
+// held W would never see its keyup and the ship sailed on while its captain read.
+test('? belongs to the battle, and puts the wheel down while it is open', async ({ page }) => {
+  await boot(page);
+  const atMenu = await page.evaluate(() => {
+    phase = 'select'; toggleHelp(true);
+    const on = !!document.querySelector('#help.on'); toggleHelp(false); return on;
+  });
+  expect(atMenu, 'battle help has no business over the menu').toBe(false);
+
+  const throttle = await page.evaluate(() => {
+    difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = 4;
+    startGame('destroyer'); skipBanner();
+    keys['KeyW'] = 1; toggleHelp(true);
+    const dt = 1 / 30; for (let i = 0; i < 90; i++) { t2 += dt; update(dt, t2); }
+    const v = player.throttle; toggleHelp(false); keys['KeyW'] = 0; return v;
+  });
+  expect(throttle, 'the ship must not sail on while the help panel is up').toBe(0);
+});
