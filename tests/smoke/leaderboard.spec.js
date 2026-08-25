@@ -87,13 +87,26 @@ test('a first win goes on the board and says so, and opting out takes it back of
     const before = LB.consent;
     startGame('destroyer'); skipBanner();
     endGame(true, 'test');
-    await new Promise(res => setTimeout(res, 300));
 
+    // Read it BEFORE the send resolves. The notice is written synchronously on purpose —
+    // the result is already on its way and the player should be told now, not after a
+    // round trip that may never come back.
     const notice = document.getElementById('lbConsent');
     const told = !!notice;
     const t = notice ? notice.textContent : '';
     const statesItIsDone = /on the leaderboard|已经上榜/.test(t);
     const offersNoChoice = !/lbYes|lbNo/.test(notice ? notice.innerHTML : '');
+
+    // ...and when the send does NOT land — which is the case here, there is no leaderboard
+    // server in these tests — the claim has to be taken back. Saying "you are on the board"
+    // to somebody who is not sends them looking for a name that was never uploaded.
+    await new Promise(res => setTimeout(res, 400));
+    const afterFailedSend = document.getElementById('lbConsent').textContent;
+    const retracted = /could not be sent|没能上传/.test(afterFailedSend);
+    const stillStatesItIsDone = /on the leaderboard|已经上榜/.test(afterFailedSend);
+
+    // Retracting must not take the opt-out control down with it: that link is the only
+    // way off the board on this screen.
     const hasOptOut = !!document.getElementById('lbOptOut');
 
     document.getElementById('lbOptOut').click();
@@ -103,6 +116,7 @@ test('a first win goes on the board and says so, and opting out takes it back of
     phase = 'play';
     startGame('destroyer'); skipBanner();
     return { before, told, statesItIsDone, offersNoChoice, hasOptOut,
+             retracted, stillStatesItIsDone,
              consentAfterOptOut: LB.consent, sessionAfterOptOut: LB.session };
   });
 
@@ -110,7 +124,9 @@ test('a first win goes on the board and says so, and opting out takes it back of
   expect(r.told).toBe(true);
   expect(r.statesItIsDone).toBe(true);   // their time is already up there
   expect(r.offersNoChoice).toBe(true);   // so it states that, instead of offering a yes/no
-  expect(r.hasOptOut).toBe(true);
+  expect(r.hasOptOut).toBe(true);          // and survives the retraction above
+  expect(r.retracted).toBe(true);          // the send failed, so the claim is withdrawn
+  expect(r.stillStatesItIsDone).toBe(false);
   expect(r.consentAfterOptOut).toBe(false);
   expect(r.sessionAfterOptOut).toBe(null);
   expect(errors).toEqual([]);
@@ -251,4 +267,83 @@ test('a resumed save is never submitted, even if a war handshake is still open',
   expect(r.hadSession).toBe(true);
   expect(r.sessionAfterResume).toBe(null);
   expect(r.practiceAfterResume).toBe(false);
+});
+
+test('a war abandoned to pick another ship is remembered, and the panel says why it is not ranked', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e)));
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof LB !== 'undefined' && typeof openLeaderboard === 'function');
+
+  const r = await page.evaluate(async () => {
+    const b = document.getElementById('storyBtn'), s = document.getElementById('story');
+    if (b && s && s.style.display === 'flex') b.click();
+
+    // Every ship pick opens a handshake, and only endGame submits. Going back to the menu
+    // and picking a different ship therefore throws the war away silently — six of those
+    // in a row is what a real player did before deciding the leaderboard was broken.
+    startGame('destroyer'); skipBanner();
+    LB.session = { session_id: 'war-in-progress', nonce: 'deadbeef' };   // stand in for the handshake
+    startGame('destroyer'); skipBanner();                                // ...and abandon it
+    const outcome = LB.lastOutcome;
+
+    // The panel is where that answer has to surface — an empty board with no explanation
+    // is exactly what sent the player looking for a bug.
+    openLeaderboard();
+    await new Promise(res => setTimeout(res, 400));
+    const why = document.getElementById('lbWhy');
+    const shown = why ? why.textContent : '';
+    const optOutStillThere = !!document.getElementById('lbForget') || !!document.getElementById('lbJoin');
+    closeLeaderboard();
+    return { reason: outcome && outcome.reason, shown, optOutStillThere };
+  });
+
+  expect(r.reason).toBe('abandoned');
+  expect(r.shown).toMatch(/not finished|never finished|没打完/);
+  expect(r.optOutStillThere).toBe(true);   // the warning is prepended, it does not replace the identity block
+  expect(errors).toEqual([]);
+});
+
+test('a counted run leaves no why-not-ranked warning behind', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof LB !== 'undefined' && typeof openLeaderboard === 'function');
+  const r = await page.evaluate(async () => {
+    const b = document.getElementById('storyBtn'), s = document.getElementById('story');
+    if (b && s && s.style.display === 'flex') b.click();
+    LB.lastOutcome = { at: Date.now(), win: true, mode: 'campaign', reason: 'counted' };
+    openLeaderboard();
+    await new Promise(res => setTimeout(res, 400));
+    const has = !!document.getElementById('lbWhy');
+    closeLeaderboard();
+    return { has };
+  });
+  expect(r.has).toBe(false);
+});
+
+test('the board name the results screen promises is the name the board actually shows', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof LB !== 'undefined' && typeof lbBoardName === 'function');
+  const r = await page.evaluate(() => {
+    const b = document.getElementById('storyBtn'), s = document.getElementById('story');
+    if (b && s && s.style.display === 'flex') b.click();
+
+    // Signed out: the callsign is the board name, and the copy explains where it came from.
+    LB.sushi.user = null;
+    startGame('destroyer'); skipBanner();
+    endGame(true, 'test');
+    const anon = { name: lbBoardName(), copy: document.getElementById('lbConsent').textContent };
+
+    // Signed in: the server ranks the ACCOUNT, so the callsign never appears on the board.
+    // Promising it is a name the player will never find.
+    LB.sushi.user = { displayName: 'Brave Sushi 85069' };
+    lbShowEnrolledNotice();
+    const signedIn = { name: lbBoardName(), copy: document.getElementById('lbConsent').textContent };
+    return { anon, signedIn, callsign: lbMyName() };
+  });
+
+  expect(r.anon.name).toBe(r.callsign);
+  expect(r.anon.copy).toContain(r.callsign);
+  expect(r.signedIn.name).toBe('Brave Sushi 85069');
+  expect(r.signedIn.copy).toContain('Brave Sushi 85069');
+  expect(r.signedIn.copy).not.toContain(r.callsign);      // the promise matches the board
 });

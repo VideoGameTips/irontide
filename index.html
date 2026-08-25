@@ -10201,6 +10201,9 @@ function lbReroll(){
   try{ localStorage.setItem('ironTideLbCallsign',JSON.stringify(LB.callsign)); }catch(e){}
 }
 function lbMyName(){ return LB.callsign?callsignText(LB.callsign.a,LB.callsign.b,isZh(),LB.id):''; }
+// 榜上真正显示的名字。登录之后服务端认的是账号，本地呼号根本不参与排名——
+// 所以结算页拿呼号去告诉玩家「你叫这个」是错的：他在榜上看到的是账号名。
+function lbBoardName(){ return (LB.sushi&&LB.sushi.user) ? LB.sushi.user.displayName : lbMyName(); }
 function lbMode(){ return quickMode?'quick':(currentSandboxIdx>=0?'sandbox':'campaign'); }
 function lbStarsTotal(){ let n=0; const t=career.theaters||{}; for(const k in t) n+=t[k].stars||0; return n; }
 
@@ -10214,6 +10217,10 @@ async function lbSign(nonce,bodyStr){
 // Opens a war. Fire-and-forget: if the handshake never lands there is simply no
 // session at the end and nothing gets submitted.
 async function lbStartRun(){
+  // 上一局的握手还开着 = 那一局没打完就被丢掉了（每选一次船都会走到这里）。
+  // 只有 endGame 会上报，所以这种局永远不会出现在榜上，而在此之前游戏什么都不说：
+  // 实测有玩家 14 分钟里开了 6 次握手、一条成绩都没有，然后以为排行榜坏了。
+  if(LB.session) LB.lastOutcome={ at:Date.now(), win:false, mode:null, reason:'abandoned' };
   LB.session=null; LB.practice=false; LB.sushi.run=null;
   // 默认上榜：只有明确关掉的人才不发。第一局就握手，所以第一局就能上榜——
   // 之前「先问再发」意味着要打完两局才有第一条成绩，实际结果是打完一局的人
@@ -10273,9 +10280,13 @@ function lbAfterBattle(win,mpMatch,durS){
   // still sitting there. Clear it first or the results screen accumulates a stack of
   // stale rank lines and an already-answered consent box.
   ['lbConsent','lbRankLine'].forEach(id=>{ const e=document.getElementById(id); if(e) e.remove(); });
-  if(!LB.supported||mpMatch) return;
-  if(MP.active||MP.everJoined) return;
-  if(LB.consent===false) return;
+  // 记下这一局到底怎么了。玩家问「我为什么不在榜上」时，面板得能回答，
+  // 而不是让他对着一个空榜自己猜——这正是这个功能第一周实际发生的事。
+  LB.lastOutcome = { at:Date.now(), win:!!win, mode:lbMode(), reason:null };
+  const bail = why => { LB.lastOutcome.reason = why; };
+  if(!LB.supported){ bail('unsupported'); return; }
+  if(mpMatch||MP.active||MP.everJoined){ bail('multiplayer'); return; }
+  if(LB.consent===false){ bail('opted-out'); return; }
   // 告知次数，不是「告知过没有」。一行字只出现一次，孩子瞄一眼就翻页了——
   // 等于从没被告知过，而这是默认上榜，告知是唯一的正当性来源。三次之后停，
   // 再多就是骚扰；面板里的「把我从榜上撤下来」是长期入口，一直都在。
@@ -10290,7 +10301,20 @@ function lbAfterBattle(win,mpMatch,durS){
     lbShowEnrolledNotice();
   }
   lbFinishRun(win,mpMatch,durS).then(async r=>{
-    if(!r) return;
+    if(!r){
+      // lbFinishRun 一进门就把 LB.session 置空了，所以只剩「当时有没有网」这一个区分。
+      bail(navigator.onLine === false ? 'offline' : 'no-reply');
+      // 那句「你的成绩已经上榜了」是在发请求之前就写上屏幕的（故意的：不该等网络）。
+      // 但请求失败时它就变成了一句假话，得当场收回——玩家会照着它去榜上找自己。
+      const say=document.getElementById('lbConsentSay');
+      if(say){ say.style.color='#8a9bb0';
+        say.textContent=T('This result could not be sent to the leaderboard — the connection was down. Your next finished battle will go up.',
+                          '这一局没能上传到排行榜——当时连不上。下一局打完就会上去。'); }
+      return;
+    }
+    LB.lastOutcome.reason = r.test ? 'test-run' : r.practice ? 'practice'
+                          : r.counted ? 'counted' : 'flagged';
+    LB.lastOutcome.score = r.war_score;
     // Relay the signature to the site-wide board. Only ever present on a run that passed
     // our own checks, so a practice or flagged war simply never gets this far.
     const site = r.sushi ? await lbSushiFinish(r.sushi) : null;
@@ -10308,9 +10332,19 @@ function lbShowEnrolledNotice(){
   const box=document.createElement('div'); box.id='lbConsent';
   box.style.cssText='margin:12px auto 0;max-width:560px;padding:11px 16px;border:1px solid #21384e;'+
     'border-radius:10px;background:rgba(255,255,255,0.03);font-size:12px;line-height:1.7;color:#9fc6e8;text-align:center';
+  // 两种身份两种措辞。登录的人看到的是自己起的账号名，「不是真名」那句对他不成立，
+  // 说了反而像在解释一个他根本没见过的名字。
+  const nm='<b style="color:#cfe0ee">'+lbBoardName()+'</b>';
+  // 声明单独包一个 span：上传失败要收回的是这句话，不是整个盒子——
+  // 连「不想上榜？」那个开关一起重写掉，等于顺手把玩家唯一的退出入口也删了。
   box.innerHTML=
-    T('🏆 Your time is on the leaderboard as <b style="color:#cfe0ee">'+lbMyName()+'</b> — a callsign from a word list, not your real name.',
-      '🏆 你的成绩已经上榜了，名字是 <b style="color:#cfe0ee">'+lbMyName()+'</b>——从词表里抽的呼号，不是真名。')+
+    '<span id="lbConsentSay">'+
+    ((LB.sushi&&LB.sushi.user)
+      ? T('🏆 Your time is on the leaderboard as ⚓ '+nm+' — your Sushi Game Lab account name.',
+          '🏆 你的成绩已经上榜了，名字是 ⚓ '+nm+'——你的寿司游戏实验室账号名。')
+      : T('🏆 Your time is on the leaderboard as '+nm+' — a callsign from a word list, not your real name.',
+          '🏆 你的成绩已经上榜了，名字是 '+nm+'——从词表里抽的呼号，不是真名。'))+
+    '</span>'+
     ' <span id="lbOptOut" style="cursor:pointer;color:#8fb8d8;text-decoration:underline">'+
       T('Rather not be on it?','不想上榜？')+'</span>';
   const txt=document.getElementById('overText');
@@ -10446,7 +10480,51 @@ function lbRenderChrome(){
     f.appendChild(sel);
   }
 }
+// 上一局为什么不在榜上。默认上榜之后最常见的困惑就是「我明明打了一局」——
+// 而真正的原因通常不是坏了，是那一局没打完。这些结论 lbAfterBattle 从一开始就在记，
+// 只是没有任何地方把它读出来，等于记了个寂寞。
+function lbWhyNotRanked(){
+  const o=LB.lastOutcome;
+  if(!o||!o.reason||o.reason==='counted') return null;
+  const M={
+    abandoned:  ['Your last battle was never finished, so it did not count. Only a battle you win or lose reaches the board — going back to pick another ship starts over.',
+                 '上一局没打完，所以没有计入。只有分出胜负的战斗才会上榜——退回去换一艘船等于从头再来。'],
+    'opted-out':['You are off the board, so your last battle was not sent.',
+                 '你已经从榜上撤下来了，所以上一局没有上传。'],
+    multiplayer:['Multiplayer matches are not ranked here — these boards are the campaign.',
+                 '联机对战不计入这里的榜——这几个榜记的是战役。'],
+    practice:   ['That was a practice run: the money cheat was used, so it stayed off the board.',
+                 '上一局算练习：用了金钱秘籍，所以没有上榜。'],
+    'test-run': ['Test mode is on: your battles are still scored, but never listed.',
+                 '测试模式开着：成绩照算，但永远不会列出来。'],
+    offline:    ['Your last result could not be sent — the connection was down. It will go up next time you finish one online.',
+                 '上一局没能上传——当时连不上。恢复联网后打完一局就会上去。'],
+    'no-reply': ['Your last result could not be sent. Finish another battle to try again.',
+                 '上一局没能上传。再打完一局就会重试。'],
+    flagged:    ['Your last battle did not pass the score checks, so it is not listed.',
+                 '上一局没通过成绩校验，所以没有列出来。'],
+    unsupported:['This browser blocks the storage the board needs, so nothing is sent.',
+                 '这个浏览器屏蔽了排行榜要用的本地存储，所以什么都不会上传。'],
+  }[o.reason];
+  return M ? T(M[0],M[1]) : null;
+}
+
+// 三个身份分支各自整体覆盖 #lbFoot 的 innerHTML，所以警示条只能等它们写完再插进去，
+// 否则先写的那块会被下一句 innerHTML= 直接冲掉。
 function lbRenderFoot(){
+  const o=document.getElementById('lbPanel'); if(!o) return;
+  lbRenderFootIdentity();
+  const why=lbWhyNotRanked(); if(!why) return;
+  const foot=o.querySelector('#lbFoot'); if(!foot) return;
+  const w=document.createElement('div');
+  w.id='lbWhy';
+  w.style.cssText='margin:0 0 11px;padding:9px 13px;border:1px solid #3a3320;border-radius:9px;'+
+    'background:rgba(255,208,96,0.06);color:#d8c48a;font-size:12px;line-height:1.65;text-align:left';
+  w.textContent='⚠ '+why;                       // 纯文本，呼号/账号名不参与拼接，不用担心注入
+  foot.insertBefore(w, foot.firstChild);        // 玩家打开面板第一个问题就是「我人呢」，排最前
+}
+
+function lbRenderFootIdentity(){
   const o=document.getElementById('lbPanel'); if(!o) return;
   const foot=o.querySelector('#lbFoot'); foot.innerHTML='';
 
