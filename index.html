@@ -30,7 +30,11 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{width:100%;height:100%;overflow:hidden;background:#0a1018;font-family:'Segoe UI',system-ui,sans-serif;color:#d6dee8;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a1018;font-family:'Segoe UI',system-ui,sans-serif;color:#d6dee8;
+    /* Mouse-look is a drag on a canvas with HUD text over it, so every look-around left the
+       objective bar and the key list highlighted blue. Nothing here is meant to be copied. */
+    -webkit-user-select:none;user-select:none;}
+  input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text;}
   #c{display:block;width:100%;height:100%;position:fixed;inset:0;touch-action:none;}
 
   /* ---- Ship select menu ---- */
@@ -4221,9 +4225,19 @@ function nextStepHint(){
     // to the next island" is advice the player cannot act on. The tank is the way across.
     const nx=nextIslandTarget(), nm=nx?(trName(nx.isl.name)||T('the next island','下一座岛')):T('the next island','下一座岛');
     const far=nx?' ('+nx.dist+'m)':'';
-    if(landCampaignMode)
-      return T('Walk to a tank, press E to board, G to float it, and drive to '+nm+far+'. '+left+' to go.',
-               '走到坦克旁按 E 上车，按 G 让它浮起来，开去「'+nm+'」'+far+'。还剩 '+left+' 座。');
+    if(landCampaignMode){
+      // E only crews tanks in playerTanks — the ones YOU own. The friendly armour driving past is
+      // AI, and telling a stranded player to "walk to a tank" when every tank in sight is somebody
+      // else's is advice they cannot act on. Say how to GET one.
+      if(nearestFieldTank())
+        return T('Press E to crew the tank beside you, G to float it, then drive to '+nm+far+'.',
+                 '按 E 上你旁边那辆坦克，按 G 让它浮起来，开去「'+nm+'」'+far+'。');
+      if(playerTanks.some(tk=>!tk.onDeck&&tk.hp>0))
+        return T('Your tank is out there — walk up to it and press E. Then G to float, and on to '+nm+far+'.',
+                 '你的坦克就在岛上——走到它旁边按 E。再按 G 浮起来，开去「'+nm+'」'+far+'。');
+      return T('Press Tab and buy a tank — it drops beside you. Then E to crew it, G to float, and on to '+nm+far+'.',
+               '按 Tab 买一辆坦克，它会空投到你旁边。然后按 E 上车、G 浮起来，开去「'+nm+'」'+far+'。');
+    }
     return T('This island is yours. Press G to re-board, then sail to '+nm+far+' — '+left+' to go.',
              '这座岛拿下了。按 G 回船上，开去「'+nm+'」'+far+'——还剩 '+left+' 座。');
   }
@@ -7840,7 +7854,14 @@ function toggleMan(){
   if(onFoot){ const prize=boardableEnemyShip();if(prize){startBoarding(prize);return;}
     const friend=boardableFriendlyShip(); if(friend){ takeCommandOf(friend); return; }
     const ftk=nearestFieldTank(); if(ftk){ mountTank(ftk); return; }
-    flashPrompt(playerShipLost?'Get back to your harbor and press P for a replacement ship.':(landCampaignMode?'Find a friendly tank to crew, or keep pushing the assault.':'Press G to re-board your ship.')); return; }
+    flashPrompt(playerShipLost
+      ? T('Get back to your harbor and press P for a replacement ship.','回到我方海港，按 P 领一条新船。')
+      : landCampaignMode
+      // "Find a friendly tank" was wrong: E crews tanks you own, and the friendly armour around
+      // you belongs to the AI. Tab is how you get one of your own.
+      ? T('Nothing to crew here — press Tab to buy a tank and it drops beside you.',
+          '这儿没有你能上的车——按 Tab 买一辆坦克，它会空投到你旁边。')
+      : T('Press G to re-board your ship.','按 G 回到船上。')); return; }
   if(piloting){ const prize=boardableEnemyShip(); if(prize){ startBoarding(prize); return; }
     if(piloting.plane.def.uav){returnFromUAV(false,'UAV recovered');return;} if(playerShipLost&&piloting.phase==='fly'){ flashPrompt(T('No deck left to land on — press P to parachute, then reach harbor.','没有甲板可降落了——按 P 跳伞，然后回海港。')); return; }
     if(piloting.phase==='fly'){ const site=foreignLandingSite();
@@ -7874,8 +7895,8 @@ function buyPlane(id){
   spot.taken=true; refreshShop(); updateHUD(); sfxClick(); flashPrompt(p.name+' ready on deck — press E aboard it to fly','ok');
 }
 function buyTank(id){
-  const T=TANKS[id]; const cost=priceOf(T.cost);
-  if(marketBlocked('tank',id,T))return;
+  const TK=TANKS[id]; const cost=priceOf(TK.cost);
+  if(marketBlocked('tank',id,TK))return;
   if(money<cost){ flashPrompt(T('Not enough funds','钱不够')); return; }
   if(landCampaignMode){
     const surf=footSurfaceAt(footPos,0), isl=landIdentity(surf)||footLand;
@@ -7885,14 +7906,14 @@ function buyTank(id){
     clampToIsland(p,isl,0.82); p.y=groundHeightAt(p,isl);
     if(playerTanks.some(tk=>!tk.onDeck&&tk.hp>0&&(tk.pos||tk.group.position).distanceTo(p)<7)){ flashPrompt(T('Too crowded for a tank drop — move a few steps','这儿太挤，坦克放不下——挪几步')); return; }
     money-=cost; buildGroundPlayerTank(p,id,isl);
-    refreshShop(); updateHUD(); sfxClick(); flashPrompt(T.name+' delivered beside you — press E near it to crew it');
+    refreshShop(); updateHUD(); sfxClick(); flashPrompt(T(trName(TK.name)+' delivered beside you — press E near it to crew it',trName(TK.name)+' 已空投到你旁边——走近按 E 上车'));
     return;
   }
   const spot=tankSpots.find(s=>!s.taken);
   if(!spot){ flashPrompt(T('No free deck slot — a bigger ship carries more tanks','甲板没空位了——换条大船能多带坦克')); return; }
   money-=cost;
   buildDeckTank(spot.pos, id); spot.taken=true;
-  refreshShop(); updateHUD(); sfxClick(); flashPrompt(T.name+' loaded on deck — walk up and press E to crew it','ok');
+  refreshShop(); updateHUD(); sfxClick(); flashPrompt(TK.name+' loaded on deck — walk up and press E to crew it','ok');
 }
 function spinProp(pa,dt){
   const dead = piloting && piloting.plane===pa && !piloting.engineOn;   // engine out → prop windmills / stops
