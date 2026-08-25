@@ -13,6 +13,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const SC = require('../server-leaderboard/scoring.js');   // par is read from the real formula, not copied
 
 // better-sqlite3 is a native module installed under server-leaderboard/. A fresh clone
 // that has not run `npm install` there should skip rather than fail the whole suite.
@@ -144,8 +145,11 @@ suite('a real run is accepted, scored on the server, and reaches the board', asy
 
   assert.equal(res.status, 200);
   assert.equal(res.json.counted, true);
-  // 4*10 + 2*3 + 1*15 + 100 win + 50 flawless + time bonus under par(240+2*80=400)
-  assert.equal(res.json.war_score, 40 + 6 + 15 + 100 + 50 + Math.round((400 - 300) / 400 * 100));
+  // 4*10 + 2*3 + 1*15 + 100 win + 50 flawless + time bonus under par(240 + enemies*80).
+  // par is read from the scoring module rather than written out, so authoring a theater's
+  // fleet size differently does not silently rot this expectation into a wrong number.
+  const parT = SC.parSeconds(0);
+  assert.equal(res.json.war_score, 40 + 6 + 15 + 100 + 50 + Math.round((parT - 300) / parT * 100));
   assert.equal(res.json.ranks.theater.rank, 1);
 
   const board = await get('/board?type=theater&map=0&diff=normal', PLAYER);

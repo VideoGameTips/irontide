@@ -13,6 +13,9 @@ async function freshMenu(page) {
     career.credits = 0; career.wins = 0; career.losses = 0; currentSandboxIdx = -1;
     const b = document.getElementById('storyBtn'), s = document.getElementById('story');
     if (b && s && s.style.display === 'flex') b.click();
+    // A brand-new captain now meets the first-run screen (guarded separately below); these tests
+    // are about the picker they reach from it, so step past it first.
+    _firstRunOpen = false; buildMenu();
     buildCampaignPicker();
   });
 }
@@ -40,46 +43,131 @@ test('a first-time captain gets a menu that fits on one screen', async ({ page }
   expect(r.height).toBeLessThan(r.viewport * 1.5);
 });
 
-test('the sections open on demand and survive the picker re-rendering', async ({ page }) => {
+const clickTab = (page, label) => page.evaluate(l =>
+  [...document.querySelectorAll('#brTabs button')].find(b => new RegExp(l).test(b.textContent)).click(), label);
+
+test('the armory is behind a tab, and stays where you put it', async ({ page }) => {
   await freshMenu(page);
-  const openMarket = () => page.evaluate(() =>
-    [...document.querySelectorAll('#maps > div')].find(d => /CAMPAIGN MARKET|战役市场/.test(d.textContent)).click());
+  const marketVisible = () => page.evaluate(eval(VISIBLE), MARKET_CARD);
 
-  await openMarket();
-  expect(await page.evaluate(eval(VISIBLE), MARKET_CARD)).toBe(true);
+  expect(await marketVisible(), 'not stacked under the battlefield picker').toBe(false);
+  await clickTab(page, 'Armory|军械库');
+  expect(await marketVisible()).toBe(true);
 
-  // Changing difficulty rebuilds the whole picker. An opened section must not snap shut.
+  // Changing difficulty rebuilds the whole picker. The tab you opened must not snap shut.
   await page.evaluate(() => setDifficulty('hard'));
-  expect(await page.evaluate(eval(VISIBLE), MARKET_CARD)).toBe(true);
+  expect(await marketVisible()).toBe(true);
 
-  await openMarket();
-  expect(await page.evaluate(eval(VISIBLE), MARKET_CARD)).toBe(false);
+  await clickTab(page, 'Campaign|战役');
+  expect(await marketVisible()).toBe(false);
 });
 
-test('a captain with credits gets the market back without asking', async ({ page }) => {
+test('an armory with nothing affordable says how to earn it', async ({ page }) => {
   await freshMenu(page);
+  await clickTab(page, 'Armory|军械库');
   const r = await page.evaluate(([market, visible]) => {
     const shown = eval(visible);
-    const asNewbie = shown(market);
-    menuOpenSections = {};                       // no manual choice recorded
+    const broke = { cards: shown(market),
+                    hint: /credits|信用/.test(document.getElementById('maps').textContent) };
     career.credits = 1200; career.wins = 3;
     buildCampaignPicker();
-    return { asNewbie, asVeteran: shown(market) };
+    return { broke, rich: shown(market) };
   }, [MARKET_CARD, VISIBLE]);
 
-  expect(r.asNewbie).toBe(false);
-  expect(r.asVeteran).toBe(true);               // it is useful now, so it is back
+  expect(r.broke.hint, 'a wall of things you cannot buy needs to say why').toBe(true);
+  expect(r.rich, 'and the catalogue is there once you can').toBe(true);
 });
 
-test('ship cards say that clicking one starts the battle, until you have played', async ({ page }) => {
+test('clicking a hull picks it — the launch bar is what sails', async ({ page }) => {
   await freshMenu(page);
-  const newbie = await page.evaluate(() =>
-    [...document.querySelectorAll('#ships > div')].filter(d => /CLICK TO SET SAIL|点这张卡就出击/.test(d.textContent)).length);
-  expect(newbie).toBeGreaterThan(0);
-
-  const veteran = await page.evaluate(() => {
-    career.wins = 2; buildMenu();
-    return [...document.querySelectorAll('#ships > div')].filter(d => /CLICK TO SET SAIL|点这张卡就出击/.test(d.textContent)).length;
+  const r = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('#ships > div')];
+    const target = cards[cards.length - 1];
+    const name = target.querySelector('h3').textContent.trim();
+    target.click();
+    return { phase, started: phase !== 'select',
+             dock: (document.querySelector('#brGo .gs') || {}).textContent || '',
+             name };
   });
-  expect(veteran).toBe(0);                       // they know how it works now
+  expect(r.started, 'a card must not start a war on its own any more').toBe(false);
+  // the dock names the hull you just picked, so the choice is visible before you commit
+  expect(r.dock).toContain(r.name.replace(/\s*DEFAULT|\s*默认/, '').trim());
+});
+
+test('a stranger gets one sentence, three pictures and one button', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof buildMenu === 'function');
+  const r = await page.evaluate(() => {
+    localStorage.clear(); loadCareer();
+    career.wins = 0; career.losses = 0; saveCareer();
+    const sp = document.getElementById('splash'); if (sp) sp.remove();
+    _firstRunOpen = true; buildMenu();
+    const vis = el => !!(el && el.offsetParent !== null);
+    const before = { pitch: vis(document.getElementById('firstrun')),
+                     ctas: document.querySelectorAll('#firstrun .go').length,
+                     picker: vis(document.getElementById('maps')),
+                     ships: vis(document.getElementById('ships')) };
+    document.getElementById('frMore').click();          // "choose your ship, difficulty, battlefield"
+    const after = { pitch: vis(document.getElementById('firstrun')),
+                    picker: vis(document.getElementById('maps')),
+                    ships: vis(document.getElementById('ships')) };
+    return { before, after };
+  });
+  expect(r.before.pitch, 'a brand-new captain meets the pitch').toBe(true);
+  expect(r.before.ctas, 'exactly one thing to press').toBe(1);
+  expect(r.before.picker, 'no battlefield picker yet').toBe(false);
+  expect(r.before.ships, 'no hulls to compare yet').toBe(false);
+  expect(r.after.pitch, 'opting in leaves the pitch behind').toBe(false);
+  expect(r.after.picker).toBe(true);
+  expect(r.after.ships).toBe(true);
+});
+
+// The pitch hides the whole menu, Continue included. Showing it to someone with a saved war
+// would strand them one screen away from the battle they were in the middle of — silently.
+test('a saved war beats the pitch, so Continue is never buried', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof buildMenu === 'function');
+  const r = await page.evaluate(() => {
+    localStorage.clear(); loadCareer();
+    career.wins = 0; career.losses = 0; saveCareer();
+    const sp = document.getElementById('splash'); if (sp) sp.remove();
+    difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = 0;
+    startGame('destroyer'); skipBanner(); saveWar();     // quit mid-first-war
+    phase = 'select'; document.getElementById('menu').style.display = 'flex';
+    _firstRunOpen = true; buildMenu();
+    const vis = el => !!(el && el.offsetParent !== null);
+    return { pitch: vis(document.getElementById('firstrun')),
+             resume: vis(document.getElementById('resumeBtn')) };
+  });
+  expect(r.pitch, 'the pitch stands down once there is a war to resume').toBe(false);
+  expect(r.resume, 'Continue is reachable').toBe(true);
+});
+
+// showRespawnMenu() raises this same #menu mid-battle to pick a replacement hull. A captain sunk
+// in their first war still has 0 wins, 0 losses and no save — every other clause of the pitch's
+// test — so without the phase check the pitch covers the picker and strands them in the fight.
+test('being sunk mid-first-war raises the ship picker, not the pitch', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof buildMenu === 'function');
+  const r = await page.evaluate(() => {
+    localStorage.clear(); loadCareer();
+    career.wins = 0; career.losses = 0; saveCareer();
+    const sp = document.getElementById('splash'); if (sp) sp.remove();
+    difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = 0;
+    _firstRunOpen = true;
+    startGame('destroyer'); skipBanner();
+    showRespawnMenu('sunk');
+    const vis = el => !!(el && el.offsetParent !== null);
+    const onRespawn = { pitch: vis(document.getElementById('firstrun')), ships: vis(document.getElementById('ships')) };
+    // ...and it must stay down through a full rebuild: the language toggle re-runs buildMenu, and
+    // this captain still has 0 wins, 0 losses and no save.
+    setLang(isZh() ? 'en' : 'zh');
+    const afterLang = { pitch: vis(document.getElementById('firstrun')), ships: vis(document.getElementById('ships')) };
+    return { phase, ...onRespawn, afterLang };
+  });
+  expect(r.phase).toBe('respawn');
+  expect(r.pitch, 'the pitch must not cover a mid-battle picker').toBe(false);
+  expect(r.ships, 'the replacement hulls are reachable').toBe(true);
+  expect(r.afterLang.pitch, 'and a language switch does not raise it either').toBe(false);
+  expect(r.afterLang.ships).toBe(true);
 });

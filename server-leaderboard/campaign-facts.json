@@ -14,7 +14,7 @@
     {
       "idx": 0,
       "name": "Training Bay",
-      "enemies": 2,
+      "enemies": 3,
       "isles": 2,
       "reinforce": 0.4,
       "boss": false,

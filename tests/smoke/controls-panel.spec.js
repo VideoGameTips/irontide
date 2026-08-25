@@ -7,6 +7,9 @@ async function boot(page) {
   await page.evaluate(() => {
     const b=document.getElementById('storyBtn'), s=document.getElementById('story');
     if(b&&s&&s.style.display==='flex') b.click();
+    // A captain who has already won one: a FIRST war deliberately grows this panel a row at a
+    // time, and these tests are about the general rule, not that opening act.
+    career.wins = Math.max(1, career.wins||0); saveCareer();
   });
 }
 const readPanel = page => page.evaluate(() => {

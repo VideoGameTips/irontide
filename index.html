@@ -121,6 +121,120 @@
   @media (prefers-reduced-motion:reduce){
     #campmap .cmg.anim,#campmap .trav.anim,#mapcard.anim{animation:none;opacity:1;stroke-dashoffset:0;}
   }
+
+  /* ---- FIRST RUN -----------------------------------------------------------------------
+     What a stranger sees before they have played once: one sentence saying what this game is,
+     three pictures saying what you do in it, and one button. Ship, difficulty and theater are
+     already chosen — comparing three hulls is a judgement you cannot make before sailing one.
+     The line under the button is the whole configuration surface a beginner is offered. */
+  #firstrun{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;
+    padding:34px 22px;text-align:center;}
+  #firstrun.on{display:flex;}
+  /* One flag hides the rest of the menu instead of ten inline styles: buildCampaignPicker can
+     rebuild #maps from several places, and an inline display:none does not survive that. */
+  #menu.firstrun > *:not(#firstrun):not(#langBtn):not(#frGear){display:none!important;}
+  #firstrun .fwm{font-size:clamp(24px,4.6vw,38px);letter-spacing:.28em;color:#9fc6e8;
+    text-shadow:0 0 24px rgba(120,180,240,.4);margin-bottom:20px;}
+  #firstrun .pitch{font-size:clamp(19px,3.2vw,33px);line-height:1.32;color:#eaf6ff;max-width:19em;}
+  #firstrun .pitch em{font-style:normal;color:#ffd060;}
+  #firstrun .psub{margin-top:10px;font-size:13px;color:#7e93a8;letter-spacing:.5px;}
+  #firstrun .beats{display:flex;gap:12px;margin:26px 0 28px;flex-wrap:wrap;justify-content:center;}
+  #firstrun .beat{width:200px;border:1px solid #1c3145;border-radius:12px;padding:14px 14px 13px;
+    background:rgba(18,32,46,.72);text-align:center;}
+  #firstrun .beat svg{width:100%;height:46px;display:block;margin-bottom:8px;overflow:visible;}
+  #firstrun .beat .btx{min-width:0;}
+  #firstrun .beat .bn{font-size:10px;letter-spacing:2px;color:#ffd060;margin-bottom:4px;}
+  #firstrun .beat .bt{font-size:15px;color:#cfe6fb;}
+  #firstrun .beat .bd{font-size:11.5px;color:#7e93a8;line-height:1.45;margin-top:4px;}
+  #firstrun .go{display:inline-flex;align-items:center;gap:15px;padding:17px 38px 17px 30px;
+    border-radius:14px;border:1px solid #7fd0a0;cursor:pointer;text-align:left;
+    background:linear-gradient(180deg,#1c5a3d,#123526);color:#d6ffea;
+    box-shadow:0 0 34px rgba(127,208,160,.28), inset 0 1px 0 rgba(255,255,255,.08);transition:.15s;}
+  #firstrun .go:hover{background:linear-gradient(180deg,#226b48,#154130);box-shadow:0 0 46px rgba(127,208,160,.38);}
+  #firstrun .go .gi{font-size:23px;color:#a6f2c3;}
+  #firstrun .go .gl{display:block;font-size:23px;letter-spacing:3px;}
+  #firstrun .go .gs{display:block;font-size:12px;color:#7fcea6;margin-top:3px;letter-spacing:.6px;}
+  #firstrun .tweak{margin-top:16px;font-size:12.5px;color:#5f7a90;}
+  #firstrun .tweak a{color:#5f8bab;cursor:pointer;border-bottom:1px dotted #3c5a72;}
+  #firstrun .tweak a:hover{color:#9fc6e8;}
+  @media (max-width:900px){
+    #firstrun .beats{gap:9px;}
+    #firstrun .beat{width:min(300px,100%);display:flex;align-items:center;gap:12px;text-align:left;padding:11px 13px;}
+    #firstrun .beat svg{width:58px;flex:none;height:30px;margin:0;}
+    #firstrun .beat .btx{flex:1;}
+    #firstrun .beat .bn{display:none;}
+    #firstrun .beat .bd{margin-top:2px;}
+    #firstrun .go{width:min(340px,100%);justify-content:center;}
+  }
+
+  /* ---- THE BRIDGE ----------------------------------------------------------------------
+     Two questions side by side — where you fight, and what you sail — with a launch bar that
+     reads all three choices back before you commit. The old menu asked them in one 2000px
+     column with ~55 blueprints wedged between the battlefield and the hull you actually had
+     to pick. Below 900px it stacks and the launch bar pins to the bottom instead. */
+  #menu.bridge{overflow:hidden;}
+  #brTop{flex:none;display:flex;align-items:center;gap:10px;padding:0 18px;height:54px;
+    border-bottom:1px solid #21384e;background:rgba(8,16,24,.55);}
+  #brTop .bwm{font-size:19px;letter-spacing:6px;color:#9fc6e8;white-space:nowrap;
+    text-shadow:0 0 18px rgba(120,180,240,.35);}
+  #brTop .sp{flex:1;}
+  #brTop #career{margin:0!important;padding-left:14px;border-left:1px solid #21384e;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:38vw;}
+  #brTop #menuNav{margin:0!important;line-height:1!important;white-space:nowrap;}
+  #brTop #menuNav .pl:not(.keep){display:none;}
+  #brTop #menuNav span[id]{padding:5px 10px!important;margin:0 2px!important;}
+  #brTop #langBtn,#brTop #frGear{position:static!important;right:auto!important;top:auto!important;flex:none;}
+  #brBody{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 392px;}
+  #brLeft{min-height:0;overflow-y:auto;padding:16px 20px 18px;}
+  #brRight{min-height:0;overflow-y:auto;display:flex;flex-direction:column;
+    padding:16px 18px 0;border-left:1px solid #21384e;background:rgba(8,16,24,.45);}
+  .brh{display:flex;align-items:baseline;gap:11px;margin-bottom:11px;}
+  .brh .n{font-size:11px;letter-spacing:3px;color:#ffd060;}
+  .brh .t{font-size:16px;letter-spacing:4px;color:#cfe6fb;white-space:nowrap;}
+  .brh .hint{min-width:0;}
+  .brh .hint{margin-left:auto;font-size:11px;color:#5f7a90;letter-spacing:.5px;}
+  #brTabs{display:flex;border-bottom:1px solid #21384e;margin-bottom:12px;flex-wrap:wrap;}
+  #brTabs button{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;
+    color:#7e93a8;font:inherit;font-size:13px;letter-spacing:1px;padding:8px 15px 9px;cursor:pointer;transition:.14s;}
+  #brTabs button:hover{color:#cfe6fb;}
+  #brTabs button[aria-selected="true"]{color:#ffd060;border-bottom-color:#ffd060;}
+  #brTabs button .cnt{font-size:10.5px;color:#5f7a90;margin-left:5px;letter-spacing:0;}
+  #brDock{flex:none;position:sticky;bottom:0;margin-top:auto;padding:12px 0 16px;
+    border-top:1px solid #21384e;background:linear-gradient(180deg,rgba(10,18,28,.6),rgba(10,18,28,.95));}
+  #brGo{width:100%;display:flex;align-items:center;gap:13px;padding:13px 17px;border-radius:11px;
+    text-align:left;cursor:pointer;font:inherit;color:#c9ffe2;border:1px solid #7fd0a0;
+    background:linear-gradient(180deg,#1a4f36,#123526);
+    box-shadow:0 0 24px rgba(127,208,160,.2), inset 0 1px 0 rgba(255,255,255,.07);transition:.15s;}
+  #brGo:hover{background:linear-gradient(180deg,#1f5f41,#15402e);box-shadow:0 0 32px rgba(127,208,160,.32);}
+  #brGo .gi{font-size:19px;color:#a6f2c3;}
+  #brGo .gl{display:block;font-size:18px;letter-spacing:4px;}
+  #brGo .gs{display:block;font-size:11px;color:#77c4a0;margin-top:2px;letter-spacing:.4px;}
+  #menu.bridge #ships{padding:0;gap:9px;flex-direction:column;flex-wrap:nowrap;}
+  #menu.bridge .ship{width:100%;padding:11px 13px;}
+  #menu.bridge .ship p{display:none;}
+  #menu.bridge .ship h3{font-size:15px;}
+  #menu.bridge > h1,#menu.bridge > .sub,#menu.bridge #menuDivider{display:none;}
+  #menu.bridge #mapcard{width:100%;margin-top:12px;}
+  #menu.bridge #campmap svg{max-width:100%;}
+  #menu.bridge #moreShips{margin:2px auto 10px;}
+  #menu.bridge #resumeBtn{width:100%;margin:8px 0 0!important;padding:9px!important;font-size:12.5px!important;}
+  @media (max-width:900px){
+    /* One column that scrolls, with the launch bar pinned. flex:1 + min-height:0 is what makes
+       the two columns share one non-scrolling screen above 900 — kept here it squeezes the body
+       shorter than its own content and the hull cards land on top of the theater card. */
+    #menu.bridge{overflow-y:auto;}
+    #brBody{display:flex;flex-direction:column;flex:none;min-height:auto;}
+    #brLeft,#brRight{overflow:visible;min-height:auto;border-left:none;padding:14px 16px;}
+    #brRight{background:none;padding-top:0;}
+    #brTop{flex-wrap:wrap;height:auto;padding:10px 14px;gap:8px;position:sticky;top:0;z-index:2;
+      background:#0d1a26;}
+    #brTop .bwm{font-size:16px;letter-spacing:4px;}
+    #brTop .sp{display:none;}
+    #brTop #career{border-left:none;padding-left:0;max-width:100%;white-space:normal;font-size:11px;
+      flex-basis:100%;text-align:left;}
+    #brTop #menuNav{white-space:normal;line-height:2.1!important;flex:1;text-align:left;}
+    #brDock{position:sticky;bottom:0;padding:10px 16px 14px;margin:0 -16px;}
+  }
   @media (max-width:560px){   /* the language button owns the top-right corner on a phone */
     #menu h1{padding-top:60px;font-size:26px;letter-spacing:4px;}
     #ships{gap:12px;padding:0 16px 20px;}
@@ -407,7 +521,7 @@
   <div id="bannerCard"><div class="bc-title"></div><div class="bc-sub"></div><div class="bc-hint"></div></div>
   <div id="topbar"><div id="money">$0</div>
     <div id="objective" style="text-align:center;font-size:13px;color:#cfe6fb;">
-      <div style="color:#ff9a8a;letter-spacing:1px;">DESTROY THE ENEMY HARBOR</div>
+      <div id="obtitle" style="color:#ff9a8a;letter-spacing:1px;">DESTROY THE ENEMY HARBOR</div>
       <div style="display:flex;gap:14px;justify-content:center;margin-top:3px;">
         <span style="color:#ff9a8a;">Enemy HQ <b id="ehp">100%</b></span>
         <span style="color:#9fd0ff;">Your HQ <b id="fhp">100%</b></span>
@@ -3070,7 +3184,7 @@ const CAMPAIGN=[
   // 2600 on every map — and free to fortify itself to 5600 inside two minutes — so "barely any
   // resistance" had exactly the same win condition as the last map of the campaign, and neither
   // could be finished. hqFortify:false keeps the warm-up theaters from growing the goal at all.
-  {name:'Training Bay',       theme:'A quick shakedown in the shallows. Barely any resistance.',enemies:2, allies:4, isles:2, reinforce:0.4, weather:'clear',  tod:0.4, boss:false, hqZ:1500, bigIsles:false, hqHp:0.35, hqFortify:false},
+  {name:'Training Bay',       theme:'A quick shakedown in the shallows. Barely any resistance.',enemies:3, allies:4, isles:2, reinforce:0.4, weather:'clear',  tod:0.4, boss:false, hqZ:1500, bigIsles:false, hqHp:0.35, hqFortify:false},
   {name:'The Landing',        theme:'Pure land assault — no enemy fleet. Beach your tanks and take every island.', enemies:0, allies:3, isles:6, reinforce:0, weather:'clear', tod:0.42, boss:false, hqZ:1400, bigIsles:false, ground:true},
   {name:'Coastal Skirmish',   theme:'A short, sharp fight in tight waters.',                 enemies:3, allies:4, isles:3, reinforce:0.6, weather:'clear',    tod:0.38, boss:false, hqZ:2400, bigIsles:false, hqHp:0.55, hqFortify:false},
   // ---- the main campaign ----
@@ -3321,6 +3435,14 @@ const QUICK_BATTLE={name:'Quick Battle', theme:'A five-minute skirmish. Sink 5 s
   enemies:2, allies:2, isles:2, reinforce:0.35, weather:'clear', tod:0.42, boss:false, hqZ:1100, bigIsles:false};
 let quickMode=false;
 const QUICK_KILL_GOAL=5;
+// A captain's first war is won by sinking a handful of ships, not by grinding the enemy harbour
+// 1500 m away: the goal has to be visible from the deck and reachable with the only two controls
+// they have been taught. Stays on until they have actually won one, so losing it is not punished.
+const FIRST_WAR_GOAL=3;
+let firstWar=false;
+// Both routes into a battle have to agree on this, or a captain who quits mid-first-war and
+// resumes gets a different win condition than the one they started under.
+function isFirstWar(){ return career.wins===0 && !quickMode && currentSandboxIdx<0 && currentMapIdx===0; }
 function applyMap(){ const M=quickMode?QUICK_BATTLE:currentSandboxIdx>=0?(SANDBOX_MAPS[currentSandboxIdx]||SANDBOX_MAPS[0]):(CAMPAIGN[currentMapIdx]||CAMPAIGN[0]);
   if(typeof weather==='object'){ weather.type=M.weather; weather.tod=M.tod; weather.day=null; }
   window._MAP=M; return M; }
@@ -3949,6 +4071,7 @@ function updateWarPacing(dt){
   // land victory: on an all-ground theater, seizing every island wins the war
   if(ground){ const cap=islands.filter(i=>i.capturable); if(cap.length&&cap.every(i=>i.owner===0)){ endGame(true,'All islands secured — the archipelago is yours!'); return; } }
   if(quickMode&&sunk>=QUICK_KILL_GOAL){ endGame(true,T(QUICK_KILL_GOAL+' ships down — quick battle won!',QUICK_KILL_GOAL+' 艘敌舰击沉——快速战斗获胜！')); return; }
+  if(firstWar&&sunk>=FIRST_WAR_GOAL){ endGame(true,T(FIRST_WAR_GOAL+' ships down — your first battle is won, Captain!','击沉 '+FIRST_WAR_GOAL+' 艘敌舰——第一场，赢了，舰长！')); return; }
   // parked aircraft slowly rearm from the ship's magazine (strategic bombs excluded — no free nukes)
   planes.forEach(p=>{ if(p.parked&&p.def.bombs&&!p.def.strategicBomb&&p.bombsLeft<p.def.bombs){
       p.deckRearmT=(p.deckRearmT||0)+dt; if(p.deckRearmT>=5){ p.deckRearmT=0; p.bombsLeft++; } } else p.deckRearmT=0; });
@@ -3982,7 +4105,15 @@ function updateWarPacing(dt){
       ce.style.cssText='margin-top:2px;font-size:11px;color:#9fc6e8;letter-spacing:1px;'; if(simpleHudOn()) ce.style.display='none'; parent.appendChild(ce); } }
   const qe=document.getElementById('quickgoal')||(function(){ const parent=document.getElementById('objective'); if(!parent) return null;
     const q=document.createElement('div'); q.id='quickgoal'; q.style.cssText='margin-top:2px;font-size:11px;color:#ffe6a0;letter-spacing:1px;'; parent.appendChild(q); return q; })();
-  if(qe) qe.textContent = quickMode ? ('⏱ '+T('QUICK BATTLE — ','快速战斗——')+Math.min(sunk,QUICK_KILL_GOAL)+'/'+QUICK_KILL_GOAL+T(' ships · ',' 艘 · ')+Math.floor(Math.max(0,t2-warStartT2)/60)+':'+String(Math.floor(Math.max(0,t2-warStartT2)%60)).padStart(2,'0')) : '';
+  if(qe) qe.textContent = quickMode ? ('⏱ '+T('QUICK BATTLE — ','快速战斗——')+Math.min(sunk,QUICK_KILL_GOAL)+'/'+QUICK_KILL_GOAL+T(' ships · ',' 艘 · ')+Math.floor(Math.max(0,t2-warStartT2)/60)+':'+String(Math.floor(Math.max(0,t2-warStartT2)%60)).padStart(2,'0'))
+                        : firstWar ? (T('Sunk ','已击沉 ')+Math.min(sunk,FIRST_WAR_GOAL)+' / '+FIRST_WAR_GOAL)
+                        : '';
+  // A first war is won by sinking ships, so the headline has to SAY that. Leaving it on "destroy
+  // the enemy harbour" and adding a second line underneath handed a first-time captain two
+  // objectives that disagree with each other — the exact confusion this battle exists to avoid.
+  const ot=document.getElementById('obtitle');
+  if(ot) ot.textContent = firstWar ? T('SINK '+FIRST_WAR_GOAL+' ENEMY SHIPS','击沉 '+FIRST_WAR_GOAL+' 艘敌舰')
+                                   : T('DESTROY THE ENEMY HARBOR','摧毁敌方海港');
   if(ce){ const from=playerFocusPos(); let txt='';
     if(from){ let tgt=enemyHarbor?enemyHarbor.pos:null, lbl=T('ENEMY HARBOR','敌方海港');
       if(sideOb&&sideOb.kind==='capture'){ let bd=1e9,bi=null;
@@ -4449,6 +4580,9 @@ function initMobileControls(){
 // The voyage map and the theater detail are one component: pick a node, the card below it
 // updates. Nodes stagger in and the travelled route draws itself the first time you see it.
 let _mapAnimated=false, _mapsOpen=false, _mapsInit=false, _allShips=false;
+// Which of the left column's three answers to "where do I fight" is showing. The market used
+// to sit inline below the battlefield picker, ~55 blueprints tall, between the two questions.
+let _menuTab='campaign';
 const STARTER_SHIPS=['destroyer','scout','cruiser'];   // the recommended all-rounder first, then fast and heavy
 function mapPerRow(){ return document.documentElement.clientWidth<680 ? 4 : 8; }
 let _mapPer=0;
@@ -4547,9 +4681,27 @@ function buildCampaignPicker(){
   // With one theater unlocked, thirty padlocks say nothing except "this is complicated".
   // Show the route only once there is a route to show; otherwise a single line of context.
   // a returning captain wants the theater they just unlocked, not the training bay they cleared
-  if(unlocked>1 && !_mapsInit){ _mapsInit=true; _mapsOpen=true; if(currentMapIdx===0) currentMapIdx=unlocked-1; }
-  const showMap = unlocked>1 && _mapsOpen;
-  if(unlocked>1){
+  // Opened by default only where it fits. At four nodes a row the serpentine is 744 px tall —
+  // taller than a phone's usable viewport — so on a narrow screen it starts collapsed behind its
+  // own toggle and the theater card below is what you actually see.
+  if(unlocked>1 && !_mapsInit){ _mapsInit=true;
+    _mapsOpen = document.documentElement.clientWidth>=900;
+    if(currentMapIdx===0) currentMapIdx=unlocked-1; }
+  // --- the left column's tabs: where you fight, and the shop that outfits you for it ---
+  const tabs=document.createElement('div'); tabs.id='brTabs'; box.appendChild(tabs);
+  const tab=(key,label,cnt)=>{ const b=document.createElement('button');
+    b.setAttribute('role','tab'); b.setAttribute('aria-selected', String(_menuTab===key));
+    b.innerHTML=label+(cnt?'<span class="cnt">'+cnt+'</span>':'');
+    b.onclick=()=>{ _menuTab=key; buildCampaignPicker(); layoutBridge(); };
+    tabs.appendChild(b); return b; };
+  tab('campaign', T('Campaign','战役'), (unlocked-1)+'/'+N);
+  tab('sandbox',  T('Sandbox','沙盒'),  String(SANDBOX_MAPS.length));
+  tab('market',   T('Armory','军械库'), '◈'+(career.credits||0));
+  { const q=document.createElement('button'); q.setAttribute('role','tab'); q.setAttribute('aria-selected','false');
+    q.innerHTML='⏱ '+T('5-min battle','5 分钟快速');
+    q.onclick=startQuickBattle; tabs.appendChild(q); }
+  const showMap = _menuTab==='campaign' && unlocked>1 && _mapsOpen;
+  if(_menuTab==='campaign' && unlocked>1){
     const t=document.createElement('button'); t.id='mapsToggle';
     t.textContent=(_mapsOpen?'▾ ':'▸ ')+T('CAMPAIGN VOYAGE  ','战役航程  ')+T('('+(unlocked-1)+' of '+N+' secured)','（已攻克 '+(unlocked-1)+'/'+N+'）');
     t.onclick=()=>{ _mapsOpen=!_mapsOpen; _mapAnimated=false; buildCampaignPicker(); };
@@ -4560,19 +4712,27 @@ function buildCampaignPicker(){
     cm.innerHTML=campaignMapSVG(!_mapAnimated); box.appendChild(cm);
     _mapAnimated=true;
   }
-  const card=document.createElement('div'); card.id='mapcard'; card.className='anim';
-  card.innerHTML=theaterCardHTML(currentMapIdx); box.appendChild(card);
-  if(showMap) wireMapNodes();
-  const dr=document.createElement('div'); dr.id='diffRow';
-  dr.style.cssText='width:100%;display:flex;flex-direction:column;align-items:center;gap:5px;margin:16px 0 6px;';
-  box.appendChild(dr);
-  const sr=document.createElement('div'); sr.id='setRow';
-  sr.style.cssText='width:100%;display:none;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:8px 0 0;';
-  box.appendChild(sr);
+  if(_menuTab==='campaign'){
+    const card=document.createElement('div'); card.id='mapcard'; card.className='anim';
+    card.innerHTML=theaterCardHTML(currentMapIdx); box.appendChild(card);
+    if(showMap) wireMapNodes();
+  }
+  // Reused, not recreated: the bridge moves these into the right column, and building a second
+  // element with the same id left renderDiffRow() filling the OLD one — two difficulty rows on
+  // screen, one of them dead.
+  let dr=document.getElementById('diffRow');
+  if(!dr){ dr=document.createElement('div'); dr.id='diffRow';
+    dr.style.cssText='width:100%;display:flex;flex-direction:column;align-items:center;gap:5px;margin:16px 0 6px;'; }
+  if(!dr.parentNode) box.appendChild(dr);
+  let sr=document.getElementById('setRow');
+  if(!sr){ sr=document.createElement('div'); sr.id='setRow';
+    sr.style.cssText='width:100%;display:none;flex-wrap:wrap;gap:10px;justify-content:center;align-items:center;margin:8px 0 0;'; }
+  if(!sr.parentNode) box.appendChild(sr);
   renderDiffRow(); renderSettingsRow();
   // --- sandbox battlefields (always unlocked, never advance the campaign) ---
-  const sbRow=menuSection(box, T('SANDBOX BATTLEFIELDS — ALWAYS UNLOCKED','沙盒战场——永久解锁'), '#ffd060',
-    SANDBOX_MAPS.length+T(' arenas',' 张地图'), 'sandbox', 'display:flex;flex-wrap:wrap;gap:10px;justify-content:center;').row;
+  const sbRow=document.createElement('div');
+  sbRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;'+(_menuTab==='sandbox'?'':'display:none');
+  if(_menuTab==='sandbox') box.appendChild(sbRow);
   // training ground first in the picker, everything else in declaration order
   SANDBOX_MAPS.map((M,i)=>({M,i})).sort((a,b)=>(b.M.training?1:0)-(a.M.training?1:0))
     .forEach(({M,i})=>{ const sel=i===currentSandboxIdx;
@@ -4592,9 +4752,16 @@ function buildCampaignPicker(){
     sbRow.appendChild(c);
   });
   // --- campaign market: permanent blueprints bought with meta-credits ---
-  const mRow=menuSection(box, T('CAMPAIGN MARKET — PERMANENT BLUEPRINTS · BANK ◈','战役市场——永久蓝图 · 信用 ◈')+(career.credits||0), '#c7a8ff',
-    (career.credits||0)>0 ? MARKET_CATALOG.length+T(' blueprints',' 件蓝图')
-                          : T('earn credits by winning a theater','打完战区赚信用后解锁'), 'market', 'display:flex;flex-wrap:wrap;gap:10px;justify-content:center;').row;
+  const mRow=document.createElement('div');
+  mRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;';
+  if(_menuTab==='market'){
+    if(!(career.credits||0)){ const hint=document.createElement('div');
+      hint.style.cssText='width:100%;text-align:center;color:#7d8a97;font-size:12px;margin:6px 0 12px;letter-spacing:.5px;';
+      hint.textContent=T('Win a theater to earn credits — blueprints are permanent once bought.',
+                         '打完一个战区就有信用可用——蓝图买下来是永久的。');
+      box.appendChild(hint); }
+    box.appendChild(mRow);
+  }
   MARKET_CATALOG.forEach(item=>{
     const def=marketDef(item), key=marketKey(item.cat,item.id), owned=ownsMarketItem(item.cat,item.id), unlocked=mapsUnlocked()>=unlockLevel(item.level);
     const c=document.createElement('div');
@@ -4608,39 +4775,9 @@ function buildCampaignPicker(){
     mRow.appendChild(c);
   });
 }
-// A collapsible block in the main menu.
-//
-// The menu was 2132px — 2.7 screens — and half of that was the campaign market: fifty
-// blueprints a brand-new captain has ◈0 credits for and cannot buy one of, sitting
-// between "pick a difficulty" and "pick your ship". Everything a first-time player needs
-// is now above the fold; the rest is one line each until they have a reason to open it.
-//
-// Auto-collapsed only while the section is genuinely useless (no credits, or no battles
-// fought yet). Once opened by hand it stays open for the session, because re-rendering
-// the picker on every difficulty click must not keep snapping it shut.
-let menuOpenSections={};
-function menuSection(box, title, colour, hint, key, rowCss){
-  const auto = key==='market' ? (career.credits||0)>0
-             : key==='sandbox' ? (career.wins+career.losses)>0 || currentSandboxIdx>=0
-             : true;
-  const open = menuOpenSections[key]!==undefined ? menuOpenSections[key] : auto;
-
-  const head=document.createElement('div');
-  head.style.cssText='width:100%;text-align:center;color:'+colour+';font-size:12px;letter-spacing:3px;'+
-    'margin:14px 0 8px;cursor:pointer;user-select:none;';
-  head.innerHTML=title+' <span style="opacity:.75">'+(open?'▴':'▾')+'</span>'+
-    (open?'':'<div style="letter-spacing:1px;font-size:10px;color:#7d8a97;margin-top:3px">'+hint+'</div>');
-  box.appendChild(head);
-
-  // The row's styling is set here rather than by the caller: assigning cssText after the
-  // fact would wipe the display:none that keeps the section shut.
-  const row=document.createElement('div');
-  row.style.cssText=(rowCss||'')+(open?'':';display:none');
-  box.appendChild(row);
-
-  head.onclick=()=>{ menuOpenSections[key]=!open; sfxClick(); buildCampaignPicker(); };
-  return { head, row };
-}
+// The sandbox maps and the campaign market used to be collapsible blocks stacked under the
+// battlefield picker — the market alone was ~55 blueprints tall, sitting between "pick a
+// difficulty" and "pick your ship". They are tabs in the left column now (see #brTabs).
 function renderDiffRow(){
   const dr=document.getElementById('diffRow'); if(!dr) return;
   const names={ easy:T('🙂 Easy','🙂 简单'), normal:T('😐 Normal','😐 普通'), hard:T('😈 Hard','😈 困难') };
@@ -4664,12 +4801,15 @@ function renderDiffRow(){
   dr.appendChild(row);
   const d=document.createElement('div'); d.textContent=descs[difficulty];
   d.style.cssText='font-size:11px;color:#5f7a90;'; dr.appendChild(d);
-  // settings live behind a gear so the first screen stays short
-  const g=document.createElement('button'); g.id='mapsToggle';
-  g.textContent='⚙️ '+T('Settings','设置');
-  g.onclick=()=>{ const sr=document.getElementById('setRow'); if(!sr) return;
-    sr.style.display=(sr.style.display==='none'?'flex':'none'); };
-  dr.appendChild(g);
+  // settings live behind a gear so the first screen stays short — in the bridge that gear is in
+  // the top bar, and two doors to the same panel a couple of inches apart is worse than one.
+  if(!document.getElementById('brTop')){
+    const g=document.createElement('button'); g.id='mapsToggle';
+    g.textContent='⚙️ '+T('Settings','设置');
+    g.onclick=()=>{ const sr=document.getElementById('setRow'); if(!sr) return;
+      sr.style.display=(sr.style.display==='none'?'flex':'none'); };
+    dr.appendChild(g);
+  }
 }
 function renderSettingsRow(){
   const sr=document.getElementById('setRow'); if(!sr) return;
@@ -4946,6 +5086,123 @@ function mpBroadcastState(){
   if(now-MP.lastSendT<0.15) return; MP.lastSendT=now;
   MP.ws.send(JSON.stringify({type:'state',state:{x:player.pos.x,z:player.pos.z,heading:player.heading,hp:player.hp,maxhp:player.maxhp,shipId:player.shipId}}));
 }
+// The zero-choice entry screen. Active only for someone who has never fought a battle AND has
+// no saved war to continue — once there is a save, the normal menu is the right screen, because
+// hiding its Continue button behind a pitch would strand them.
+let _firstRunOpen=true;
+// phase matters: showRespawnMenu() puts this same #menu up in the MIDDLE of a battle to pick a
+// replacement hull, and a brand-new captain who is sunk in their first war satisfies every other
+// clause here — the pitch would cover the picker and strand them mid-fight.
+function firstRunActive(){ return _firstRunOpen && phase==='select' && career.wins+career.losses===0 && !loadSave(); }
+function leaveFirstRun(){ _firstRunOpen=false; buildMenu(); }
+// The single switch for "is the pitch up". Two callers, because showRespawnMenu raises #menu
+// mid-battle WITHOUT rebuilding it — so a stale .firstrun class from the last buildMenu would
+// otherwise still be covering the replacement-hull picker.
+function showFirstRun(on){
+  const menu=document.getElementById('menu'), fr=document.getElementById('firstrun');
+  if(menu) menu.classList.toggle('firstrun', on);
+  if(fr) fr.classList.toggle('on', on);
+}
+const FR_ART={
+  sail:'<svg viewBox="0 0 150 46"><path d="M6 34 h138" stroke="#22485f" stroke-width="1.5" stroke-dasharray="3 6"/>'+
+    '<path d="M20 30 L30 21 L86 18 L124 26 L128 30 L92 36 L28 36 Z" fill="#8fb4cf" opacity=".9"/>'+
+    '<rect x="60" y="10" width="7" height="9" fill="#8fb4cf" opacity=".9"/><rect x="82" y="11" width="6" height="8" fill="#8fb4cf" opacity=".9"/>'+
+    '<path d="M132 24 l16 4 -16 4" fill="none" stroke="#7fd0a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'+
+    '<path d="M124 28 h20" stroke="#7fd0a0" stroke-width="2" stroke-linecap="round"/></svg>',
+  gun:'<svg viewBox="0 0 150 46"><rect x="18" y="36" width="114" height="6" rx="2" fill="#20394c"/>'+
+    '<path d="M56 36 L60 24 L84 24 L88 36 Z" fill="#8fb4cf" opacity=".92"/>'+
+    '<rect x="80" y="16" width="30" height="5.5" rx="2" fill="#8fb4cf" opacity=".92" transform="rotate(-20 80 19)"/>'+
+    '<path d="M110 7 l7 -4 -1 5 6 1 -6 2 3 5 -6 -3 -2 5 -1 -6 -5 2 z" fill="#ffd060"/>'+
+    '<circle cx="30" cy="22" r="9" fill="none" stroke="#ffd060" stroke-width="1.6"/>'+
+    '<text x="30" y="22" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#ffd060">$</text>'+
+    '<path d="M42 22 h9 m-3 -3 l3 3 -3 3" fill="none" stroke="#7fd0a0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  isle:'<svg viewBox="0 0 150 46"><path d="M8 38 h134" stroke="#22485f" stroke-width="1.5"/>'+
+    '<path d="M22 38 q16 -18 34 0 z" fill="#2c4f66"/><path d="M62 38 q20 -25 42 0 z" fill="#37627d"/>'+
+    '<path d="M104 38 q13 -14 28 0 z" fill="#24455a"/>'+
+    '<path d="M83 12 v-11 h16 l-4 5 4 5 h-16" fill="#ffd060"/></svg>',
+};
+function buildFirstRun(){
+  const menu=document.getElementById('menu'); if(!menu) return null;
+  let fr=document.getElementById('firstrun');
+  if(!fr){ fr=document.createElement('div'); fr.id='firstrun'; menu.insertBefore(fr, menu.firstChild); }
+  const beat=(art,n,t,d)=>'<div class="beat">'+FR_ART[art]+'<div class="btx"><div class="bn">'+n+
+    '</div><div class="bt">'+t+'</div><div class="bd">'+d+'</div></div></div>';
+  fr.innerHTML='<div class="fwm">IRON TIDE</div>'+
+    '<div class="pitch">'+T('Sail a warship. <em>Bolt on more guns.</em> Flatten their harbour.',
+                            '开一艘军舰，<em>把炮一门门装满</em>，把敌人的港口炸平。')+'</div>'+
+    '<div class="psub">'+T('Free in your browser · no download, no account','浏览器里直接玩 · 不用下载、不用注册')+'</div>'+
+    '<div class="beats">'+
+      beat('sail','01',T('Steer','开船'),T('Hold W. Your cannons aim and fire on their own.','按住 W。船上的炮会自己瞄准开火。'))+
+      beat('gun','02',T('Get paid, buy guns','拿赏金，买炮'),T('Every ship you sink pays. Bolt what you buy onto the deck.','每击沉一条船都有钱拿，买来的炮装在甲板上。'))+
+      beat('isle','03',T('Take the sea','把海拿下来'),T(CAMPAIGN.length+' theaters, island by island, to their flagship.',CAMPAIGN.length+' 个战区，一座岛一座岛打到他们的旗舰。'))+
+    '</div>'+
+    '<button class="go" id="frGo"><span class="gi">▶</span><span>'+
+      '<span class="gl">'+T('START YOUR FIRST BATTLE','开始第一场战斗')+'</span>'+
+      '<span class="gs">'+T('About 3 minutes · sink '+FIRST_WAR_GOAL+' ships · it teaches you as you go',
+                            '大约 3 分钟 · 击沉 '+FIRST_WAR_GOAL+' 条船 · 边打边教')+'</span></span></button>'+
+    '<div class="tweak">'+T('Played before?','玩过了？')+' <a id="frMore">'+
+      T('Choose your ship, difficulty and battlefield','自己选船、难度和战场')+'</a></div>';
+  fr.querySelector('#frGo').onclick=()=>{
+    currentSandboxIdx=-1; quickMode=false; currentMapIdx=0;   // the defaults, applied rather than asked about
+    chooseShip('destroyer');
+  };
+  fr.querySelector('#frMore').onclick=leaveFirstRun;
+  return fr;
+}
+// The bridge frame. It MOVES the menu's existing pieces into two columns rather than rebuilding
+// them, so every builder above (the voyage chart, the theater card, the hull cards, the difficulty
+// row) stays the single place that knows how to draw its own thing.
+let _pickedShip=null;
+function layoutBridge(){
+  const menu=document.getElementById('menu'); if(!menu) return;
+  let top=document.getElementById('brTop');
+  if(!top){
+    top=document.createElement('div'); top.id='brTop';
+    top.innerHTML='<div class="bwm">IRON TIDE</div>';
+    const body=document.createElement('div'); body.id='brBody';
+    const left=document.createElement('div'); left.id='brLeft';
+    const right=document.createElement('div'); right.id='brRight';
+    body.appendChild(left); body.appendChild(right);
+    menu.appendChild(top); menu.appendChild(body);
+  }
+  const left=document.getElementById('brLeft'), right=document.getElementById('brRight');
+  const put=(el,parent,before)=>{ if(el&&parent&&el.parentNode!==parent) parent.insertBefore(el, before||null); };
+  // top bar: rank line, then the nav pills, then language and settings
+  put(document.getElementById('career'), top);
+  put(document.getElementById('menuNav'), top);
+  put(document.getElementById('langBtn'), top);
+  const gr=document.getElementById('frGear');
+  if(gr) put(gr, top);   // in the bridge the gear is a normal top-bar button, not a floating one
+  if(!top.querySelector('.sp')){ const sp=document.createElement('div'); sp.className='sp';
+    top.insertBefore(sp, document.getElementById('career')||null); }
+  // left: where you fight.  right: what you sail.
+  put(document.getElementById('maps'), left);
+  let rh=document.getElementById('brShipHead');
+  if(!rh){ rh=document.createElement('div'); rh.id='brShipHead'; rh.className='brh'; right.appendChild(rh); }
+  rh.innerHTML='<span class="n">02</span><span class="t">'+T('YOUR COMMAND','你的座舰')+'</span>'+
+    '<span class="hint">'+T('Click a hull, then set sail','点一张卡选船，再按出击')+'</span>';
+  put(document.getElementById('ships'), right);
+  put(document.getElementById('moreShips'), right);
+
+  let dock=document.getElementById('brDock');
+  if(!dock){ dock=document.createElement('div'); dock.id='brDock';
+    dock.innerHTML='<button id="brGo"><span class="gi">▶</span><span>'+
+      '<span class="gl"></span><span class="gs"></span></span></button>'; }
+  right.appendChild(dock);                       // always last in the column
+  put(document.getElementById('resumeBtn'), dock);
+  // the launch bar reads the whole choice back before it commits to it
+  const ship=_pickedShip&&SHIPS[_pickedShip]?_pickedShip:'destroyer';
+  const where=currentSandboxIdx>=0
+    ? ((isZh()&&typeof SANDBOX_ZH!=='undefined'&&SANDBOX_ZH[SANDBOX_MAPS[currentSandboxIdx].name]||{}).name||SANDBOX_MAPS[currentSandboxIdx].name)
+    : campaignName(currentMapIdx);
+  const dif={easy:T('Easy','简单'),normal:T('Normal','普通'),hard:T('Hard','困难')}[difficulty]||difficulty;
+  const go=document.getElementById('brGo');
+  if(go){
+    go.querySelector('.gl').textContent=T('SET SAIL','出　击');
+    go.querySelector('.gs').textContent=where+' · '+catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,ship,'name',SHIPS[ship].name)+' · '+dif;
+    go.onclick=()=>chooseShip(ship);
+  }
+}
 function buildMenu(){
   // language toggle — 中文/English switch pinned to the menu's top-right corner
   const menu=document.getElementById('menu');
@@ -4957,61 +5214,74 @@ function buildMenu(){
     menu.appendChild(b);
   }
   const lb=document.getElementById('langBtn'); if(lb) lb.textContent=isZh()?'🌐 English':'🌐 中文';
+  // Settings live behind the gear on the first screen too — the only other thing a stranger is
+  // offered besides the language. It hands them the full menu with the settings row already open.
+  if(menu && !document.getElementById('frGear')){
+    const g=document.createElement('button'); g.id='frGear'; g.textContent='⚙';
+    g.title=T('Settings','设置');
+    g.style.cssText='position:absolute;top:14px;z-index:21;padding:7px 12px;font-size:14px;'+
+      'background:#12202e;border:1px solid #2a4660;color:#cfe6fb;border-radius:8px;cursor:pointer;display:none;';
+    g.onclick=()=>{ leaveFirstRun(); const sr=document.getElementById('setRow'); if(sr) sr.style.display='flex'; };
+    menu.appendChild(g);
+  }
+  // Parked off the language button's real width — that button says "English" in one language and
+  // "中文" in the other, so a hardcoded offset is right in exactly one of them.
+  { const g=document.getElementById('frGear');
+    if(g) g.style.right=((lb?lb.offsetWidth:92)+30)+'px'; }
   // career banner — rank, perks and lifetime record under the subtitle.
   // A row of zeroes teaches a first-time captain nothing, so it waits until there is a record.
+  // Rebuilt on every call rather than once: buildMenu re-runs on a language switch, and the
+  // old build-once guard left this whole strip frozen in the language it was first drawn in.
   const sub=document.querySelector('#menu .sub');
-  if(sub && !document.getElementById('career') && career.wins+career.losses>0){
-    const r=careerRank(), nx=nextRank(), d=document.createElement('div');
-    d.id='career';
-    d.style.cssText='text-align:center;margin:-8px 0 14px;font-size:12px;color:#7e93a8;letter-spacing:1px;';
-    d.innerHTML=`<span style="color:#ffd060">⚓ ${isZh()?trRank(r.name):r.name.toUpperCase()}</span>`+
-      (r.perk?` <span style="color:#7fd0a0">${T('+'+Math.round(r.perk*100)+'% starting funds','初始资金 +'+Math.round(r.perk*100)+'%')}</span>`:'')+
-      ` &nbsp;·&nbsp; `+T(`${career.sunk} ships · ${career.planes} aircraft · ${career.islands} islands · ${career.wins}W/${career.losses}L`,
-        `击沉 ${career.sunk} · 飞机 ${career.planes} · 岛屿 ${career.islands} · ${career.wins}胜/${career.losses}负`)+
-      (nx?` &nbsp;·&nbsp; <span style="color:#5f7a90">${T(careerScore()+'/'+nx.score+' to '+nx.name,careerScore()+'/'+nx.score+' 分升'+trRank(nx.name))}</span>`:'');
-    sub.after(d);
-    const log=document.createElement('div');
-    log.style.cssText='text-align:center;margin:-6px 0 14px;';
-    log.innerHTML='<span id="warlogBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px">'+T('📖 WAR LOG','📖 战争日志')+'</span>'+
-      ' <span id="almanacBtn" style="cursor:pointer;color:#8fb8d8;font-size:11px;letter-spacing:2px;border:1px solid #21384e;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('⚓ SHIP ALMANAC','⚓ 舰船图鉴')+'</span>'+
-      ' <span id="medalsBtn" style="cursor:pointer;color:#ffd060;font-size:11px;letter-spacing:2px;border:1px solid #4e3f21;border-radius:20px;padding:5px 15px;margin-left:8px">🎖 '+T('MEDALS','奖章墙')+' '+((career.achievements||[]).length)+'/'+ACHIEVEMENTS.length+'</span>'+
-      ' <span id="mpBtn" style="cursor:pointer;color:#8fd0a0;font-size:11px;letter-spacing:2px;border:1px solid #214e2e;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('🌐 MULTIPLAYER','🌐 联机对战')+'</span>'+
-      ' <span id="lbBtn" style="cursor:pointer;color:#ffd060;font-size:11px;letter-spacing:2px;border:1px solid #4e3f21;border-radius:20px;padding:5px 15px;margin-left:8px">'+T('🏆 LEADERBOARD','🏆 排行榜')+'</span>';
-    d.after(log);
-    log.querySelector('#warlogBtn').onclick=showWarLog;
-    log.querySelector('#almanacBtn').onclick=buildAlmanac;
-    log.querySelector('#medalsBtn').onclick=showMedals;
-    log.querySelector('#mpBtn').onclick=openMultiplayer;
-    log.querySelector('#lbBtn').onclick=openLeaderboard;
+  let cdiv=document.getElementById('career');
+  if(sub && !cdiv){ cdiv=document.createElement('div'); cdiv.id='career';
+    cdiv.style.cssText='text-align:center;margin:-8px 0 14px;font-size:12px;color:#7e93a8;letter-spacing:1px;';
+    sub.after(cdiv); }
+  if(cdiv){
+    const hasRecord=career.wins+career.losses>0;
+    cdiv.style.display=hasRecord?'block':'none';
+    if(hasRecord){ const r=careerRank(), nx=nextRank();
+      cdiv.innerHTML=`<span style="color:#ffd060">⚓ ${isZh()?trRank(r.name):r.name.toUpperCase()}</span>`+
+        (r.perk?` <span style="color:#7fd0a0">${T('+'+Math.round(r.perk*100)+'% starting funds','初始资金 +'+Math.round(r.perk*100)+'%')}</span>`:'')+
+        ` &nbsp;·&nbsp; `+T(`${career.sunk} ships · ${career.planes} aircraft · ${career.islands} islands · ${career.wins}W/${career.losses}L`,
+          `击沉 ${career.sunk} · 飞机 ${career.planes} · 岛屿 ${career.islands} · ${career.wins}胜/${career.losses}负`)+
+        (nx?` &nbsp;·&nbsp; <span style="color:#5f7a90">${T(careerScore()+'/'+nx.score+' to '+nx.name,careerScore()+'/'+nx.score+' 分升'+trRank(nx.name))}</span>`:''); }
+  }
+  // The menu's navigation strip. Everything that is not "pick a battle and sail" lives here,
+  // including the training course — it used to be a green banner shouting above the theater
+  // picker, which is the wrong size for something you go to on purpose rather than by accident.
+  let nav=document.getElementById('menuNav');
+  if(!nav && sub){ nav=document.createElement('div'); nav.id='menuNav';
+    nav.style.cssText='text-align:center;margin:-6px 0 14px;line-height:2.2;'; }
+  if(nav){
+    // icon and label are separate so the bridge can drop to icons only — six labelled pills plus
+    // a language button do not fit one row in English, and a wrapped nav strip eats the chart.
+    const pill=(id,ico,label,colour,edge,keep)=>'<span id="'+id+'" title="'+label+
+      '" style="cursor:pointer;color:'+colour+';font-size:11px;letter-spacing:2px;border:1px solid '+edge+
+      ';border-radius:20px;padding:5px 15px;margin:0 4px;white-space:nowrap"><b class="pi">'+ico+
+      '</b><span class="pl'+(keep?' keep':'')+'"> '+label+'</span></span>';
+    nav.innerHTML=
+      pill('learnBtn','🎓',T('LEARN TO PLAY','新手教程'),'#a6f2c3','#3c6a52',true)+
+      pill('warlogBtn','📖',T('WAR LOG','战争日志'),'#8fb8d8','#21384e')+
+      pill('almanacBtn','⚓',T('SHIP ALMANAC','舰船图鉴'),'#8fb8d8','#21384e')+
+      pill('medalsBtn','🎖',T('MEDALS','奖章墙')+' '+((career.achievements||[]).length)+'/'+ACHIEVEMENTS.length,'#ffd060','#4e3f21')+
+      pill('mpBtn','🌐',T('MULTIPLAYER','联机对战'),'#8fd0a0','#214e2e')+
+      pill('lbBtn','🏆',T('LEADERBOARD','排行榜'),'#ffd060','#4e3f21');
+    const _tut=SANDBOX_MAPS.findIndex(m=>m.training);
+    nav.querySelector('#learnBtn').onclick=()=>{ if(_tut<0) return;
+      currentSandboxIdx=_tut; quickMode=false; markCourseSeen(); chooseShip('destroyer'); };
+    nav.querySelector('#warlogBtn').onclick=showWarLog;
+    nav.querySelector('#almanacBtn').onclick=buildAlmanac;
+    nav.querySelector('#medalsBtn').onclick=showMedals;
+    nav.querySelector('#mpBtn').onclick=openMultiplayer;
+    nav.querySelector('#lbBtn').onclick=openLeaderboard;
+    const anchor=cdiv||sub; if(anchor && nav.previousElementSibling!==anchor) anchor.after(nav);
   }
   // ⏱ quick battle button — one click, straight into a five-minute skirmish with your usual ship
-  if(!document.getElementById('quickBtn')){
-    const sub2=document.querySelector('#menu .sub');
-    if(sub2){ const qb=document.createElement('div'); qb.id='quickBtn';
-      qb.style.cssText='text-align:center;margin:2px 0 10px;';
-      qb.innerHTML='<span style="cursor:pointer;color:#ffe6a0;font-size:12px;letter-spacing:2px;border:1px solid #4e3f21;border-radius:20px;padding:6px 18px;background:rgba(255,208,96,0.05)">⏱ '+T('5-MINUTE BATTLE','5 分钟快速战斗')+'</span>';
-      qb.firstChild.onclick=startQuickBattle;
-      sub2.after(qb); } }
-  // 🎓 LEARN TO PLAY — the tutorial was effectively unfindable.
-  // It lives on the "Training Ground" sandbox map, which sat as one of eight identical cards a
-  // long scroll down the menu — while the big card at the TOP reads "Training Bay", which is
-  // campaign operation 1 and teaches nothing. Two near-identical names and the visible one is
-  // the wrong one, so a new player either never found the course or thought they had done it.
-  // This is one unmissable button, above everything else, straight into the course in one click.
-  const _tutMapIdx=SANDBOX_MAPS.findIndex(m=>m.training);
-  let learnB=document.getElementById('learnBtn');
-  if(!learnB && _tutMapIdx>=0){
-    const sub3=document.querySelector('#menu .sub');
-    if(sub3){ learnB=document.createElement('div'); learnB.id='learnBtn';
-      learnB.style.cssText='text-align:center;margin:12px 0 2px;';
-      learnB.innerHTML='<span style="cursor:pointer;display:inline-block;color:#062015;background:#7fd0a0;font-size:14px;font-weight:700;'+
-        'letter-spacing:2px;border-radius:22px;padding:11px 28px;box-shadow:0 0 20px rgba(127,208,160,.38)">🎓 '+
-        T('NEW HERE? LEARN TO PLAY','第一次玩？先学怎么玩')+'</span>';
-      learnB.firstChild.onclick=()=>{ currentSandboxIdx=_tutMapIdx; quickMode=false; markCourseSeen(); chooseShip('destroyer'); };
-      sub3.after(learnB); } }
-  // Retires itself once the player has actually taken the course — but the course stays fully
-  // replayable from its card, which is why this is its own flag and not the course's own one.
-  if(learnB) learnB.style.display=courseSeen()?'none':'block';
+  // The 5-minute battle used to be a chip here. It is one of the left column's tabs now, beside
+  // the campaign and the sandbox — all three answer "where do I fight", so they belong together.
+  // The training course used to be a green banner here, shouting above the theater picker. It is
+  // one pill in #menuNav now: somewhere you go on purpose, not something that grabs you on the way in.
   // continue button — appears when a saved war exists (fresh menu only, not the respawn picker)
   let rb=document.getElementById('resumeBtn');
   if(!rb){ rb=document.createElement('button'); rb.id='resumeBtn';
@@ -5029,8 +5299,15 @@ function buildMenu(){
   wrap.innerHTML='';   // idempotent: buildMenu is re-run on language switch
   // Eight hulls (one of them a one-life flagship) is a lot to weigh up before your first
   // battle. A first-time captain sees three; the rest are one click away.
-  const rookie = career.wins+career.losses===0 && !_allShips;
-  const ids = rookie ? STARTER_SHIPS : Object.keys(SHIPS);
+  if(!_pickedShip){ try{ const v=localStorage.getItem('ironTideLastShip'); if(v&&SHIPS[v]&&!SHIPS[v].marketOnly) _pickedShip=v; }catch(e){}
+    if(!_pickedShip) _pickedShip='destroyer'; }
+  // The right column is a column: twenty-two cards push the difficulty row and the launch bar off
+  // the screen, which is the pile this layout exists to undo. Three, plus whichever one you have
+  // actually picked, and the rest are one click away.
+  const shortList = !_allShips;
+  const ids = shortList
+    ? STARTER_SHIPS.concat(STARTER_SHIPS.includes(_pickedShip)?[]:[_pickedShip]).filter(id=>SHIPS[id])
+    : Object.keys(SHIPS);
   ids.forEach(id=>{
     const s=SHIPS[id];
     if(s.marketOnly&&!ownsMarketItem('ship',id))return;
@@ -5038,29 +5315,68 @@ function buildMenu(){
     const bar=(v,mx)=>`<div class="bar"><i style="width:${Math.round(v/mx*100)}%"></i></div>`;
     const rec = id==='destroyer' && career.wins+career.losses===0;   // point brand-new captains at the all-rounder
     if(rec) div.style.borderColor='#7fd0a0';
-    div.innerHTML=`<h3>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'name',s.name)}${rec?`<span style="float:right;font-size:10px;color:#7fd0a0;letter-spacing:1px;padding-top:5px">${T('★ START HERE','★ 新手推荐')}</span>`:''}</h3><div class="cls">${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'cls',s.cls)}</div><p>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'desc',s.desc)}</p>
+    div.innerHTML=`<h3>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'name',s.name)}${rec?`<span style="float:right;font-size:10px;color:#7fd0a0;letter-spacing:1px;padding-top:5px">${T('DEFAULT','默认')}</span>`:''}</h3><div class="cls">${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'cls',s.cls)}</div><p>${catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,id,'desc',s.desc)}</p>
       <div class="stats">
         <div class="row"><span>${T('Hull','船体')}</span>${bar(s.hp,700)}</div>
         <div class="row"><span>${T('Size','尺寸')}</span>${bar(s.len,100)}</div>
         <div class="row"><span>${T('Mounts','炮位')}</span>${bar(s.mounts,15)}</div>
       </div>
-      ${career.wins+career.losses===0?`<div style="margin-top:9px;text-align:center;color:#7fd0a0;font-size:11px;letter-spacing:1px">${T('⚓ CLICK TO SET SAIL','⚓ 点这张卡就出击')}</div>`:''}`;
+      ${career.wins+career.losses===0?`<div style="margin-top:9px;text-align:center;color:#7fd0a0;font-size:11px;letter-spacing:1px">${T('⚓ CLICK TO CHOOSE THIS HULL','⚓ 点这张卡选这条船')}</div>`:''}`;
     // Clicking a card starts the battle immediately — no separate launch button, because
     // the fastest way in is one click. It just has to SAY so: without the line above, a
     // first-time captain reads three cards as things to compare and starts three wars
     // finding out. Shown only until they have played once; after that it is noise.
-    div.onclick=()=>chooseShip(id);
+    if(_pickedShip===id) div.style.borderColor='#5fd0ff';
+    // Selecting, not launching: the dock below reads theater + hull + difficulty back before it
+    // commits. A card that sails on the first click cannot show you what it is about to do.
+    div.onclick=()=>{ _pickedShip=id; buildMenu(); };
     wrap.appendChild(div);
   });
   const old=document.getElementById('moreShips'); if(old) old.remove();
-  if(rookie){
+  if(shortList){
+    const n=Object.keys(SHIPS).filter(id=>!SHIPS[id].marketOnly||ownsMarketItem('ship',id)).length;
     const b=document.createElement('button'); b.id='moreShips';
-    b.textContent='▾ '+T('Show all '+Object.keys(SHIPS).length+' warships','显示全部 '+Object.keys(SHIPS).length+' 艘军舰');
+    b.textContent='▾ '+T('Show all '+n+' warships','显示全部 '+n+' 艘军舰');
     b.onclick=()=>{ _allShips=true; buildMenu(); };
     wrap.parentNode.insertBefore(b, wrap.nextSibling);
   }
-  // first-ever launch: run the prologue once
-  if(!career.seenIntro) showStory('⚓ IRON TIDE', isZh()&&typeof LORE_ZH_INTRO!=='undefined'?LORE_ZH_INTRO:LORE.intro, T('BEGIN','启航'), ()=>{ career.seenIntro=true; saveCareer(); });
+  // The prologue used to run here, in front of a stranger who has not yet seen the water. It is
+  // shown on the first victory screen instead (endGame) — the same words read as a reward for
+  // winning rather than a toll gate on the way in.
+
+  // --- first run: one sentence, three pictures, one button; everything else stands down ---
+  buildFirstRun();
+  const onFirst=firstRunActive();
+  // The bridge frame is only for the menu proper: the respawn picker is a different job, and the
+  // pitch replaces the whole thing.
+  // Not gated on phase: showRespawnMenu raises this same menu mid-battle, and a language switch
+  // there re-runs buildMenu — dropping the class then would leave the pieces sitting in two
+  // columns with no grid to lay them out.
+  if(menu) menu.classList.toggle('bridge', !onFirst);
+  if(!onFirst){
+    layoutBridge();
+    const right=document.getElementById('brRight');
+    // built inside #maps by buildCampaignPicker; they belong to "what you sail", not "where"
+    const dr=document.getElementById('diffRow'), sr=document.getElementById('setRow'),
+          dock=document.getElementById('brDock');
+    if(right&&dr&&dock){
+      if(!document.getElementById('brDiffHead')){ const h=document.createElement('div');
+        h.id='brDiffHead'; h.className='brh'; right.insertBefore(h, dock); }
+      const h=document.getElementById('brDiffHead');
+      h.innerHTML='<span class="n">03</span><span class="t">'+T('DIFFICULTY','难度')+'</span>';
+      right.insertBefore(dr, dock); if(sr) right.insertBefore(sr, dock);
+    }
+    const left=document.getElementById('brLeft');
+    if(left && !document.getElementById('brWhereHead')){ const h=document.createElement('div');
+      h.id='brWhereHead'; h.className='brh'; left.insertBefore(h, left.firstChild); }
+    const wh=document.getElementById('brWhereHead');
+    if(wh) wh.innerHTML='<span class="n">01</span><span class="t">'+T('WHERE YOU FIGHT','去哪打')+'</span>';
+  }
+  showFirstRun(onFirst);
+  // Settings are a set-once preference, so they live in the top bar on both screens — and only
+  // there: renderDiffRow's own gear would be a second door to the same panel two inches away.
+  const gear=document.getElementById('frGear');
+  if(gear) gear.style.display=(onFirst||menu.classList.contains('bridge'))?'block':'none';
 }
 function installBossStarterGuns(build){
   const half=Math.floor(build.mounts.length/2),slots=[0,1,2,3,4,5,half,half+1,half+2,half+3,half+4,half+5];
@@ -5327,6 +5643,7 @@ function startGame(shipId){
   // `sunk >= QUICK_KILL_GOAL`, starting one after any other battle declared victory within
   // three seconds, medal and all. Side objectives baselined off the same stale numbers.
   sunk=0; sessPlanes=0; sessBosses=0; sessIslands=0; sideOb=null; sideObT=25;
+  firstWar = isFirstWar();
   lbStartRun();   // opens the leaderboard handshake for this war (no-op unless the player opted in)
   offensiveT=160+Math.random()*80; offensiveN=0;   // war pacing starts over, not mid-escalation
   fleetOrder=-1; _callsignN=0;                     // orders and callsigns start from the top
@@ -5353,6 +5670,9 @@ function startGame(shipId){
     // ...through SANDBOX_ZH, not raw M.name/M.theme: every sandbox map announced itself in
     // English even with the game set to Chinese, which is a strange thing to meet on the way
     // into a level whose whole job is explaining itself.
+    else if(firstWar) showBanner(T('YOUR FIRST BATTLE','第一场战斗'),
+      T('Sink '+FIRST_WAR_GOAL+' enemy ships. Hold W to sail — your cannons aim and fire by themselves.',
+        '击沉 '+FIRST_WAR_GOAL+' 艘敌舰。按住 W 前进——你的炮会自己瞄准开火。')+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:4});
     else if(currentSandboxIdx>=0){ const sz=isZh()&&typeof SANDBOX_ZH!=='undefined'?SANDBOX_ZH[M.name]:null;
       showBanner(T('SANDBOX','沙盒战场')+' · '+(sz?sz.name:M.name), (sz?sz.theme:M.theme)+T('<br>— FLEET COMMAND','<br>—— 舰队司令部'), {dur:3}); }
     else showBanner(T('OPERATION '+(currentMapIdx+1),'第 '+(currentMapIdx+1)+' 号作战')+' · '+campaignName(currentMapIdx),
@@ -5452,6 +5772,7 @@ function showRespawnMenu(msg){
   menuSubEn=msg||'Pick a replacement. It redeploys from your harbor.';
   if(sub) sub.textContent=trText(menuSubEn);
   const rb=document.getElementById('resumeBtn'); if(rb) rb.style.display='none';   // mid-war menu: no resume button
+  showFirstRun(false);        // this menu is a picker, not the front door
   document.getElementById('menu').style.display='flex';
   updateMode();
 }
@@ -9919,13 +10240,19 @@ function actionPlan(){
   const mapAllowed = !(typeof contentFilterOn==='function' && contentFilterOn()) &&
                      !(typeof nukesBannedHere==='function' && nukesBannedHere());
   const canBuild = onFoot && footLand && !((footLand.capRing && footLand.owner!==0) || footLand.team===1);
-  const always = [
-    R('Tab','armory (buy things)','军械库（买东西）'),
-    R('H','upgrades for your whole fleet','给整支舰队买升级'),
-    R('O','order your fleet (hit the enemy HQ / take islands / follow me)','指挥舰队（打敌方总部／占岛／跟着我）'), R('Enter','radio the fleet','和舰队喊话'),
-    R('K', 'settings', '设置'), R('L','photo mode','拍照模式'),
-    R('M', 'sound on/off', '音效开关'), R('J','music on/off','音乐开关'),
-  ];
+  // A key earns its row by being able to DO something from where you are standing — the same
+  // test canBuild and mapAllowed already apply. Three of these used to print unconditionally
+  // and then do nothing: there is no fleet to upgrade, order or radio when you are sailing alone.
+  const hasFleet = allies.length>0;
+  const always = [];
+  if(money>0)  always.push(R('Tab','armory (buy things)','军械库（买东西）'));
+  if(hasFleet){
+    always.push(R('H','upgrades for your whole fleet','给整支舰队买升级'));
+    always.push(R('O','order your fleet (hit the enemy HQ / take islands / follow me)','指挥舰队（打敌方总部／占岛／跟着我）'));
+    always.push(R('Enter','radio the fleet','和舰队喊话'));
+  }
+  always.push(R('K', 'settings', '设置'), R('L','photo mode','拍照模式'),
+              R('M', 'sound on/off', '音效开关'), R('J','music on/off','音乐开关'));
   if(mapAllowed) always.unshift(R('N','big map of the battle','整场战斗的大地图'));
   if(canBuild)   always.push(R('B','build something on this island','在这座岛上盖东西'));
 
@@ -9996,6 +10323,16 @@ function actionPlan(){
     R('G','get off onto land','下船上岸'), R('P','jump out with a parachute','跳伞逃生'));
   return {t:zh?'在自己甲板上':'ON YOUR DECK', rows, more:always};
 }
+// While a first-time captain is being walked through the basics, this panel shows the keys the
+// lesson has actually reached — one row, then two, then three. Fifteen keys at second one is the
+// "I pressed something and I don't know what happened" the panel exists to prevent.
+// Returns null when there is no restriction (any battle but a first war's tutorial).
+function tutTaughtKeys(){
+  if(!(firstWar && tutSteps && tutIdx>=0)) return null;
+  const set=new Set();
+  for(let i=0;i<=tutIdx && i<tutSteps.length;i++) (tutSteps[i].keys||[]).forEach(k=>set.add(k));
+  return set;
+}
 function renderActions(){
   const box=document.getElementById('actions'); if(!box) return;
   if(phase!=='play'){ box.style.display='none'; return; }
@@ -10005,11 +10342,19 @@ function renderActions(){
   const foot=document.getElementById('actFoot');
   if(actionsHidden){ foot.textContent=isZh()?'/ 显示能做什么':'/ show controls'; return; }
   const plan=actionPlan();
+  // The first war grows the panel instead of opening at full size: during the lesson only the
+  // keys it has taught, and the nine-row "everything else" block stays shut until the war is won.
+  const taught=tutTaughtKeys();
+  // Both groups are filtered together: a key the lesson has reached must show even when it
+  // normally lives in the "everything else" block (Tab is taught the moment a bounty is paid).
+  if(taught){ plan.rows=plan.rows.concat(plan.more).filter(r=>taught.has(r[0])); plan.more=[]; }
+  else if(firstWar) plan.more=[];
   document.getElementById('actTitle').textContent=plan.t;
   const grp=list=>'<div class="actgrp'+(list===plan.more?' more':'')+'">'+list.map(([k,d])=>
     '<div class="actrow">'+(k?'<b class="actkey">'+k+'</b>':'<b class="actkey" style="opacity:.25">·</b>')+'<span>'+d+'</span></div>').join('')+'</div>';
   document.getElementById('actList').innerHTML = grp(plan.rows) + (plan.more.length?grp(plan.more):'');
-  foot.textContent = isZh()?'/ 收起':'/ hide';
+  foot.textContent = firstWar ? T('/ more keys appear as you go','/ 更多按键会一路出现')
+                              : (isZh()?'/ 收起':'/ hide');
 }
 function toggleActions(){
   if(phase!=='play') return;
@@ -10025,7 +10370,8 @@ function tickActions(dt){
   if(phase!=='play') return;
   const k=[driving,manning,onFoot,footLand,drivingTank,shopOpen,harborOpen,buildOpen,settingsOpen,
     tacticalOpen,chatOpen,photoMode,playerShipLost,landCampaignMode,
-    piloting&&piloting.phase, planes.some(p=>p.parked), isZh(), gameSettings.hideActions].join('|');
+    piloting&&piloting.phase, planes.some(p=>p.parked), isZh(), gameSettings.hideActions,
+    firstWar, tutIdx, allies.length>0, money>0].join('|');
   if(k===_actLast) return; _actLast=k; renderActions();
 }
 // The mode readout used to be a one-line hint in the bottom corner. renderActions() replaced it
@@ -10725,6 +11071,15 @@ function endGame(win,msg){
     '<br>'+T(`Ships sunk ${career.sunk} · Aircraft ${career.planes} · Islands ${career.islands} · Leviathans ${career.bosses} · Wars ${career.wins}W/${career.losses}L`,`击沉军舰 ${career.sunk} · 击落飞机 ${career.planes} · 占领岛屿 ${career.islands} · 利维坦 ${career.bosses} · 战争 ${career.wins}胜/${career.losses}负`) +
     (nx?`<br><span style="color:#6b7d92">${T('Next rank: '+nx.name+' at '+nx.score+' points (you have '+careerScore()+')','下一军衔：'+trRank(nx.name)+'（需 '+nx.score+' 分，你有 '+careerScore()+' 分）')}</span>`:`<br><span style="color:#ffd060">${T('Highest rank achieved.','已达到最高军衔。')}</span>`)+
     unlockMsg + cheerMsg(win,mpMatch);
+  // First campaign win ever: this is where the prologue lands. It sits above the chronicle beat
+  // so the two read in order — the world, then what just happened in it.
+  if(win && currentSandboxIdx<0 && !quickMode && !mpMatch && !career.seenIntro){
+    career.seenIntro=true; saveCareer();
+    document.getElementById('overText').innerHTML +=
+      `<br><br><span style="display:block;max-width:620px;margin:8px auto 0;padding-top:14px;border-top:1px solid #21384e;text-align:left;color:#cfe0ee;font-size:13px;line-height:1.7">`+
+      `<span style="display:block;color:#ffd060;letter-spacing:2px;font-size:12px;margin-bottom:7px;text-align:center">${T('⚓ HOW IT STARTED','⚓ 故事从这里开始')}</span>`+
+      `${(isZh()&&typeof LORE_ZH_INTRO!=='undefined')?LORE_ZH_INTRO:LORE.intro}</span>`;
+  }
   // campaign win: append this theater's chronicle beat to the victory screen
   // (cheerMsg defined below endGame — hoisted function declaration)
   if(win && currentSandboxIdx<0 && !quickMode && LORE.beats[currentMapIdx]){
@@ -10842,6 +11197,7 @@ function resumeWar(){
   // easy theater's board. One line makes it a rule instead of a coincidence.
   LB.session=null; LB.practice=false;
   currentMapIdx=Math.max(0,Math.min(CAMPAIGN.length-1,s.mapIdx|0));
+  firstWar = isFirstWar();   // a resumed first war keeps the goal it was started under
   document.getElementById('menu').style.display='none';
   document.getElementById('hud').style.display='block';
   sfxResume(); phase='play';
@@ -10974,22 +11330,31 @@ const TUT_SEEN_KEY='ironTideCourseSeen';
 function courseSeen(){ try{ return localStorage.getItem(TUT_SEEN_KEY)==='1'; }catch(e){ return false; } }
 function markCourseSeen(){ try{ localStorage.setItem(TUT_SEEN_KEY,'1'); }catch(e){} }
 function onTrainingMap(){ const M=(typeof currentSandboxIdx!=='undefined'&&currentSandboxIdx>=0)?SANDBOX_MAPS[currentSandboxIdx]:null; return !!(M&&M.training); }
-let tutSteps=null, tutIdx=-1, tutHold=0, tutCamBase=0, tutPlacedBase=0, tutSunkBase=0, _tutLast='';
+let tutSteps=null, tutIdx=-1, tutHold=0, tutCamBase=0, tutSunkBase=0, _tutLast='';
 let tutDoneKey=TUT_DONE_KEY, _tutGunBase=0, _tutBombBase=0, _tutTankPos=null;
 function tutorialDone(){ try{ return localStorage.getItem(TUT_DONE_KEY)==='1'; }catch(e){ return false; } }
 function startTutorial(){
   if(tutorialDone()||landCampaignMode) return;
   tutDoneKey=TUT_DONE_KEY;
+  // keys[] drives the action panel bottom-right: it shows what this lesson has reached and
+  // nothing else, so the list grows a row at a time instead of opening with fifteen.
   tutSteps=[   // enter() re-baselines each step when it becomes active, so dying/respawning mid-tutorial can't skip or double a step
-    { text:()=>T('You are at the helm — hold W to sail forward','你已经在舵位上——按住 W，军舰就会前进'), done:()=>player&&player.throttle>0.3 },
-    { enter:()=>tutCamBase=camYaw.v,
+    { key:'W', keys:['W/S'],
+      text:()=>T('You are at the helm — hold W to sail forward','你已经在舵位上——按住 W，军舰就会前进'), done:()=>player&&player.throttle>0.3 },
+    { key:'A / D', keys:['W/S','A/D','Mouse'], enter:()=>tutCamBase=camYaw.v,
       text:()=>T('Move the mouse to look around · A/D turn the ship','动一动鼠标看看四周 · A/D 让军舰转向'), done:()=>Math.abs(camYaw.v-tutCamBase)>0.45 },
-    { enter:()=>tutSunkBase=sunk,
+    { keys:['W/S','A/D','Mouse'], enter:()=>tutSunkBase=sunk,
       text:()=>T('Your deck guns aim and fire by themselves — sail toward the red enemy ships!','你的甲板炮会自己瞄准开火——朝红色敌舰开过去吧！'), done:()=>sunk>tutSunkBase },
-    { text:()=>T('Enemy sunk — that paid a bounty! Press Tab to open the Armory','击沉敌舰，赚到赏金了！按 Tab 打开军械库'), done:()=>shopOpen },
-    { enter:()=>tutPlacedBase=placed.length,
-      text:()=>T('Click a weapon to select it, Tab to close the shop, then press F to mount it','点选一门武器，按 Tab 关闭商店，再按 F 装上新炮'), done:()=>placed.length>tutPlacedBase },
-    { text:()=>T('Perfect, Captain! Now sink the enemy harbor to win the war','太棒了，舰长！现在去击沉敌方海港，赢下这场战争'), hold:6 },
+    // The shop and the mounting slot used to live here, as steps four and five — two more keys and
+    // two new ideas standing between a first-time captain and ever winning once. A destroyer
+    // already sails with two deck guns fitted (makePlayerShip), so battle one needs neither.
+    // Buying a SECOND gun is the next battle's lesson; Tab shows up on its own once there is
+    // money to spend.
+    { key:'Tab', keys:['W/S','A/D','Mouse','Tab'],
+      text:()=>firstWar
+        ? T('That paid a bounty — Tab spends it. Sink '+Math.max(1,FIRST_WAR_GOAL-sunk)+' more and this battle is yours.',
+            '击沉有赏金，按 Tab 就能花。再击沉 '+Math.max(1,FIRST_WAR_GOAL-sunk)+' 条，这一局就是你的了。')
+        : T('Perfect, Captain! Now sink the enemy harbor to win the war','太棒了，舰长！现在去击沉敌方海港，赢下这场战争'), hold:6 },
   ];
   tutIdx=0; tutHold=0; _tutLast=''; if(tutSteps[0].enter)tutSteps[0].enter(); tutShow();
 }
@@ -11352,7 +11717,7 @@ function applyStaticI18n(){
   const set=(sel,html)=>{ const el=document.querySelector(sel); if(el) el.innerHTML=html; };
   set('#menu .sub',(phase==='respawn'&&menuSubEn)?trText(menuSubEn):T('Choose your command. Buy guns. Hold the line.','选择座舰，买炮装舰，守住防线。'));
   const obj=document.getElementById('objective');
-  if(obj) obj.innerHTML='<div style="color:#ff9a8a;letter-spacing:1px;">'+T('DESTROY THE ENEMY HARBOR','摧毁敌方海港')+'</div>'+
+  if(obj) obj.innerHTML='<div id="obtitle" style="color:#ff9a8a;letter-spacing:1px;">'+T('DESTROY THE ENEMY HARBOR','摧毁敌方海港')+'</div>'+
     '<div style="display:flex;gap:14px;justify-content:center;margin-top:3px;">'+
     '<span style="color:#ff9a8a;">'+T('Enemy HQ ','敌方总部 ')+'<b id="ehp">100%</b></span>'+
     '<span style="color:#9fd0ff;">'+T('Your HQ ','我方总部 ')+'<b id="fhp">100%</b></span></div>'+

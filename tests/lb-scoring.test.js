@@ -15,11 +15,13 @@ const war = (over = {}) => Object.assign({
 }, over);
 
 test('war score rewards the fight, not the grind', () => {
-  const parT = SC.parSeconds(0);                       // 240 + 2*80 = 400
-  assert.equal(parT, 400);
+  const parT = SC.parSeconds(0);                       // 240 + 3*80 = 480
+  assert.equal(parT, 480);
 
+  // Derived from parT, not a literal: par moves whenever a theater's authored fleet size does,
+  // and the property under test is "the time bonus scales with par", not the number 480.
   const base = SC.warScore(war());
-  assert.equal(base, 4 * 10 + 2 * 3 + 1 * 15 + 100 + 50 + Math.round((400 - 300) / 400 * 100));
+  assert.equal(base, 4 * 10 + 2 * 3 + 1 * 15 + 100 + 50 + Math.round((parT - 300) / parT * 100));
 
   // slower run scores lower...
   assert.ok(SC.warScore(war({ duration_s: 390 })) < base);
@@ -54,8 +56,9 @@ test('the hull ceiling grows with time and never shrinks', () => {
     assert.ok(n > prev, `ceiling must be monotonic: ${s}s gave ${n} after ${prev}`);
     prev = n;
   }
-  // Training Bay starts with 2 hulls, so a zero-second war can involve at most those.
-  assert.equal(SC.maxHullsSpawned(0, 0), 2);
+  // Training Bay starts with 3 hulls, so a zero-second war can involve at most those.
+  // (This is the anti-cheat ceiling a first-time captain's 3-kill win has to fit under.)
+  assert.equal(SC.maxHullsSpawned(0, 0), 3);
 });
 
 test('the ceiling is generous enough for a genuinely great run', () => {

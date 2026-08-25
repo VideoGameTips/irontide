@@ -166,3 +166,61 @@ test('the warm-up theaters have a softer HQ that does not grow', async ({ page }
   expect(r.warmup.ups).toBe(0);                     // the warm-up HQ buys nothing at all
   expect(r.late.ups).toBeGreaterThan(0);            // the hard theaters still fortify themselves
 });
+
+// --- a captain's first war ---------------------------------------------------------------
+// It ends by sinking a handful of ships, not by grinding the harbour 1500 m away: the goal has
+// to be visible from the deck and reachable with the only two controls that have been taught.
+const FRESH = () => {
+  try { localStorage.clear(); } catch (e) {}
+  loadCareer();
+  career.wins = 0; career.losses = 0; career.seenIntro = false; career.mapsUnlocked = 1;
+  saveCareer();
+};
+
+test('a first war is won by sinking ships, not by flattening the harbour', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(FRESH_SRC => {
+    eval('(' + FRESH_SRC + ')()');
+    difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = 0;
+    startGame('destroyer'); skipBanner();
+    const enemiesAtStart = enemies.length;      // the goal must be reachable without waiting on reinforcements
+    // the headline has to say the goal too — a first war that shows "destroy the enemy harbour"
+    // over "sunk 1/3" hands a first-time captain two objectives that disagree.
+    sunk = 1; updateWarPacing(1 / 30);
+    const headline = (document.getElementById('obtitle') || {}).textContent || '';
+    setLang('en'); updateWarPacing(1 / 30);           // applyStaticI18n rebuilds #objective
+    const headlineAfterLangSwitch = (document.getElementById('obtitle') || {}).textContent || '';
+    let wonAt = null; const real = window.endGame;
+    window.endGame = (w, m) => { if (wonAt === null && w) wonAt = sunk; real(w, m); };
+    sunk = FIRST_WAR_GOAL; updateWarPacing(1 / 30);
+    window.endGame = real;
+    return { firstWar, goal: FIRST_WAR_GOAL, enemiesAtStart, wonAt, headline, headlineAfterLangSwitch };
+  }, FRESH.toString());
+  expect(r.firstWar).toBe(true);
+  expect(r.enemiesAtStart).toBeGreaterThanOrEqual(r.goal);
+  expect(r.wonAt).toBe(r.goal);
+  expect(r.headline, 'the headline names the first-war goal').toContain(String(r.goal));
+  expect(r.headlineAfterLangSwitch, 'and survives the i18n rebuild of #objective').toContain(String(r.goal));
+});
+
+// Quitting mid-war and coming back used to silently change the win condition: `firstWar` is set
+// in startGame, and resumeWar never set it, so a reloaded page resumed the same battle under the
+// harbour goal instead — no error, no crash, just a different game than the one you started.
+test('resuming a first war keeps the goal it was started under', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(FRESH_SRC => {
+    eval('(' + FRESH_SRC + ')()');
+    difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = 0;
+    startGame('destroyer'); skipBanner();
+    sunk = 1; saveWar();
+    firstWar = false; phase = 'select';         // what a page reload leaves behind
+    resumeWar(); skipBanner();
+    let wonAt = null; const real = window.endGame;
+    window.endGame = (w, m) => { if (wonAt === null && w) wonAt = sunk; real(w, m); };
+    sunk = FIRST_WAR_GOAL; updateWarPacing(1 / 30);
+    window.endGame = real;
+    return { firstWar, wonAt, goal: FIRST_WAR_GOAL };
+  }, FRESH.toString());
+  expect(r.firstWar, 'a resumed first war is still a first war').toBe(true);
+  expect(r.wonAt).toBe(r.goal);
+});

@@ -119,48 +119,49 @@ test('the bow wash sounds like water, not like rain', async ({ page }) => {
 // "there has to be a tutorial of how to click the tutorial." The course lives on the Training
 // GROUND sandbox card, one of eight identical tiles a long scroll down the menu — while the big
 // card at the top reads Training BAY, which is campaign operation 1 and teaches nothing.
-test('a brand-new player is shown the tutorial and reaches it in one click', async ({ page }) => {
+//
+// It is no longer pushed at a stranger: the first battle teaches itself in four steps, and the
+// 36-step course is somewhere you go on purpose afterwards. What still has to hold is that it is
+// FINDABLE — one named entry in the menu strip, one click into the real course — and that it
+// stays findable, because unlike the old banner it never retires.
+test('the training course is one click from the menu, and stays that way', async ({ page }) => {
   await page.goto('http://localhost:3000/');
   await page.waitForFunction(() => typeof buildMenu === 'function' && typeof courseSeen === 'function');
   const r = await page.evaluate(() => {
     try { localStorage.clear(); } catch (e) {}
     const b = document.getElementById('storyBtn'), s = document.getElementById('story');
     if (b && s && s.style.display === 'flex') b.click();
-    buildMenu();
+    _firstRunOpen = false; buildMenu();                 // the menu you reach by opting in
 
     const btn = document.getElementById('learnBtn');
-    const shownToNewPlayer = !!btn && btn.style.display !== 'none';
-    // it must sit ABOVE the quick-battle button — a new player reads down, and one of these
-    // teaches the game while the other drops them straight into a fight
-    const qb = document.getElementById('quickBtn');
-    const aboveQuickBattle = !!(btn && qb) &&
-      (btn.compareDocumentPosition(qb) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-    // and the course card is visually marked out from the seven sandbox maps beside it
+    const findable = !!(btn && btn.offsetParent !== null);
+    // and the course card is still visually marked out from the seven sandbox maps beside it
+    _menuTab = 'sandbox'; buildCampaignPicker();
     const cards = [...document.querySelectorAll('#maps div')].filter(d => /🎓/.test(d.textContent || ''));
+    _menuTab = 'campaign'; buildCampaignPicker();
     const cardLabelled = cards.some(d => /START HERE|从这里开始/.test(d.textContent || ''));
 
-    // ONE click — no ship menu, no scrolling, no map picker
-    btn.querySelector('span').click();
+    btn.click();                                        // ONE click — no picker, no scrolling
     skipBanner();
     const landed = { onTrainingMap: onTrainingMap(), tutIdx, steps: tutSteps ? tutSteps.length : 0,
                      ship: player && player.def ? player.def.name : null };
 
-    // back at the menu it retires itself, having been taken
-    phase = 'select'; buildMenu();
+    // back at the menu — startGame hid it on the way into the course
+    phase = 'select'; document.getElementById('menu').style.display = 'flex'; buildMenu();
     const after = document.getElementById('learnBtn');
-    return { shownToNewPlayer, aboveQuickBattle, cardLabelled, landed,
-             seen: courseSeen(), retired: !after || after.style.display === 'none' };
+    return { findable, cardLabelled, landed, seen: courseSeen(),
+             stillThere: !!(after && after.offsetParent !== null) };
   });
 
-  expect(r.shownToNewPlayer).toBe(true);
-  expect(r.aboveQuickBattle).toBe(true);
+  expect(r.findable).toBe(true);
   expect(r.cardLabelled).toBe(true);
   // one click really did start the course, not merely select the map
   expect(r.landed.onTrainingMap).toBe(true);
   expect(r.landed.tutIdx).toBe(0);
-  expect(r.landed.steps).toBeGreaterThan(20);        // the real course, not the 6-step first-battle hints
-  expect(r.landed.ship).toBeTruthy();                // and they were given a ship rather than dumped in a picker
-  // ...and having taken it once, the menu stops shouting
+  expect(r.landed.steps).toBeGreaterThan(20);        // the real course, not the first-battle hints
+  expect(r.landed.ship).toBeTruthy();                // and they were given a ship rather than a picker
   expect(r.seen).toBe(true);
-  expect(r.retired).toBe(true);
+  // The old green banner retired itself once taken. A nav entry must NOT: the course is
+  // deliberately replayable, and something you can only ever open once is a trap.
+  expect(r.stillThere).toBe(true);
 });
