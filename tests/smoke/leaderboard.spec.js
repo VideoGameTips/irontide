@@ -27,7 +27,9 @@ test('the game plays normally with no leaderboard server, and the board falls ba
     // A war starts and ends with no server reachable.
     career.wins = 2; career.losses = 1;
     startGame('destroyer'); skipBanner();
-    const startedClean = LB.session === null;      // consent not given -> no handshake at all
+    // No server here, so there is still no session — but the reason changed: it is the
+    // dead port, not a withheld consent. On by default now.
+    const startedClean = LB.session === null;
 
     endGame(true, 'test');
     const survivedEndGame = phase === 'over';
@@ -58,7 +60,7 @@ test('the game plays normally with no leaderboard server, and the board falls ba
 
   expect(r.identity.hasId).toBe(true);
   expect(r.identity.validCallsign).toBe(true);
-  expect(r.identity.consent).toBe(null);           // nothing sent before the player agrees
+  expect(r.identity.consent).toBe(null);           // 'never told yet', not 'opted out'
   expect(r.identity.nameHasTag).toBe(true);
   expect(r.startedClean).toBe(true);
   expect(r.survivedEndGame).toBe(true);
@@ -69,38 +71,70 @@ test('the game plays normally with no leaderboard server, and the board falls ba
   expect(errors).toEqual([]);
 });
 
-test('the consent question is asked once, on the results screen, and is remembered', async ({ page }) => {
+test('a first win goes on the board and says so, and opting out takes it back off', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   await page.goto('http://localhost:3000/');
   await page.waitForFunction(() => typeof LB !== 'undefined');
 
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate(async () => {
     const b = document.getElementById('storyBtn'), s = document.getElementById('story');
     if (b && s && s.style.display === 'flex') b.click();
 
+    // On by default: the very first battle opens a handshake, so the very first win can
+    // rank. Waiting for consent meant two finished battles before anything appeared,
+    // and a player who finished one saw an empty board and assumed it was broken.
+    const before = LB.consent;
     startGame('destroyer'); skipBanner();
     endGame(true, 'test');
-    const askedOnFirstBattle = !!document.getElementById('lbConsent');
+    await new Promise(res => setTimeout(res, 300));
 
-    document.getElementById('lbNo').click();
-    const afterNo = { consent: LB.consent, boxGone: !document.getElementById('lbConsent') };
+    const notice = document.getElementById('lbConsent');
+    const told = !!notice;
+    const t = notice ? notice.textContent : '';
+    const statesItIsDone = /on the leaderboard|已经上榜/.test(t);
+    const offersNoChoice = !/lbYes|lbNo/.test(notice ? notice.innerHTML : '');
+    const hasOptOut = !!document.getElementById('lbOptOut');
 
-    // Declining is remembered, so the next battle neither asks again nor sends anything.
+    document.getElementById('lbOptOut').click();
+    await new Promise(res => setTimeout(res, 300));
+
+    // Opting out must stop the NEXT battle too, not just this one.
     phase = 'play';
     startGame('destroyer'); skipBanner();
-    endGame(true, 'test');
-    const asksAgain = !!document.getElementById('lbConsent');
-
-    return { askedOnFirstBattle, afterNo, asksAgain, sessionAfterDecline: LB.session };
+    return { before, told, statesItIsDone, offersNoChoice, hasOptOut,
+             consentAfterOptOut: LB.consent, sessionAfterOptOut: LB.session };
   });
 
-  expect(r.askedOnFirstBattle).toBe(true);
-  expect(r.afterNo.consent).toBe(false);
-  expect(r.afterNo.boxGone).toBe(true);
-  expect(r.asksAgain).toBe(false);
-  expect(r.sessionAfterDecline).toBe(null);
+  expect(r.before).toBe(null);
+  expect(r.told).toBe(true);
+  expect(r.statesItIsDone).toBe(true);   // their time is already up there
+  expect(r.offersNoChoice).toBe(true);   // so it states that, instead of offering a yes/no
+  expect(r.hasOptOut).toBe(true);
+  expect(r.consentAfterOptOut).toBe(false);
+  expect(r.sessionAfterOptOut).toBe(null);
   expect(errors).toEqual([]);
+});
+
+test('a player who already said no stays off the board', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof LB !== 'undefined');
+  const r = await page.evaluate(() => {
+    const b = document.getElementById('storyBtn'), s = document.getElementById('story');
+    if (b && s && s.style.display === 'flex') b.click();
+    // Somebody who declined under the old opt-in flow has a stored '0'. Flipping the
+    // default must not quietly re-enrol them — that would break a promise made to a
+    // real person.
+    localStorage.setItem('ironTideLbConsent', '0');
+    lbLoad();
+    const consent = LB.consent;
+    startGame('destroyer'); skipBanner();
+    endGame(true, 'test');
+    return { consent, session: LB.session, noticeShown: !!document.getElementById('lbConsent') };
+  });
+  expect(r.consent).toBe(false);
+  expect(r.session).toBe(null);
+  expect(r.noticeShown).toBe(false);
 });
 
 test('the money cheat turns the battle into a practice run and says so at the keypress', async ({ page }) => {

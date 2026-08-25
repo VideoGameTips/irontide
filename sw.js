@@ -3,7 +3,7 @@
 // UPDATE CONVENTION: this is a single-file game with no build step, so whenever
 // index.html or any vendored script changes, bump the version suffix below —
 // the old cache is deleted on activate and clients pick up the new one.
-const CACHE = 'irontide-v92';
+const CACHE = 'irontide-v93';
 const ASSETS = [
   './',
   'manifest.json',

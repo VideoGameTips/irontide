@@ -4213,7 +4213,7 @@ function backslashMoneyCode(){
     // The run is still submitted (marked practice) so the career total stays continuous —
     // dropping it would make the NEXT honest battle look like a suspicious jump.
     LB.practice=true;
-    flashPrompt(LB.consent===true
+    flashPrompt(LB.consent!==false
       ? T('💰 SECRET FUNDS: +$10,000 — practice run, not ranked','💰 秘密资金：+$10,000——本局转为练习局，不计入排行榜')
       : '💰 '+T('SECRET FUNDS: +$10,000','秘密资金：+$10,000'));}
 }
@@ -10215,7 +10215,14 @@ async function lbSign(nonce,bodyStr){
 // session at the end and nothing gets submitted.
 async function lbStartRun(){
   LB.session=null; LB.practice=false; LB.sushi.run=null;
-  if(!LB.supported||LB.consent!==true) return;
+  // 默认上榜：只有明确关掉的人才不发。第一局就握手，所以第一局就能上榜——
+  // 之前「先问再发」意味着要打完两局才有第一条成绩，实际结果是打完一局的人
+  // 看到空榜，以为坏了。代价说清楚：这一发生在告知玩家之前，发出去的是随机
+  // 设备 id + 两个词表下标，没有任何个人信息，而且结算页立刻告知并给一键关闭。
+  if(!LB.supported||LB.consent===false) return;
+  // 明知没网就别发。省不了多少，但每次失败的 fetch 都会在控制台留一条错误，
+  // 而这游戏本来就是设计成能离线玩的——不该因为「可选功能连不上」而看起来像坏了。
+  try{ if(navigator.onLine===false) return; }catch(e){}
   if(MP.active||MP.everJoined) return;                 // a shared arena is not the campaign
   const mode=lbMode();
 
@@ -10268,8 +10275,11 @@ function lbAfterBattle(win,mpMatch,durS){
   ['lbConsent','lbRankLine'].forEach(id=>{ const e=document.getElementById(id); if(e) e.remove(); });
   if(!LB.supported||mpMatch) return;
   if(MP.active||MP.everJoined) return;
-  if(LB.consent===null){ lbShowConsent(); return; }     // first battle: ask, do not send
-  if(LB.consent!==true) return;
+  if(LB.consent===false) return;
+  const firstTime = LB.consent===null;                 // 还没被告知过
+  // 同步告知，不等提交回来。这句话不依赖服务端说了什么——成绩已经发出去了，
+  // 玩家现在就该知道。放进 .then() 里意味着网络挂起时他们永远看不到。
+  if(firstTime){ lbSetConsent(true); lbShowEnrolledNotice(); }
   lbFinishRun(win,mpMatch,durS).then(async r=>{
     if(!r) return;
     // Relay the signature to the site-wide board. Only ever present on a run that passed
@@ -10280,31 +10290,35 @@ function lbAfterBattle(win,mpMatch,durS){
 }
 
 // ---- the one-time question, asked on the results screen -------------------------
-function lbShowConsent(){
+function lbShowEnrolledNotice(){
+  // 告知，不是提问。他们的成绩此刻已经在榜上了，所以措辞必须是「你上榜了」，
+  // 而不是「要不要上榜」——把已经发生的事说成一个待选项才是真的不老实。
+  // 一行字加一个「关掉」，不挡路：第一次赢的那一刻不该被弹窗打断。
   const over=document.getElementById('over'); if(!over) return;
-  let box=document.getElementById('lbConsent');
-  if(box) box.remove();
-  box=document.createElement('div'); box.id='lbConsent';
-  box.style.cssText='margin:14px auto 0;max-width:560px;padding:14px 18px;border:1px solid #21384e;'+
-    'border-radius:10px;background:rgba(255,255,255,0.03);font-size:13px;line-height:1.7;color:#cfe0ee';
+  const stale=document.getElementById('lbConsent'); if(stale) stale.remove();
+  const box=document.createElement('div'); box.id='lbConsent';
+  box.style.cssText='margin:12px auto 0;max-width:560px;padding:11px 16px;border:1px solid #21384e;'+
+    'border-radius:10px;background:rgba(255,255,255,0.03);font-size:12px;line-height:1.7;color:#9fc6e8;text-align:center';
   box.innerHTML=
-    '<div style="color:#ffd060;letter-spacing:2px;font-size:12px;margin-bottom:8px">'+T('🏆 JOIN THE LEADERBOARD?','🏆 要上排行榜吗？')+'</div>'+
-    '<div style="color:#9fc6e8">'+T('Your battles can be ranked against other captains. You would go on the board as '+
-        '<b>'+lbMyName()+'</b> — a callsign picked from a word list, not your real name. No account, no email, nothing typed in.',
-      '你的战绩可以和其他舰长比一比。你在榜上的名字是 <b>'+lbMyName()+'</b>——从词表里抽的呼号，不是真名。不用注册，不填邮箱，什么都不用输入。')+'</div>'+
-    '<div style="color:#6b7d92;font-size:11px;margin-top:6px">'+T('You can change your mind any time in the leaderboard panel. This battle stays private either way — the board starts with your next one.',
-      '随时可以在排行榜面板里改主意。这一场无论如何都不会上传——从下一场开始才计入。')+'</div>'+
-    '<div style="margin-top:11px;display:flex;gap:9px;justify-content:center;flex-wrap:wrap">'+
-      '<button id="lbYes" style="cursor:pointer;background:#13283a;color:#cfe6fb;border:1px solid #3579a8;border-radius:8px;padding:8px 20px;font-size:12px;letter-spacing:2px">'+T('YES, RANK ME','好，给我排名')+'</button>'+
-      '<button id="lbNo" style="cursor:pointer;background:#1a1a1a;color:#9fb3c6;border:1px solid #333;border-radius:8px;padding:8px 20px;font-size:12px;letter-spacing:2px">'+T('NO THANKS','不用了')+'</button>'+
-    '</div>';
+    T('🏆 Your time is on the leaderboard as <b style="color:#cfe0ee">'+lbMyName()+'</b> — a callsign from a word list, not your real name.',
+      '🏆 你的成绩已经上榜了，名字是 <b style="color:#cfe0ee">'+lbMyName()+'</b>——从词表里抽的呼号，不是真名。')+
+    ' <span id="lbOptOut" style="cursor:pointer;color:#8fb8d8;text-decoration:underline">'+
+      T('Rather not be on it?','不想上榜？')+'</span>';
   const txt=document.getElementById('overText');
   if(txt&&txt.parentNode) txt.parentNode.insertBefore(box,txt.nextSibling); else over.appendChild(box);
-  box.querySelector('#lbYes').onclick=()=>{ lbSetConsent(true); sfxClick();
-    box.innerHTML='<div style="text-align:center;color:#7ff0a8;font-size:13px">'+
-      T('⚓ You are on the board as <b>'+lbMyName()+'</b>. Your next battle counts.',
-        '⚓ 你的呼号是 <b>'+lbMyName()+'</b>，下一场战斗就开始计入排行榜。')+'</div>'; };
-  box.querySelector('#lbNo').onclick=()=>{ lbSetConsent(false); sfxClick(); box.remove(); };
+  box.querySelector('#lbOptOut').onclick=async()=>{
+    sfxClick();
+    lbSetConsent(false);
+    // 关掉不只是「以后不发」——已经上去的那条也要一起撤下来，否则「不想上榜」
+    // 只兑现了一半。
+    try{
+      await fetch(lbBase()+'/forget',{ method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({player_id:LB.id}) });
+    }catch(e){}
+    box.innerHTML='<span style="color:#8a9bb0">'+
+      T('Taken off the board. You can turn it back on in the leaderboard panel.',
+        '已经从榜上撤下来了。想再上榜可以在排行榜面板里打开。')+'</span>';
+  };
 }
 
 // ---- "you placed 3rd" on the results screen -------------------------------------
@@ -10426,12 +10440,15 @@ function lbRenderFoot(){
   const o=document.getElementById('lbPanel'); if(!o) return;
   const foot=o.querySelector('#lbFoot'); foot.innerHTML='';
 
-  if(LB.consent!==true){
+  if(LB.consent===false){
     foot.innerHTML='<div style="color:#9fc6e8;font-size:12px">'+
-      T('You are not on the board yet. Join as <b>'+lbMyName()+'</b> — a callsign from a word list, no account, no name to type.',
-        '你还没上榜。以 <b>'+lbMyName()+'</b> 的身份加入——词表抽的呼号，不用注册，不用输入任何名字。')+'</div>'+
-      '<div style="margin-top:9px"><span id="lbJoin" style="'+lbChip(true)+'">'+T('JOIN THE BOARD','加入排行榜')+'</span>'+
-      '<span id="lbRoll" style="'+lbChip(false)+'">'+T('NEW CALLSIGN','换个呼号')+'</span></div>';
+      T('You are off the board — nothing from this browser is being sent.',
+        '你已经从榜上撤下来了，这台设备的成绩不会再上传。')+'</div>'+
+      '<div style="margin-top:9px"><span id="lbJoin" style="'+lbChip(true)+'">'+T('PUT ME BACK ON','重新上榜')+'</span>'+
+      '<span id="lbRoll" style="'+lbChip(false)+'">'+T('NEW CALLSIGN','换个呼号')+'</span></div>'+
+      '<div style="margin-top:9px;color:#55697d">'+
+        T('Your callsign would be <b style="color:#9fb3c6">'+lbMyName()+'</b> — from a word list, no account, nothing to type.',
+          '你的呼号会是 <b style="color:#9fb3c6">'+lbMyName()+'</b>——词表抽的，不用注册，什么都不用输入。')+'</div>';
     foot.querySelector('#lbJoin').onclick=()=>{ lbSetConsent(true); sfxClick(); lbRender(); };
     foot.querySelector('#lbRoll').onclick=()=>{ lbReroll(); sfxClick(); lbRenderFoot(); };
     return;
@@ -10489,7 +10506,7 @@ async function lbRender(){
     // URIs, and this id next to a client IP in an access log is exactly what we promised
     // not to keep.
     const h={};
-    if(LB.consent===true&&LB.id) h['X-IT-Player']=LB.id;
+    if(LB.consent!==false&&LB.id) h['X-IT-Player']=LB.id;
     const res=await fetch(lbBase()+'/board?'+q.toString(),{headers:h});
     if(res.ok) data=await res.json();
   }catch(e){ /* handled below */ }
@@ -10532,7 +10549,7 @@ async function lbRender(){
     '</div>';
   };
 
-  let html=data.rows.map(r=>row(r,LB.consent===true&&data.me&&data.me.rank===r.rank)).join('');
+  let html=data.rows.map(r=>row(r,LB.consent!==false&&data.me&&data.me.rank===r.rank)).join('');
   if(data.me&&data.me.rank>data.rows.length){
     html+='<div style="text-align:center;color:#55697d;font-size:11px;margin:6px 0">···</div>'+row(data.me,true);
   }

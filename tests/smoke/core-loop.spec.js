@@ -10,7 +10,16 @@ const GAME = 'http://localhost:3000/';
 async function boot(page) {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', m => {
+    if (m.type() !== 'error') return;
+    // Resource-load failures are excluded on purpose. The leaderboard is an OPTIONAL
+    // service and this dev server does not host it, so every battle logs a 404 for it —
+    // that is the feature degrading exactly as designed, not something broken. The
+    // console text carries no URL, so it cannot be filtered more narrowly than this.
+    // Missing scripts are covered separately and precisely by tests/script-assets.test.js.
+    if (/Failed to load resource/.test(m.text())) return;
+    errors.push(m.text());
+  });
   await page.goto(GAME);
   await page.waitForFunction(() => typeof startGame === 'function' && typeof SHIPS === 'object');
   // a fresh profile sees the prologue — dismiss it so the menu is interactive
