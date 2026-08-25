@@ -13,7 +13,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const Database = require('better-sqlite3');
 
-const SCHEMA_VERSION = 2;   // v2: signed-in captains alongside anonymous ones
+const SCHEMA_VERSION = 3;   // v2 两档身份 · v3 测试局标记
 
 function open(dataDir) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -100,7 +100,11 @@ function migrate(db) {
       status       TEXT NOT NULL DEFAULT 'ok',
       flags        TEXT,
       ip_hash      TEXT,
-      created_at   INTEGER NOT NULL
+      created_at   INTEGER NOT NULL,
+      -- 测试局。仍然跑完整校验、仍然算分、status/flags 记的是真实结论——
+      -- 只是永远不上榜。这样在生产上验证整条链路不必往孩子们的榜里塞垃圾，
+      -- 而管理页还看得出「这条测试局本来会不会通过」。
+      is_test      INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS idx_runs_theater ON runs(mode, map_idx, difficulty, won, status);
     CREATE INDEX IF NOT EXISTS idx_runs_war     ON runs(difficulty, status, created_at);
@@ -118,6 +122,8 @@ function migrate(db) {
   const sessionCols = cols('sessions');
   if (!sessionCols.has('sushi_run_id')) db.exec('ALTER TABLE sessions ADD COLUMN sushi_run_id TEXT');
   if (!sessionCols.has('sushi_mode')) db.exec('ALTER TABLE sessions ADD COLUMN sushi_mode TEXT');
+  const runCols = cols('runs');
+  if (!runCols.has('is_test')) db.exec('ALTER TABLE runs ADD COLUMN is_test INTEGER NOT NULL DEFAULT 0');
 
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }
@@ -150,11 +156,11 @@ function prepare(db) {
       INSERT INTO runs (player_id, session_id, mode, map_idx, difficulty, won, duration_s,
                         sunk, planes, islands, bosses, ships_lost, stars, war_score,
                         career_score, career_ok, stars_total, medals, completed, mastery,
-                        client_ver, elapsed_s, status, flags, ip_hash, created_at)
+                        client_ver, elapsed_s, status, flags, ip_hash, created_at, is_test)
       VALUES (@player_id, @session_id, @mode, @map_idx, @difficulty, @won, @duration_s,
               @sunk, @planes, @islands, @bosses, @ships_lost, @stars, @war_score,
               @career_score, @career_ok, @stars_total, @medals, @completed, @mastery,
-              @client_ver, @elapsed_s, @status, @flags, @ip_hash, @created_at)
+              @client_ver, @elapsed_s, @status, @flags, @ip_hash, @created_at, @is_test)
     `),
     touchPlayerRun: db.prepare(`
       UPDATE players SET last_run_at = @now,
@@ -186,7 +192,7 @@ function prepare(db) {
       SELECT r.player_id, p.callsign_a, p.callsign_b, p.kind, p.display_name,
              MIN(r.duration_s) AS value, r.stars, r.ships_lost, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
-      WHERE r.status = 'ok' AND p.banned = 0 AND r.mode = 'campaign'
+      WHERE r.status = 'ok' AND r.is_test = 0 AND p.banned = 0 AND r.mode = 'campaign'
         AND r.map_idx = @map AND r.difficulty = @diff AND r.won = 1
         AND r.created_at >= @since
       GROUP BY r.player_id
@@ -201,7 +207,7 @@ function prepare(db) {
       SELECT r.player_id, p.callsign_a, p.callsign_b, p.kind, p.display_name,
              MAX(r.war_score) AS value, r.map_idx, r.sunk, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
-      WHERE r.status = 'ok' AND p.banned = 0 AND r.mode = 'campaign'
+      WHERE r.status = 'ok' AND r.is_test = 0 AND p.banned = 0 AND r.mode = 'campaign'
         AND r.difficulty = @diff AND r.created_at >= @since
       GROUP BY r.player_id
       ORDER BY value DESC, r.created_at ASC
@@ -211,7 +217,7 @@ function prepare(db) {
       SELECT r.player_id, p.callsign_a, p.callsign_b, p.kind, p.display_name,
              MAX(r.career_score) AS value, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
-      WHERE r.status = 'ok' AND r.career_ok = 1 AND p.banned = 0
+      WHERE r.status = 'ok' AND r.is_test = 0 AND r.career_ok = 1 AND p.banned = 0
         AND r.created_at >= @since
       GROUP BY r.player_id
       ORDER BY value DESC, r.created_at ASC
@@ -221,7 +227,7 @@ function prepare(db) {
       SELECT r.player_id, p.callsign_a, p.callsign_b, p.kind, p.display_name,
              MAX(r.mastery) AS value, r.stars_total, r.medals, r.completed, r.created_at
       FROM runs r JOIN players p ON p.player_id = r.player_id
-      WHERE r.status = 'ok' AND r.career_ok = 1 AND p.banned = 0
+      WHERE r.status = 'ok' AND r.is_test = 0 AND r.career_ok = 1 AND p.banned = 0
         AND r.created_at >= @since
       GROUP BY r.player_id
       ORDER BY value DESC, r.created_at ASC

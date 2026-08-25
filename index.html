@@ -10095,7 +10095,7 @@ function trainingCourseRunning(){
 // =====================================================================
 const LB_CLIENT_VER='lb1';
 let lbOpen=false;
-let LB={ id:null, callsign:null, consent:null, session:null, practice:false, supported:false,
+let LB={ id:null, callsign:null, consent:null, session:null, practice:false, supported:false, test:false,
          busy:false, lastRanks:null,
          // Sushi ID is the site-wide account service. Signing in is entirely optional:
          // an anonymous captain gets every board in this game. What an account adds is a
@@ -10180,6 +10180,15 @@ function lbLoad(){
     LB.callsign=c;
     const k=localStorage.getItem('ironTideLbConsent');
     LB.consent = k==='1' ? true : k==='0' ? false : null;
+    // 测试局开关：?lbtest=1 打开、?lbtest=0 关掉，存起来所以刷新后还在。
+    // 打开之后每一局照常校验、照常算分，但永远不上榜——这样才能在真正的线上
+    // 验证整条链路，而不必往孩子们的榜里塞垃圾再手动去数据库删。
+    try{
+      const q=new URLSearchParams(location.search).get('lbtest');
+      if(q==='1') localStorage.setItem('ironTideLbTest','1');
+      if(q==='0') localStorage.removeItem('ironTideLbTest');
+    }catch(e){}
+    LB.test = localStorage.getItem('ironTideLbTest')==='1';
     LB.view.diff=difficulty;
   }catch(e){ LB.supported=false; }   // storage blocked (private mode) — stay offline, keep playing
 }
@@ -10240,7 +10249,7 @@ async function lbFinishRun(win,mpMatch,durS){
     career:{ sunk:career.sunk||0, planes:career.planes||0, islands:career.islands||0,
              wins:career.wins||0, bosses:career.bosses||0, score:careerScore() },
     stars_total:lbStarsTotal(), medals:(career.achievements||[]).length,
-    completed:!!career.completed, practice:!!LB.practice, client_ver:LB_CLIENT_VER };
+    completed:!!career.completed, practice:!!LB.practice, test:!!LB.test, client_ver:LB_CLIENT_VER };
   try{
     const str=JSON.stringify(body);
     const sig=await lbSign(sess.nonce,str);
@@ -10313,6 +10322,9 @@ function lbShowResult(r,site){
       : T('posted to the Sushi Game Lab board','已发到寿司游戏实验室全站榜'));
   }
   if(r.practice){ parts.length=0; parts.push(T('practice run — not ranked','练习局——不计入排行榜')); }
+  // 测试模式很容易开着就忘了，所以每一局都明说，而不是只在打开时提示一次。
+  if(r.test){ parts.length=0; parts.push(T('TEST RUN — recorded but never ranked (?lbtest=0 to turn off)',
+                                           '测试局——已入库但永不上榜（?lbtest=0 关掉）')); }
   if(!parts.length) return;
   const txt=document.getElementById('overText'); if(!txt) return;
   const old=document.getElementById('lbRankLine'); if(old) old.remove();

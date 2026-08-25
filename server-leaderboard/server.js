@@ -376,6 +376,9 @@ async function handleFinish(req, res, ipHash) {
     flags: flags.length ? flags.join(',') : null,
     ip_hash: ipHash,
     created_at: t,
+    // 测试局：照常校验、照常算分，status/flags 记的是真实结论——只是永远不上榜。
+    // 客户端自报，不做防伪：谎称自己是测试局只会让自己上不了榜，没有作弊动机。
+    is_test: body.test ? 1 : 0,
   });
 
   try {
@@ -421,6 +424,7 @@ async function handleFinish(req, res, ipHash) {
     war_score: row.war_score,
     ranks,
     sushi,
+    test: row.is_test === 1,
   });
 }
 

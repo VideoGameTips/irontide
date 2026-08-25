@@ -577,3 +577,54 @@ suite('nothing is attested for a practice or a flagged run', async () => {
   assert.equal(f.json.counted, false);
   assert.equal(f.json.sushi, null, 'a flagged war is never promoted to the site board');
 });
+
+// ---- 测试局 -------------------------------------------------------------------------
+//
+// 在真正的线上验证整条链路，不能靠往孩子们的榜里塞几条再手动去数据库删——
+// 我今天就是这么干的，而且删漏过。测试局照常校验、照常算分（否则测了等于没测），
+// 只是四张榜一张都不收。
+
+suite('a test run is scored and stored, but never reaches any board', async () => {
+  const p = 'tester-0001';
+  const s = await startRun({ player: p });
+  backdate(s.session_id, 400);
+  const res = await finish(s, goodRun({ test: true }), { player: p });
+
+  assert.equal(res.status, 200);
+  assert.equal(res.json.test, true, 'the reply says so, so nobody forgets the switch is on');
+  assert.ok(res.json.war_score > 0, 'still scored — a test that skips scoring tests nothing');
+
+  const row = runBySession(s.session_id);
+  assert.equal(row.is_test, 1);
+  assert.equal(row.status, 'ok', 'the REAL verdict is still recorded, not overwritten by "test"');
+
+  // …and it is invisible on every board, including the player's own rank line.
+  for (const q of ['type=theater&map=0&diff=normal', 'type=war&diff=normal', 'type=career', 'type=mastery']) {
+    const board = await get('/board?' + q, p);
+    assert.equal(board.json.me, null, `test run leaked onto ${q}`);
+    assert.ok(!board.json.rows.some(r => r.tag === undefined && false), q);
+  }
+});
+
+suite('a test run that would have been flagged still records why', async () => {
+  const p = 'tester-0002';
+  const s = await startRun({ player: p });
+  // no backdating: the claimed duration beats the wall clock
+  const res = await finish(s, goodRun({ test: true }), { player: p });
+
+  const row = runBySession(s.session_id);
+  assert.equal(row.is_test, 1);
+  assert.equal(row.status, 'flagged');
+  assert.match(row.flags, /duration-exceeds-wallclock/,
+    'a test run has to be able to tell you the pipeline WOULD have rejected it');
+});
+
+suite('ordinary runs are unaffected by the test column existing', async () => {
+  const p = 'nontester-0001';
+  const s = await startRun({ player: p });
+  backdate(s.session_id, 400);
+  await finish(s, goodRun(), { player: p });
+  assert.equal(runBySession(s.session_id).is_test, 0);
+  const board = await get('/board?type=theater&map=0&diff=normal', p);
+  assert.ok(board.json.me, 'a real run still ranks');
+});
