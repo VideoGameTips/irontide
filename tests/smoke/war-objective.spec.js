@@ -224,3 +224,36 @@ test('resuming a first war keeps the goal it was started under', async ({ page }
   expect(r.firstWar, 'a resumed first war is still a first war').toBe(true);
   expect(r.wonAt).toBe(r.goal);
 });
+
+// --- the objective has to name the thing that ends THIS battle -------------------------------
+// It said "destroy the enemy harbour" on every map, including the ground theaters that are won by
+// taking every island — and the compass needle pointed at that harbour, three kilometres the wrong
+// way. A player who follows both ends up nowhere, and nothing on screen ever says otherwise.
+test('the headline and the compass name the real win condition', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(() => {
+    try { localStorage.clear(); } catch (e) {}
+    loadCareer(); career.wins = 6; career.mapsUnlocked = 31; saveCareer();
+    const read = () => ({ title: (document.getElementById('obtitle') || {}).textContent || '',
+                          compass: (document.getElementById('obcompass') || {}).textContent || '',
+                          next: (document.getElementById('nextstep') || {}).textContent || '' });
+    const run = (setup) => { setup(); startGame('destroyer'); skipBanner();
+      const dt = 1 / 30; for (let i = 0; i < 30; i++) { t2 += dt; update(dt, t2); }
+      updateWarPacing(dt); return read(); };
+    const groundIdx = CAMPAIGN.findIndex(m => m.ground);
+    const ground = run(() => { difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = groundIdx; });
+    const naval  = run(() => { quickMode = false; currentSandboxIdx = -1; currentMapIdx = 4; });
+    const quick  = run(() => { quickMode = true; currentSandboxIdx = -1; });
+    quickMode = false;
+    return { ground, naval, quick, capturable: 'checked' };
+  });
+  // ground: islands, never the harbour — headline, needle and next step all agree
+  expect(r.ground.title).toMatch(/TAKE EVERY ISLAND|占领所有岛屿/);
+  expect(r.ground.compass, 'the needle must not point at a harbour that is not the goal').not.toMatch(/ENEMY HARBOR|敌方海港/);
+  // naval and quick keep their own goals
+  expect(r.naval.title).toMatch(/HARBOR|海港/);
+  expect(r.quick.title).toMatch(/SINK|击沉/);
+  // and every one of them answers "what now"
+  for (const k of ['ground', 'naval', 'quick'])
+    expect(r[k].next.length, k + ' left the next-step line empty').toBeGreaterThan(6);
+});

@@ -239,3 +239,33 @@ test('a panel keeps its own instructions during a first war', async ({ page }) =
   expect(rows.length, 'the armory list is not the helm list').toBeGreaterThan(1);
   expect(rows, 'clicking is how you buy things').toContain('Click');
 });
+
+// The panel lists what is LEGAL. ? answers what is NEXT — the question a player standing on a
+// beach with fifteen legal keys actually has, and which nothing on screen used to answer.
+test('? answers what to do now, and Esc puts it away without skipping the tutorial', async ({ page }) => {
+  await boot(page);
+  await page.evaluate(() => {
+    localStorage.removeItem('ironTideTutorialDone');
+    loadCareer(); career.wins = 0; career.losses = 0; saveCareer();
+    difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = 0;
+    startGame('destroyer'); skipBanner();
+  });
+  await page.keyboard.press('Shift+Slash');
+  const open = await page.evaluate(() => ({
+    shown: !!document.querySelector('#help.on'),
+    sentence: (document.getElementById('helpNow') || {}).textContent || '',
+    keys: document.querySelectorAll('#help .kr').length,
+    course: !!document.getElementById('helpCourse'),
+    tutIdx,
+  }));
+  expect(open.shown).toBe(true);
+  expect(open.sentence.length, 'it has to actually say something').toBeGreaterThan(6);
+  expect(open.keys, 'and list every key, not the short list').toBeGreaterThan(5);
+  expect(open.course, 'a way back to the course belongs here').toBe(true);
+
+  await page.keyboard.press('Escape');
+  const closed = await page.evaluate(() => ({ shown: !!document.querySelector('#help.on'), tutIdx }));
+  expect(closed.shown).toBe(false);
+  // Esc skips the tutorial when nothing is over it. Closing help must not do that by accident.
+  expect(closed.tutIdx, 'Esc fell through and skipped the lesson').toBe(open.tutIdx);
+});
