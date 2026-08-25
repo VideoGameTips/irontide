@@ -36,3 +36,50 @@ for (const c of CASES) {
     expect(r.attempted).toBe(c.wantHandshakeAttempt);
   });
 }
+
+test('the "you are on the board" notice repeats a few times, then stops', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof LB !== 'undefined');
+  const shown = await page.evaluate(async () => {
+    const b = document.getElementById('storyBtn'), s = document.getElementById('story');
+    if (b && s && s.style.display === 'flex') b.click();
+    localStorage.removeItem('ironTideLbConsent');
+    localStorage.removeItem('ironTideLbTold');
+    lbLoad();
+    const seen = [];
+    for (let i = 0; i < 5; i++) {
+      phase = 'play';
+      startGame('destroyer'); skipBanner();
+      endGame(true, 'test');
+      await new Promise(r => setTimeout(r, 120));
+      seen.push(!!document.getElementById('lbConsent'));
+    }
+    return seen;
+  });
+  // Told on the first three wins, then left alone. Once is too easy for a nine year old
+  // to skim past, and this is opt-out — being told is the whole justification for it.
+  expect(shown).toEqual([true, true, true, false, false]);
+});
+
+test('opting out silences the notice for good', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof LB !== 'undefined');
+  const r = await page.evaluate(async () => {
+    const b = document.getElementById('storyBtn'), s = document.getElementById('story');
+    if (b && s && s.style.display === 'flex') b.click();
+    localStorage.removeItem('ironTideLbConsent');
+    localStorage.removeItem('ironTideLbTold');
+    lbLoad();
+    startGame('destroyer'); skipBanner(); endGame(true, 'test');
+    await new Promise(res => setTimeout(res, 120));
+    document.getElementById('lbOptOut').click();
+    await new Promise(res => setTimeout(res, 300));
+    // Turn it back on from the panel; the notice must not start nagging again.
+    lbSetConsent(true);
+    phase = 'play';
+    startGame('destroyer'); skipBanner(); endGame(true, 'test');
+    await new Promise(res => setTimeout(res, 120));
+    return { noticeBack: !!document.getElementById('lbConsent') };
+  });
+  expect(r.noticeBack).toBe(false);
+});

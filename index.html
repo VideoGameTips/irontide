@@ -10276,10 +10276,19 @@ function lbAfterBattle(win,mpMatch,durS){
   if(!LB.supported||mpMatch) return;
   if(MP.active||MP.everJoined) return;
   if(LB.consent===false) return;
-  const firstTime = LB.consent===null;                 // 还没被告知过
+  // 告知次数，不是「告知过没有」。一行字只出现一次，孩子瞄一眼就翻页了——
+  // 等于从没被告知过，而这是默认上榜，告知是唯一的正当性来源。三次之后停，
+  // 再多就是骚扰；面板里的「把我从榜上撤下来」是长期入口，一直都在。
+  let told = 0;
+  try{ told = Number(localStorage.getItem('ironTideLbTold')||0)||0; }catch(e){}
+  const shouldTell = told < 3;
   // 同步告知，不等提交回来。这句话不依赖服务端说了什么——成绩已经发出去了，
   // 玩家现在就该知道。放进 .then() 里意味着网络挂起时他们永远看不到。
-  if(firstTime){ lbSetConsent(true); lbShowEnrolledNotice(); }
+  if(shouldTell){
+    try{ localStorage.setItem('ironTideLbTold', String(told+1)); }catch(e){}
+    lbSetConsent(true);
+    lbShowEnrolledNotice();
+  }
   lbFinishRun(win,mpMatch,durS).then(async r=>{
     if(!r) return;
     // Relay the signature to the site-wide board. Only ever present on a run that passed
@@ -10309,6 +10318,7 @@ function lbShowEnrolledNotice(){
   box.querySelector('#lbOptOut').onclick=async()=>{
     sfxClick();
     lbSetConsent(false);
+    try{ localStorage.setItem('ironTideLbTold','99'); }catch(e){}   // 关掉了就别再念
     // 关掉不只是「以后不发」——已经上去的那条也要一起撤下来，否则「不想上榜」
     // 只兑现了一半。
     try{
