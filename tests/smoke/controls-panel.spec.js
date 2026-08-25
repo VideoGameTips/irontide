@@ -220,3 +220,22 @@ test('both new settings are reachable, in either language', async ({ page }) => 
   // every row translated — a half-Chinese settings panel is how the old rows were spotted
   expect(zh.filter(r => /[a-zA-Z]{4,}/.test(r))).toEqual([]);
 });
+
+// A first war grows this panel one key at a time — but a panel that has taken over the screen
+// carries its OWN short list, and filtering that left the armory showing "Tab — close" as its
+// only row, one step after the tutorial told the player to go shopping.
+test('a panel keeps its own instructions during a first war', async ({ page }) => {
+  await boot(page);
+  const rows = await page.evaluate(() => {
+    localStorage.clear(); loadCareer(); career.wins = 0; career.losses = 0; saveCareer();
+    difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = 0;
+    startGame('destroyer'); skipBanner();
+    if (!firstWar) throw new Error('this test needs a first war');
+    tutIdx = (tutSteps || []).length - 1;          // the step that teaches Tab
+    shopOpen = true; renderActions(); shopOpen = false;
+    return [...document.querySelectorAll('#actList .actrow')].map(e =>
+      e.querySelector('.actkey').textContent);
+  });
+  expect(rows.length, 'the armory list is not the helm list').toBeGreaterThan(1);
+  expect(rows, 'clicking is how you buy things').toContain('Click');
+});

@@ -211,13 +211,26 @@
   #brGo .gs{display:block;font-size:11px;color:#77c4a0;margin-top:2px;letter-spacing:.4px;}
   #menu.bridge #ships{padding:0;gap:9px;flex-direction:column;flex-wrap:nowrap;}
   #menu.bridge .ship{width:100%;padding:11px 13px;}
-  #menu.bridge .ship p{display:none;}
+  /* Clamped, not deleted: "press C to dive" is the difference between a submarine and a bad
+     destroyer, and the almanac is a separate trip. Two lines fit and still say it. */
+  #menu.bridge .ship p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow:hidden;min-height:0;margin-bottom:8px;font-size:11.5px;line-height:1.45;}
   #menu.bridge .ship h3{font-size:15px;}
   #menu.bridge > h1,#menu.bridge > .sub,#menu.bridge #menuDivider{display:none;}
   #menu.bridge #mapcard{width:100%;margin-top:12px;}
   #menu.bridge #campmap svg{max-width:100%;}
   #menu.bridge #moreShips{margin:2px auto 10px;}
   #menu.bridge #resumeBtn{width:100%;margin:8px 0 0!important;padding:9px!important;font-size:12.5px!important;}
+  /* --- the respawn picker ---------------------------------------------------------------
+     Mid-battle this menu asks exactly one thing: which hull do you sail back out in. The left
+     column would let you re-point currentMapIdx at another theater in the middle of a war, and
+     showRespawnMenu's message ("pick a replacement") writes into .sub, which the bridge hides. */
+  #menu.bridge.respawn > .sub{display:block;text-align:center;margin:0;padding:11px 18px;
+    background:linear-gradient(180deg,#2a2212,#1a1408);border-bottom:1px solid #4e3f21;
+    color:#ffe6a0;font-size:14px;letter-spacing:.5px;}
+  #menu.bridge.respawn #brLeft{display:none;}
+  #menu.bridge.respawn #brBody{grid-template-columns:minmax(0,1fr);}
+  #menu.bridge.respawn #brRight{border-left:none;max-width:520px;margin:0 auto;}
   @media (max-width:900px){
     /* One column that scrolls, with the launch bar pinned. flex:1 + min-height:0 is what makes
        the two columns share one non-scrolling screen above 900 — kept here it squeezes the body
@@ -4730,9 +4743,13 @@ function buildCampaignPicker(){
   if(!sr.parentNode) box.appendChild(sr);
   renderDiffRow(); renderSettingsRow();
   // --- sandbox battlefields (always unlocked, never advance the campaign) ---
+  // Built only when its tab is showing: this loop and the market's below used to run on every
+  // rebuild into a node that was never inserted — 63 cards' worth of DOM thrown away each time
+  // the difficulty, the tab, the language or the window width changed.
+  if(_menuTab==='sandbox'){
   const sbRow=document.createElement('div');
-  sbRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;'+(_menuTab==='sandbox'?'':'display:none');
-  if(_menuTab==='sandbox') box.appendChild(sbRow);
+  sbRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;';
+  box.appendChild(sbRow);
   // training ground first in the picker, everything else in declaration order
   SANDBOX_MAPS.map((M,i)=>({M,i})).sort((a,b)=>(b.M.training?1:0)-(a.M.training?1:0))
     .forEach(({M,i})=>{ const sel=i===currentSandboxIdx;
@@ -4751,17 +4768,17 @@ function buildCampaignPicker(){
 
     sbRow.appendChild(c);
   });
+  }
   // --- campaign market: permanent blueprints bought with meta-credits ---
-  const mRow=document.createElement('div');
-  mRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;';
   if(_menuTab==='market'){
+    const mRow=document.createElement('div');
+    mRow.style.cssText='display:flex;flex-wrap:wrap;gap:10px;justify-content:center;';
     if(!(career.credits||0)){ const hint=document.createElement('div');
       hint.style.cssText='width:100%;text-align:center;color:#7d8a97;font-size:12px;margin:6px 0 12px;letter-spacing:.5px;';
       hint.textContent=T('Win a theater to earn credits — blueprints are permanent once bought.',
                          '打完一个战区就有信用可用——蓝图买下来是永久的。');
       box.appendChild(hint); }
     box.appendChild(mRow);
-  }
   MARKET_CATALOG.forEach(item=>{
     const def=marketDef(item), key=marketKey(item.cat,item.id), owned=ownsMarketItem(item.cat,item.id), unlocked=mapsUnlocked()>=unlockLevel(item.level);
     const c=document.createElement('div');
@@ -4774,6 +4791,7 @@ function buildCampaignPicker(){
     if(unlocked&&!owned)c.onclick=()=>buyCampaignMarketItem(key);
     mRow.appendChild(c);
   });
+  }
 }
 // The sandbox maps and the campaign market used to be collapsible blocks stacked under the
 // battlefield picker — the market alone was ~55 blueprints tall, sitting between "pick a
@@ -5191,8 +5209,12 @@ function layoutBridge(){
   right.appendChild(dock);                       // always last in the column
   put(document.getElementById('resumeBtn'), dock);
   // the launch bar reads the whole choice back before it commits to it
-  const ship=_pickedShip&&SHIPS[_pickedShip]?_pickedShip:'destroyer';
-  const where=currentSandboxIdx>=0
+  // Same ownership test the card list uses, or the dock can name (and launch) a market hull whose
+  // card was filtered out from under it.
+  const ship=(_pickedShip&&SHIPS[_pickedShip]&&(!SHIPS[_pickedShip].marketOnly||ownsMarketItem('ship',_pickedShip)))
+    ? _pickedShip : 'destroyer';
+  const where=quickMode ? T('Quick Battle','快速战斗')
+    : currentSandboxIdx>=0
     ? ((isZh()&&typeof SANDBOX_ZH!=='undefined'&&SANDBOX_ZH[SANDBOX_MAPS[currentSandboxIdx].name]||{}).name||SANDBOX_MAPS[currentSandboxIdx].name)
     : campaignName(currentMapIdx);
   const dif={easy:T('Easy','简单'),normal:T('Normal','普通'),hard:T('Hard','困难')}[difficulty]||difficulty;
@@ -5299,7 +5321,8 @@ function buildMenu(){
   wrap.innerHTML='';   // idempotent: buildMenu is re-run on language switch
   // Eight hulls (one of them a one-life flagship) is a lot to weigh up before your first
   // battle. A first-time captain sees three; the rest are one click away.
-  if(!_pickedShip){ try{ const v=localStorage.getItem('ironTideLastShip'); if(v&&SHIPS[v]&&!SHIPS[v].marketOnly) _pickedShip=v; }catch(e){}
+  if(!_pickedShip){ try{ const v=localStorage.getItem('ironTideLastShip');
+      if(v&&SHIPS[v]&&(!SHIPS[v].marketOnly||ownsMarketItem('ship',v))) _pickedShip=v; }catch(e){}
     if(!_pickedShip) _pickedShip='destroyer'; }
   // The right column is a column: twenty-two cards push the difficulty row and the launch bar off
   // the screen, which is the pile this layout exists to undo. Three, plus whichever one you have
@@ -5352,7 +5375,8 @@ function buildMenu(){
   // Not gated on phase: showRespawnMenu raises this same menu mid-battle, and a language switch
   // there re-runs buildMenu — dropping the class then would leave the pieces sitting in two
   // columns with no grid to lay them out.
-  if(menu) menu.classList.toggle('bridge', !onFirst);
+  if(menu){ menu.classList.toggle('bridge', !onFirst);
+    menu.classList.toggle('respawn', phase==='respawn'); }
   if(!onFirst){
     layoutBridge();
     const right=document.getElementById('brRight');
@@ -5773,7 +5797,9 @@ function showRespawnMenu(msg){
   if(sub) sub.textContent=trText(menuSubEn);
   const rb=document.getElementById('resumeBtn'); if(rb) rb.style.display='none';   // mid-war menu: no resume button
   showFirstRun(false);        // this menu is a picker, not the front door
-  document.getElementById('menu').style.display='flex';
+  const mn=document.getElementById('menu');
+  mn.classList.add('respawn');   // one question only: which hull do you go back out in
+  mn.style.display='flex';
   updateMode();
 }
 function resetFootHealth(){ footHP=footMaxHP; }
@@ -10221,17 +10247,17 @@ function actionPlan(){
   const parkedPlane = planes.some(p=>p.parked);
 
   // --- panels take over the screen, so they get their own short list ---
-  if(chatOpen)     return {t:R('','RADIO','无线电')[1], rows:[R('Enter','send','发送'), R('Esc','close','关闭')], more:[]};
+  if(chatOpen)     return {t:R('','RADIO','无线电')[1], rows:[R('Enter','send','发送'), R('Esc','close','关闭')], more:[], panel:true};
   if(shopOpen)     return {t:zh?'军械库':'ARMORY', rows:[
       R('Click','buy a weapon, plane or tank','点击购买 武器/飞机/坦克'), R('Tab','close','关闭'),
-      R('Esc','close','关闭')], more:[]};
-  if(harborOpen)   return {t:zh?'海港指挥部':'HARBOR', rows:[R('Click','buy a fleet upgrade','点击购买舰队升级'), R('H','close','关闭')], more:[]};
-  if(buildOpen)    return {t:zh?'岛屿工程':'ENGINEERS', rows:[R('Click','build a defence','点击建造防御'), R('B','close','关闭')], more:[]};
-  if(settingsOpen) return {t:zh?'设置':'SETTINGS', rows:[R('K','close','关闭')], more:[]};
-  if(tacticalOpen) return {t:zh?'战术地图':'TACTICAL MAP', rows:[R('Click','pick a target','点击选择目标'), R('N','close','关闭')], more:[]};
+      R('Esc','close','关闭')], more:[], panel:true};
+  if(harborOpen)   return {t:zh?'海港指挥部':'HARBOR', rows:[R('Click','buy a fleet upgrade','点击购买舰队升级'), R('H','close','关闭')], more:[], panel:true};
+  if(buildOpen)    return {t:zh?'岛屿工程':'ENGINEERS', rows:[R('Click','build a defence','点击建造防御'), R('B','close','关闭')], more:[], panel:true};
+  if(settingsOpen) return {t:zh?'设置':'SETTINGS', rows:[R('K','close','关闭')], more:[], panel:true};
+  if(tacticalOpen) return {t:zh?'战术地图':'TACTICAL MAP', rows:[R('Click','pick a target','点击选择目标'), R('N','close','关闭')], more:[], panel:true};
   if(photoMode)    return {t:zh?'拍照模式':'PHOTO MODE', rows:[
       R('WASD','fly the camera','移动镜头'), R('Space','up','上升'), R('Shift','down','下降'),
-      R('Mouse','look','鼠标转视角'), R('L','exit','退出')], more:[]};
+      R('Mouse','look','鼠标转视角'), R('L','exit','退出')], more:[], panel:true};
 
   // Only the keys that will actually DO something from where you are standing. The tactical map
   // refuses on theatres with strategic weapons barred, and the island engineers refuse unless you
@@ -10347,7 +10373,9 @@ function renderActions(){
   const taught=tutTaughtKeys();
   // Both groups are filtered together: a key the lesson has reached must show even when it
   // normally lives in the "everything else" block (Tab is taught the moment a bounty is paid).
-  if(taught){ plan.rows=plan.rows.concat(plan.more).filter(r=>taught.has(r[0])); plan.more=[]; }
+  // Never on a panel: the armory's own list is what tells you to click a weapon, and the first
+  // war sends you there at step 4. Filtering it left "Tab — close" as the only row on screen.
+  if(taught && !plan.panel){ plan.rows=plan.rows.concat(plan.more).filter(r=>taught.has(r[0])); plan.more=[]; }
   else if(firstWar) plan.more=[];
   document.getElementById('actTitle').textContent=plan.t;
   const grp=list=>'<div class="actgrp'+(list===plan.more?' more':'')+'">'+list.map(([k,d])=>

@@ -171,3 +171,50 @@ test('being sunk mid-first-war raises the ship picker, not the pitch', async ({ 
   expect(r.afterLang.pitch, 'and a language switch does not raise it either').toBe(false);
   expect(r.afterLang.ships).toBe(true);
 });
+
+// The bridge hides .sub as a tagline — and .sub is the only place showRespawnMenu and chooseShip
+// write to. Losing it means a mid-battle picker with no instruction, and picking the Leviathan a
+// second time doing nothing and saying nothing. Neither failure makes a sound.
+test('the respawn picker speaks, and asks one question', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof startGame === 'function');
+  const r = await page.evaluate(() => {
+    localStorage.clear(); loadCareer(); career.wins = 6; career.mapsUnlocked = 7; saveCareer();
+    const sp = document.getElementById('splash'); if (sp) sp.remove();
+    _firstRunOpen = false; _menuTab = 'market'; buildMenu();
+    difficulty = 'easy'; quickMode = false; currentSandboxIdx = -1; currentMapIdx = 0;
+    startGame('destroyer'); skipBanner();
+    showRespawnMenu('Pick a replacement. It redeploys from your harbor.');
+    const vis = el => !!(el && el.offsetParent !== null);
+    return { message: vis(document.querySelector('#menu .sub')),
+             // the theater picker would re-point currentMapIdx in the middle of a war
+             theaterPicker: vis(document.getElementById('brLeft')),
+             hulls: vis(document.getElementById('ships')) };
+  });
+  expect(r.message, 'the replacement prompt has to be readable').toBe(true);
+  expect(r.theaterPicker, 'no changing theaters mid-war').toBe(false);
+  expect(r.hulls).toBe(true);
+});
+
+// The launch bar states the whole choice, so it has to be able to state a quick battle — and it
+// must never name a hull the player does not own, which the short card list silently filters out.
+test('the launch bar names what you will actually get', async ({ page }) => {
+  await page.goto('http://localhost:3000/');
+  await page.waitForFunction(() => typeof buildMenu === 'function');
+  const r = await page.evaluate(() => {
+    localStorage.clear(); loadCareer();
+    career.wins = 6; career.mapsUnlocked = 7; career.marketOwned = {}; saveCareer();
+    const sp = document.getElementById('splash'); if (sp) sp.remove();
+    const unowned = Object.keys(SHIPS).find(id => SHIPS[id].marketOnly);
+    try { localStorage.setItem('ironTideLastShip', unowned); } catch (e) {}
+    _pickedShip = null; _firstRunOpen = false; buildMenu();
+    const campaign = (document.querySelector('#brGo .gs') || {}).textContent;
+    quickMode = true; layoutBridge();
+    const quick = (document.querySelector('#brGo .gs') || {}).textContent;
+    quickMode = false;
+    return { unowned, unownedName: trName(SHIPS[unowned].name), picked: _pickedShip, campaign, quick };
+  });
+  expect(r.picked, 'a hull you do not own must not be preselected').not.toBe(r.unowned);
+  expect(r.campaign).not.toContain(r.unownedName);
+  expect(r.quick, 'a quick battle is not a campaign theater').toMatch(/Quick Battle|快速战斗/);
+});
