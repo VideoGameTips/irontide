@@ -16,7 +16,11 @@ const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
   const browser = await chromium.launch();
   const page = await browser.newPage();
   await page.goto(GAME, { waitUntil: 'load' });
-  await page.waitForFunction(() => typeof SHIPS === 'object' && typeof CAMPAIGN !== 'undefined');
+  // ...and for the renderer, because two of the counts below can only be read by starting a
+  // game. If it never boots that is itself a launch-blocking finding, so this is allowed to
+  // time out loudly rather than being guarded into a silent pass.
+  await page.waitForFunction(() => typeof SHIPS === 'object' && typeof CAMPAIGN !== 'undefined'
+    && typeof startGame === 'function' && typeof scene !== 'undefined' && !!scene);
 
   const g = await page.evaluate(() => {
     const src = document.documentElement.outerHTML;
@@ -45,6 +49,18 @@ const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
       placeIsF: /e\.code==='KeyF'\) tryPlace/.test(src),
       manIsE: /e\.code==='KeyE'\) toggleMan/.test(src),
       photoIsL: /e\.code==='KeyL'[^\n]*togglePhotoMode/.test(src),
+      // The armory's own tab count. Five catalogues, one per tab — the README quoted 121 long
+      // after it was 203, and nothing here noticed because there was no rule for it.
+      shopItems: [WEAPONS, PLANES, TANKS, HANDHELD, STRUCTS].reduce((n, c) => n + Object.keys(c).length, 0),
+      // LAST on purpose: this one starts a battle to read the course it builds, so everything
+      // above must already have been read off an untouched game.
+      trainingSteps: (() => {
+        const i = SANDBOX_MAPS.findIndex(m => m.training);
+        if (i < 0) return -1;
+        career.mapsUnlocked = 30; currentSandboxIdx = i; quickMode = false;
+        startGame('destroyer');
+        return (typeof tutSteps !== 'undefined' && tutSteps) ? tutSteps.length : -1;
+      })(),
     };
   });
 
@@ -69,6 +85,8 @@ const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
     ['F places a bought gun',           g.placeIsF,               g.placeIsF],
     ['E mans a gun',                    g.manIsE,                 g.manIsE],
     ['L is photo mode',                 g.photoIsL,               g.photoIsL],
+    ['203 shop items across 5 tabs',     g.shopItems === 203,      g.shopItems],
+    ['36-step training course',          g.trainingSteps === 36,   g.trainingSteps],
   ];
 
   let bad = 0;
@@ -105,6 +123,8 @@ const GAME = process.env.IRONTIDE_URL || 'https://sushigamelab.com/irontide/';
     [/(\d+)\s*种坦克/g,                                     g.tanks,         '种坦克'],
     [/(\d+)\s*枚勋章/g,                                     g.medals,        '枚勋章'],
     [/(\d+)\s*关战役/g,                                     g.theaters,      '关战役'],
+    [/(\d+)\s*个物品/g,                                     g.shopItems,     '个物品'],
+    [/训练场[^\n]*?(\d+)\s*步/g,                            g.trainingSteps, '步（训练场）'],
   ];
   const drift = [];
   for (const rel of files) {
