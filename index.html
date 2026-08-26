@@ -296,14 +296,70 @@
   #hitmarker{position:absolute;left:50%;top:50%;width:30px;height:30px;transform:translate(-50%,-50%) scale(.65);opacity:0;transition:opacity .05s,transform .08s;}
   #hitmarker:before,#hitmarker:after{content:'';position:absolute;inset:0;background:linear-gradient(45deg,transparent 45%,#fff1b4 46%,#fff1b4 54%,transparent 55%);filter:drop-shadow(0 0 3px #ff9c38);}
   #hitmarker:after{transform:rotate(90deg);}#hitmarker.on{opacity:1;transform:translate(-50%,-50%) scale(1);}
-  #killfeed{position:absolute;top:245px;right:22px;width:270px;display:flex;flex-direction:column;align-items:flex-end;gap:4px;font-size:12px;font-weight:700;letter-spacing:.4px;text-shadow:0 1px 3px #000;}
-  .killline{padding:4px 7px;border-right:2px solid #ffcf64;background:linear-gradient(90deg,transparent,rgba(8,16,24,.7));color:#ffe6a0;animation:killin .18s ease-out;}
+  /* Left column, not right: this grows a line per kill, and on the right that meant it slid under
+     the controls list (measured 208x106px of overlap). The left middle is empty. */
+  #killfeed{display:flex;flex-direction:column;align-items:flex-start;gap:4px;font-size:12px;font-weight:700;letter-spacing:.4px;text-shadow:0 1px 3px #000;}
+  .killline{padding:4px 7px;border-left:2px solid #ffcf64;background:linear-gradient(90deg,rgba(8,16,24,.7),transparent);color:#ffe6a0;animation:killin .18s ease-out;}
   .killline.enemy{border-color:#ff756c;color:#ffd0c8;}.killline.crit{border-color:#ff9b36;color:#fff0c8;box-shadow:0 0 9px rgba(255,120,30,.18);}
   .killline.rail{border-color:#8eefff;color:#d9fbff;text-shadow:0 0 7px #2edcff,0 1px 3px #000;}.killline.aa{border-color:#75c8ff;color:#d8f3ff;}
   .killline.missile{border-color:#ff735f;color:#ffd9d3;}@keyframes killin{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
   #topbar{position:absolute;top:14px;left:0;right:0;display:flex;justify-content:space-between;padding:0 22px;}
   #money{font-size:20px;color:#ffe08a;letter-spacing:1px;text-shadow:0 0 8px rgba(255,200,80,.4);}
   #score{font-size:14px;color:#9fb6cc;}
+  /* ---- top bar, four zones by how fast you must react ---------------------------------------
+     It used to be one centred column carrying six unrelated things: the objective, both HQ bars,
+     the next-step hint, island income, a timed bonus mission and a compass. Everything the same
+     size, the same colour, the same place — so a 143-second countdown and "Your HQ 100%" (which
+     never changes) competed for the same glance, and the block was wide enough to run under the
+     minimap at every screen size measured. Split by urgency instead:
+       #alertBar   things with a deadline or a threat — loud, and absent when there are none
+       #objective  what wins this battle, and how far along you are
+       #statPanel  reference numbers, parked under the minimap where they can be looked up
+       #nextstep   what to do next, down by the other guidance at the bottom  */
+  #objective{text-align:center;font-size:13px;color:#cfe6fb;max-width:min(46vw,520px);}
+  #obtitle{color:#ff9a8a;letter-spacing:1px;}
+  #quickgoal{margin-top:2px;font-size:11px;color:#ffe6a0;letter-spacing:1px;}
+  #alertBar{position:absolute;top:80px;left:50%;transform:translateX(-50%);z-index:12;
+    display:none;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;
+    border:1px solid #7a5a18;background:rgba(38,28,6,.86);color:#ffd060;
+    font-size:12px;letter-spacing:1px;white-space:nowrap;box-shadow:0 3px 14px rgba(0,0,0,.45);}
+  #alertBar.on{display:flex;}
+  /* Reference numbers sit with the other reference number (money) on the left; the right column
+     belongs to the map and the controls list, which is why the first attempt at parking these
+     under the minimap landed straight on top of #actions. */
+  /* One flowing column, not three absolutely-positioned boxes. The radio log and the kill feed
+     both grow and shrink with traffic, so stacking them at fixed offsets meant they were always
+     one busy moment away from landing on each other — which is exactly what happened the first
+     time the kill feed moved over here. A flex column cannot overlap itself. */
+  #leftCol{position:absolute;top:116px;left:22px;width:min(300px,34vw);
+    display:flex;flex-direction:column;gap:9px;pointer-events:none;
+    max-height:calc(100vh - 300px);overflow:hidden;}
+  #statPanel{text-align:left;font-size:11px;color:#a9b8c8;line-height:1.6;}
+  #hqrow{display:flex;gap:12px;}
+  #hqrow .hq-e{color:#ff9a8a;} #hqrow .hq-f{color:#9fd0ff;}
+  /* the compass DOES belong with the map — it is the same question asked in words */
+  #obcompass{position:absolute;top:242px;right:18px;width:172px;text-align:right;
+    font-size:11px;color:#9fc6e8;letter-spacing:1px;}
+  #nextstep{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);
+    max-width:min(80vw,720px);text-align:center;color:#a6f2c3;font-size:12px;letter-spacing:.3px;}
+  /* ---- system menu: the way OUT of a battle -------------------------------------------------
+     An exit already existed (#helpQuit) but it lived inside the `?` panel — on a key the action
+     list labels "what should I do" — and touch has no keyboard at all, so on a phone there was
+     no way to leave a battle once you were in one. Same exit, somewhere you can see it. */
+  #topRight{display:flex;align-items:center;gap:12px;pointer-events:auto;}
+  #sysBtn{pointer-events:auto;cursor:pointer;flex:none;width:34px;height:34px;border-radius:9px;
+    border:1px solid #2c4a66;background:rgba(10,20,30,.72);color:#cfe6fb;font-size:16px;line-height:1;
+    display:flex;align-items:center;justify-content:center;transition:.14s;}
+  #sysBtn:hover{background:rgba(20,40,58,.92);color:#fff;border-color:#4b7ea6;}
+  #sysMenu{position:absolute;top:58px;right:22px;z-index:34;display:none;flex-direction:column;
+    min-width:190px;padding:6px;border-radius:12px;border:1px solid #2c4a66;
+    background:rgba(8,16,24,.97);box-shadow:0 10px 30px rgba(0,0,0,.55);pointer-events:auto;}
+  #sysMenu.on{display:flex;}
+  .sys-item{background:none;border:none;color:#cfe6fb;font:inherit;font-size:13px;text-align:left;
+    padding:10px 12px;border-radius:8px;cursor:pointer;transition:.12s;}
+  .sys-item:hover{background:rgba(40,70,96,.72);}
+  .sys-item.danger{color:#ffb4a6;margin-top:3px;border-top:1px solid #24384c;border-radius:0 0 8px 8px;}
+  .sys-item.danger:hover{background:#3a1e1a;}
   #shiphpwrap{position:absolute;left:22px;bottom:20px;width:300px;}
   #shiphpwrap .lab{font-size:11px;letter-spacing:2px;color:#9fb6cc;margin-bottom:4px;}
   #shiphp{height:15px;background:#0c1620;border:1px solid #21384e;border-radius:5px;overflow:hidden;}
@@ -336,7 +392,7 @@
   /* ---- "what can I do right now" panel: the game has 25 keys and a nine-year-old
          should not have to remember them. Lives under the minimap, rebuilt on every
          mode change, and lists ONLY what actually works in the current situation. ---- */
-  #actions{position:absolute;top:246px;right:18px;width:212px;max-height:calc(100vh - 262px);
+  #actions{position:absolute;top:270px;right:18px;width:212px;max-height:calc(100vh - 286px);
     overflow-y:auto;background:rgba(6,14,22,.72);border:1px solid #24405a;border-radius:9px;
     padding:9px 10px 8px;font-size:11.5px;color:#b9cbdb;line-height:1.5;pointer-events:none;
     box-shadow:0 3px 14px rgba(0,0,0,.35);scrollbar-width:thin;}
@@ -507,6 +563,15 @@
      the keyboard hint card ("W/S throttle · Mouse look") shows on a device with neither.
      itch.io embeds this game in landscape, so that is how most phone players arrive. */
   @media (pointer:coarse) and (max-height:560px){
+    /* Landscape on a phone: barely 375px of height, so the top collapses to two short lines and
+       the guidance sits just above the mode line rather than halfway up the screen. */
+    #objective{position:absolute;top:30px;left:0;right:0;max-width:none;font-size:10px;}
+    #score{display:none;}
+    #alertBar{top:58px;left:0;right:0;transform:none;width:auto;border-radius:0;
+      border-left:0;border-right:0;justify-content:center;font-size:10px;padding:3px 8px;}
+    #statPanel{display:none;} #obcompass{display:none;}
+    #nextstep{bottom:132px;font-size:10px;max-width:94vw;}
+    #minimap{width:92px;height:92px;top:78px;right:8px;}
     #actions{display:none!important;}
     #killfeed{display:none;}
     #objective{font-size:10px!important;}#objective div:last-child{font-size:9px!important;}
@@ -528,8 +593,34 @@
     body.touch-ready #claude{bottom:auto;top:180px;}
     body.touch-ready #claudeBubble{max-width:34vw;}
   }
+  /* Short screens — a phone held sideways, or a small window. Vertical room is the scarce thing
+     here, not width: bottom:196px put the guidance line nearly half way up a 375px screen. */
+  @media (max-height:520px){
+    /* #hud-qualified so this wins regardless of where it sits relative to the width queries —
+       a short screen is a stronger constraint than a narrow one, and these must not be a
+       function of which rule happens to be written last. */
+    #hud #leftCol{max-height:26vh;}
+    #hud #nextstep{bottom:104px;}
+  }
   @media (max-width:760px){
-    #minimap{width:132px;height:132px;top:56px;right:12px;}
+    /* A phone top is a STACK, not three columns. Money and the menu button keep the corners; the
+       objective drops out of that flex row onto its own full-width line beneath them (which is
+       also what stops the top-right group from sitting on the minimap); the alert band spans the
+       screen under that. Reference numbers and the compass stand down — the objective line and
+       the guidance line already carry what they were repeating. */
+    #objective{position:absolute;top:34px;left:0;right:0;max-width:none;font-size:11px;}
+    /* the stats strip wraps to five lines at this width and drags the whole top bar down with
+       it — 65px tall, which is what was landing on the objective line below */
+    #score{display:none;}
+    #alertBar{top:66px;left:0;right:0;transform:none;width:auto;border-radius:0;
+      border-left:0;border-right:0;justify-content:center;font-size:10.5px;padding:5px 10px;}
+    #statPanel{display:none;}
+    #obcompass{display:none;}
+    /* narrow lines wrap three ways, so six radio calls became a 307px column — capped and
+       clipped instead, oldest off the bottom */
+    #leftCol{max-height:min(34vh,180px);width:min(300px,42vw);}
+    #nextstep{bottom:196px;font-size:11px;max-width:92vw;}
+    #minimap{width:104px;height:104px;top:96px;right:10px;}
     #killfeed{display:none;}#score{font-size:10px;max-width:36vw;text-align:right;}#money{font-size:16px;}
     #objective{font-size:10px!important;}#objective div:last-child{font-size:9px!important;}
     #prompt{bottom:52px;max-width:82vw;font-size:12px;text-align:center;}
@@ -564,19 +655,31 @@
 <!-- HUD -->
 <div id="hud">
   <div id="cross"></div>
-  <div id="hitmarker"></div><div id="killfeed"></div>
+  <div id="hitmarker"></div>
   <div id="bannerCard"><div class="bc-title"></div><div class="bc-sub"></div><div class="bc-hint"></div></div>
   <div id="topbar"><div id="money">$0</div>
-    <div id="objective" style="text-align:center;font-size:13px;color:#cfe6fb;">
-      <div id="obtitle" style="color:#ff9a8a;letter-spacing:1px;">DESTROY THE ENEMY HARBOR</div>
-      <div style="display:flex;gap:14px;justify-content:center;margin-top:3px;">
-        <span style="color:#ff9a8a;">Enemy HQ <b id="ehp">100%</b></span>
-        <span style="color:#9fd0ff;">Your HQ <b id="fhp">100%</b></span>
-      </div>
-      <div id="nextstep" style="margin-top:4px;color:#a6f2c3;font-size:12px;"></div>
-      <div id="territory" style="margin-top:3px;color:#a9b8c8;font-size:11px;">ISLANDS 0–0</div>
+    <div id="objective">
+      <div id="obtitle">DESTROY THE ENEMY HARBOR</div>
+      <div id="quickgoal"></div>
     </div>
-    <div id="score">Sunk: 0</div></div>
+    <div id="topRight"><div id="score">Sunk: 0</div><button id="sysBtn" aria-haspopup="true" aria-expanded="false">&#9776;</button></div></div>
+  <div id="sysMenu" role="menu">
+    <button class="sys-item" data-sys="resume"></button>
+    <button class="sys-item" data-sys="settings"></button>
+    <button class="sys-item" data-sys="help"></button>
+    <button class="sys-item" data-sys="board"></button>
+    <button class="sys-item danger" data-sys="quit"></button>
+  </div>
+  <div id="alertBar"></div>
+  <div id="leftCol">
+    <div id="statPanel">
+      <div id="hqrow"><span class="hq-e">Enemy HQ <b id="ehp">100%</b></span><span class="hq-f">Your HQ <b id="fhp">100%</b></span></div>
+      <div id="territory">ISLANDS 0-0</div>
+    </div>
+    <div id="killfeed"></div>
+  </div>
+  <div id="obcompass"></div>
+  <div id="nextstep"></div>
   <div id="shiphpwrap"><div class="lab">HULL INTEGRITY</div><div id="shiphp"><i></i></div></div>
   <div id="prompt"></div>
   <div id="tut"></div>
@@ -594,6 +697,7 @@
       <button class="tbtn" data-act="map">MAP</button>
       <button class="tbtn" data-act="sonar">SONAR</button>
       <button class="tbtn" data-act="mine">MINE</button>
+      <button class="tbtn" data-act="menu">MENU</button>
     </div>
     <div id="touchMove" class="touch-stick"><div class="knob"></div></div>
     <div id="touchLook" class="touch-look"></div>
@@ -3545,12 +3649,37 @@ const _commsLines=[];
 function nextCallsign(){ const i=_callsignN++; return CALLSIGNS[i%CALLSIGNS.length]+'-'+(1+Math.floor(i/CALLSIGNS.length)); }
 function commsInit(){ if(document.getElementById('comms'))return; const hud=document.getElementById('hud'); if(!hud)return;
   const d=document.createElement('div'); d.id='comms';
-  d.style.cssText='position:absolute;left:14px;top:120px;width:300px;pointer-events:none;font-size:11px;line-height:1.55;text-shadow:0 1px 3px #000;';
-  hud.appendChild(d); }
-function comms(from,msg,col){ _commsLines.push({from,msg,col:col||'#a8d4f0',t:9}); while(_commsLines.length>6)_commsLines.shift(); }
-function commsShip(s,msg,col,quiet=4){
+  // into the shared left column — parked at a fixed top:120 it sat straight on the stat panel
+  d.style.cssText='pointer-events:none;font-size:11px;line-height:1.55;text-shadow:0 1px 3px #000;';
+  const col=document.getElementById('leftCol');
+  if(col) col.insertBefore(d, document.getElementById('killfeed')); else hud.appendChild(d); }
+// Radio traffic, filtered and paced.
+//   prio 0  filler — "moving to secure X", "threat clear, resuming patrol", cargo runs. The fleet
+//           chattering to itself. Allowed on screen only when nothing that matters is up there,
+//           and it can never push a real message off.
+//   prio 1  normal — orders you gave, weather, radar contacts, a hull captured.
+//   prio 2  urgent — distress calls, a surrender, the rival admiral.
+// The old version kept a flat six lines and shifted the oldest out the instant a seventh arrived,
+// so a burst of chatter shoved messages off before anyone could read them — and every one of them
+// looked equally important on the way past.
+const COMMS_SOFT=5, COMMS_HARD=8, COMMS_MIN_READ=3.0;
+function comms(from,msg,col,prio){
+  prio = prio==null ? 1 : prio;
+  if(prio<1 && _commsLines.some(L=>L.prio>=1)) return;          // filler yields to real traffic
+  const life = prio>=2 ? 16 : prio>=1 ? 13 : 8;
+  _commsLines.push({from,msg,col:col||'#a8d4f0',t:life,life,prio});
+  const age=L=>L.life-L.t;
+  while(_commsLines.length>COMMS_HARD) _commsLines.shift();      // hard ceiling, spam or not
+  while(_commsLines.length>COMMS_SOFT){
+    let i=_commsLines.findIndex(L=>L.prio<1);                    // drop filler first...
+    if(i<0) i=_commsLines.findIndex(L=>age(L)>=COMMS_MIN_READ);  // ...then anything already read
+    if(i<0) break;                                              // all of it is new — let it stand
+    _commsLines.splice(i,1);
+  }
+}
+function commsShip(s,msg,col,quiet=4,prio){
   if(!s)return; if((s._radioQuiet||0)>0)return;
-  comms(s.callsign||'SHIP',msg,col); s._radioQuiet=quiet;
+  comms(s.callsign||'SHIP',msg,col,prio); s._radioQuiet=quiet;
 }
 // ===== RIVAL ADMIRAL — a named enemy commander whose attitude shifts over the whole campaign =====
 // intro(arrogant) -> frustrated(first loss) -> angry(his Leviathan sunk) -> respect(halfway) ->
@@ -3602,26 +3731,28 @@ function rivalSpeak(pool){
   let pick=lines[Math.floor(Math.random()*lines.length)];
   if(lines.length>1 && pick===_rivalLastLine) pick=lines[(lines.indexOf(pick)+1)%lines.length];
   _rivalLastLine=pick;
-  comms(RIVAL_NAME_EN, T(pick[0],pick[1]), '#ff8a70');
+  comms(RIVAL_NAME_EN, T(pick[0],pick[1]), '#ff8a70', 2);
 }
 function updateComms(dt){ if(!_commsLines.length){ const el=document.getElementById('comms'); if(el&&el.innerHTML)el.innerHTML=''; return; }
   commsInit(); const el=document.getElementById('comms'); if(!el)return; let html='';
   for(let i=_commsLines.length-1;i>=0;i--){ const L=_commsLines[i]; L.t-=dt; if(L.t<=0){ _commsLines.splice(i,1); continue; } }
-  _commsLines.forEach(L=>{ const o=Math.min(1,L.t/2.2).toFixed(2);
+  // newest first, like the kill feed: the column is clipped when traffic is heavy, and clipping
+  // the BOTTOM of an oldest-first list would hide exactly the message that just arrived
+  _commsLines.slice().reverse().forEach(L=>{ const o=Math.min(1,L.t/2.2).toFixed(2);
     html+='<div style="opacity:'+o+';color:'+L.col+'"><span style="color:#ffd060">📻 '+trName(L.from)+':</span> '+trText(L.msg)+'</div>'; });
   el.innerHTML=html; }
 function nearestCaptureIsland(pos){ let b=null,bd=1e9; islands.forEach(i=>{ if(!i.capturable||i.owner===0||i.r<70)return; const d=i.pos.distanceTo(pos); if(d<bd){bd=d;b=i;} }); return b; }
 function assignAllyRole(a,role){ if(a.role===role)return; a.role=role;
-  if(role==='capture'){ a.capIsland=nearestCaptureIsland(a.pos); if(a.capIsland&&Math.random()<0.5)comms(a.callsign,T('Moving to secure '+(trName(a.capIsland.name)||'the island')+'.','正在去拿下'+(trName(a.capIsland.name)||'那座岛')+'。'),'#7fd0a0'); }
+  if(role==='capture'){ a.capIsland=nearestCaptureIsland(a.pos); if(a.capIsland&&Math.random()<0.5)comms(a.callsign,T('Moving to secure '+(trName(a.capIsland.name)||'the island')+'.','正在去拿下'+(trName(a.capIsland.name)||'那座岛')+'。'),'#7fd0a0',0); }
 }
 function checkDistress(){
   const wounded=[];
   if(player&&player.hp>0&&player.hp<player.maxhp*0.3) wounded.push({s:player,name:'FLAGSHIP',pos:player.pos});
   allies.forEach(a=>{ if(a.sinkT===0&&a.hp<a.maxhp*0.3) wounded.push({s:a,name:a.callsign,pos:a.pos}); });
   wounded.forEach(w=>{ if((w.s._sos||0)>0)return; w.s._sos=20;
-    comms(trName(w.name),T('⚠ Taking heavy fire — requesting assistance!','⚠ 火力太猛，请求支援！'),'#ff9a6a'); w.s._radioQuiet=8; if(w.s===player)sfxAlarm();
+    comms(trName(w.name),T('⚠ Taking heavy fire — requesting assistance!','⚠ 火力太猛，请求支援！'),'#ff9a6a',2); w.s._radioQuiet=8; if(w.s===player)sfxAlarm();
     let best=null,bd=1e9; allies.forEach(a=>{ if(a.sinkT||a.def.support||a===w.s||a.role==='assist'||(a.hp<a.maxhp*0.35))return; const d=a.pos.distanceTo(w.pos); if(d<bd){bd=d;best=a;} });
-    if(best){ best.role='assist'; best.assist=w.s; commsShip(best,'Copy — inbound to cover '+w.name+'.','#7fd0a0',8); }
+    if(best){ best.role='assist'; best.assist=w.s; commsShip(best,'Copy — inbound to cover '+w.name+'.','#7fd0a0',8,0); }
   });
 }
 function fleetOrderCmd(){
@@ -3859,11 +3990,28 @@ function showHit(target,kill=false,mode=''){
   if(!gameSettings.combatFeedback)return;
   hitFlashT=Math.max(hitFlashT,kill ? .22 : .11);
   const el=document.getElementById('hitmarker');if(el)el.classList.add('on');
-  if(target){const feed=document.getElementById('killfeed');if(feed){const line=document.createElement('div');line.className='killline'+(kill?' enemy':'');
+  if(target){const feed=document.getElementById('killfeed');if(feed){
+    const pre=kill?'DESTROYED · ':(mode==='crit'?'CRITICAL HIT · ':mode==='rail'?'RAIL STRIKE · ':mode==='aa'?'AIR HIT · ':mode==='missile'?'MISSILE HIT · ':'HIT · ');
+    const label=(isZh()&&typeof MP_ZH!=='undefined'&&MP_ZH[pre]?MP_ZH[pre]:pre)+trName(target);
+    const key=(kill?'K':'H')+'|'+mode+'|'+trName(target);
+    // Every shell that connects used to mint its own line, so holding the trigger on one tank
+    // filled the feed with five copies of "HIT · TANK" and pushed the kill that mattered off the
+    // top. Repeats fold into a counter on the line that is already there, and its clock restarts.
+    const top=feed.firstChild;
+    if(top && top.dataset.key===key){
+      top.dataset.n=String((+top.dataset.n||1)+1);
+      top.textContent=label+' ×'+top.dataset.n;
+      clearTimeout(+top.dataset.timer);
+      top.dataset.timer=String(setTimeout(()=>top.remove(), kill?5200:2600));
+      return;
+    }
+    const line=document.createElement('div');line.className='killline'+(kill?' enemy':'');
     if(mode){line.className+=' '+mode;}
-    { const pre=kill?'DESTROYED · ':(mode==='crit'?'CRITICAL HIT · ':mode==='rail'?'RAIL STRIKE · ':mode==='aa'?'AIR HIT · ':mode==='missile'?'MISSILE HIT · ':'HIT · ');
-      line.textContent=(isZh()&&typeof MP_ZH!=='undefined'&&MP_ZH[pre]?MP_ZH[pre]:pre)+trName(target); }
-    feed.prepend(line);while(feed.children.length>5)feed.lastChild.remove();setTimeout(()=>line.remove(),3600);}}
+    line.textContent=label; line.dataset.key=key; line.dataset.n='1';
+    // a kill is worth reading; a glancing hit is worth a glance
+    line.dataset.timer=String(setTimeout(()=>line.remove(), kill?5200:2600));
+    feed.prepend(line);
+    while(feed.children.length>5){ const last=feed.lastChild; clearTimeout(+last.dataset.timer); last.remove(); }}}
 }
 function shipBreakupLikely(ship,dmg,hitPos){
   if(!ship||ship===player||ship.proxy||ship._wreckSpawned||ship._catBreakup)return false;
@@ -4176,18 +4324,18 @@ function updateWarPacing(dt){
     else if(sideOb.t<=0){ flashPrompt(T('✖ Objective failed.','✖ 任务失败。')); sideOb=null; sideObT=40+Math.random()*30; }
   } else { sideObT-=dt; if(sideObT<=0) newSideObjective(); }
   // HUD line (lazy element under the objective banner)
+  // the timed mission is the one thing up here with a clock on it, so it lives in the alert bar
   let el=document.getElementById('sideob');
-  if(!el){ const parent=document.getElementById('objective');
-    if(parent){ el=document.createElement('div'); el.id='sideob';
-      el.style.cssText='margin-top:3px;font-size:11px;color:#ffd060;letter-spacing:1px;'; if(simpleHudOn()) el.style.display='none'; parent.appendChild(el); } }
+  if(!el){ const parent=document.getElementById('alertBar');
+    if(parent){ el=document.createElement('div'); el.id='sideob'; parent.appendChild(el); } }
   if(el) el.textContent = sideOb ? ('★ '+trText(sideOb.label)+'  '+Math.min(sideOb.goal,sideObProgress())+'/'+sideOb.goal+' · '+Math.ceil(sideOb.t)+'s · $'+sideOb.pay) : '';
+  // the bar itself is absent, not merely empty, when nothing needs attention — an empty pill
+  // parked under the objective is just another thing to look past
+  const ab=document.getElementById('alertBar');
+  if(ab) ab.classList.toggle('on', !simpleHudOn() && !!(el&&el.textContent));
   // #26: objective compass — one arrow that always points somewhere useful
-  let ce=document.getElementById('obcompass');
-  if(!ce){ const parent=document.getElementById('objective');
-    if(parent){ ce=document.createElement('div'); ce.id='obcompass';
-      ce.style.cssText='margin-top:2px;font-size:11px;color:#9fc6e8;letter-spacing:1px;'; if(simpleHudOn()) ce.style.display='none'; parent.appendChild(ce); } }
-  const qe=document.getElementById('quickgoal')||(function(){ const parent=document.getElementById('objective'); if(!parent) return null;
-    const q=document.createElement('div'); q.id='quickgoal'; q.style.cssText='margin-top:2px;font-size:11px;color:#ffe6a0;letter-spacing:1px;'; parent.appendChild(q); return q; })();
+  const ce=document.getElementById('obcompass');   // now lives beside the minimap it belongs to
+  const qe=document.getElementById('quickgoal');
   if(qe) qe.textContent = quickMode ? ('⏱ '+T('QUICK BATTLE — ','快速战斗——')+Math.min(sunk,QUICK_KILL_GOAL)+'/'+QUICK_KILL_GOAL+T(' ships · ',' 艘 · ')+Math.floor(Math.max(0,t2-warStartT2)/60)+':'+String(Math.floor(Math.max(0,t2-warStartT2)%60)).padStart(2,'0'))
                         : firstWar ? (T('Sunk ','已击沉 ')+Math.min(sunk,FIRST_WAR_GOAL)+' / '+FIRST_WAR_GOAL)
                         : '';
@@ -4587,6 +4735,7 @@ addEventListener('keydown',e=>{
     return;
   }
   if(e.code==='Escape'){                                    // Esc closes an open panel first; only a bare Esc skips the tutorial
+    if(sysMenuOpen){ toggleSysMenu(false); return; }
     if(shopOpen){ toggleShop(); return; }
     if(harborOpen){ toggleHarbor(); return; }
     if(buildOpen){ toggleBuild(); return; }
@@ -4669,6 +4818,7 @@ function resetTouchMove(){
 function pulseKey(code,ms=120){setKey(code,1);setTimeout(()=>setKey(code,0),ms);}
 // Every label the thumb sees. Kept short on purpose — these sit in 58px pills.
 function touchButtonLabel(act){
+  if(act==='menu')return T('MENU','菜单');
   if(act==='fire')return piloting&&piloting.plane&&piloting.plane.def.uav?T('CAM','镜头'):T('FIRE','开火');
   if(act==='action'){
     if(piloting)return piloting.plane.def.uav?T('RECALL','召回'):(piloting.phase==='landing'?T('ABORT','中止'):T('LAND','降落'));
@@ -4697,7 +4847,7 @@ function refreshTouchControls(){
   if(!mobileControlsReady)return;
   document.querySelectorAll('#touchControls .tbtn').forEach(b=>{
     const act=b.dataset.act;b.textContent=touchButtonLabel(act);
-    b.classList.toggle('on',(act==='view'&&fpv)||(act==='shop'&&shopOpen)||(act==='harbor'&&harborOpen)||(act==='build'&&buildOpen)||(act==='map'&&tacticalOpen));
+    b.classList.toggle('on',(act==='view'&&fpv)||(act==='shop'&&shopOpen)||(act==='harbor'&&harborOpen)||(act==='build'&&buildOpen)||(act==='map'&&tacticalOpen)||(act==='menu'&&sysMenuOpen));
     const deadHere=(act==='special'&&piloting&&(!piloting.plane.def.bomb));
     b.style.visibility=deadHere?'hidden':'visible';
   });
@@ -4731,9 +4881,10 @@ function touchActionTap(act){
   // everything else is world input and belongs to the panel while it is up
   // Same rule as the keyboard: a freezing panel owns the screen, but the armory does not pause
   // the war, so a thumb tap meant for the world closes it and goes through instead of vanishing.
-  const panelAct=act==='shop'||act==='harbor'||act==='build'||act==='map';
+  const panelAct=act==='shop'||act==='harbor'||act==='build'||act==='map'||act==='menu';
   if(freezingPanelOpen()&&!panelAct)return;
   if(shopOpen&&!panelAct) toggleShop();
+  if(act==='menu'){toggleSysMenu();return;}
   if(act==='action'){toggleMan();return;}
   if(act==='special'){
     if(piloting||drivingTank)return;
@@ -5951,6 +6102,7 @@ function startGame(shipId){
 let _inputWired=false;
 function wireGameInput(){   // shared by startGame and resumeWar; must only attach once per page load
   if(_inputWired) return; _inputWired=true;
+  wireSysMenu();
   const cv=document.getElementById('c');
   cv.addEventListener('click',()=>{ sfxResume(); if(Date.now()-lastTouchInput<700||touchCapable())return; if(phase==='play' && !panelOpen()) try{const _pl=cv.requestPointerLock(); if(_pl&&_pl.catch)_pl.catch(()=>{});}catch(e){} });   // the armory leaves most of the canvas exposed — a click meant for the shop must never trap the cursor
   document.addEventListener('mousemove',e=>{ if(document.pointerLockElement===cv){
@@ -6890,7 +7042,7 @@ function deployNemesis(){
   if(nem.boss){ const b=enemies.find(e=>e.def.boss&&e.sinkT===0); if(!b) return;
     b.hp=b.maxhp=Math.round(b.maxhp*(nem.hpMul||1)); b.nemesis=nem; attachNemesisLabel(b,nem); }
   else spawnNemesis(nem);
-  setTimeout(()=>{ if(phase!=='play')return; if(typeof comms==='function') comms(nem.name.toUpperCase(),nem.taunt,'#ff8a6a');
+  setTimeout(()=>{ if(phase!=='play')return; if(typeof comms==='function') comms(nem.name.toUpperCase(),nem.taunt,'#ff8a6a',2);
     flashPrompt(T('☠ NEMESIS — ','☠ 宿敌——')+nem.name+', '+nem.title); if(typeof sfxAlarm==='function') sfxAlarm(); }, 2600);
 }
 function nearestEnemyShipTo(pos){ let b=null,bd=1e9; enemies.forEach(e=>{ if(e.sinkT>0)return; const d=e.pos.distanceTo(pos); if(d<bd){bd=d;b=e;} }); return b; }
@@ -7212,7 +7364,7 @@ function updateAlly(a,dt){
   if(a.def.support){ objective=patient?patient.pos:(friendlyHarbor?friendlyHarbor.pos:new THREE.Vector3()); stand=patient?80:0; }
   else if(a.role==='assist' && a.assist && (a.assist===player?player.hp>0:a.assist.sinkT===0)){
     objective=a.assist.pos; stand=100;
-    if((a.assist===player?player.hp:a.assist.hp) > (a.assist.maxhp||player.maxhp)*0.6){ commsShip(a,'Threat clear — resuming patrol.','#a8d4f0',6); a.role='attack'; a.assist=null; } }
+    if((a.assist===player?player.hp:a.assist.hp) > (a.assist.maxhp||player.maxhp)*0.6){ commsShip(a,'Threat clear — resuming patrol.','#a8d4f0',6,0); a.role='attack'; a.assist=null; } }
   else if(a.role==='regroup' && player && player.hp>0){ objective=player.pos; stand=110; }
   // strike: sail for the enemy HQ and hold a bombardment line inside gun range (360 m) but
   // outside its pier. Escorts still get shot at on the way — aiShipFire picks its own targets
@@ -7239,8 +7391,8 @@ function updateAlly(a,dt){
   let desired = stand>0 ? (dP>stand+45?bearing:dP<stand-45?bearing+Math.PI:bearing+Math.PI/2*a.orbitDir) : bearing;
   // occasional radio chatter
   a.commsT-=dt; if(a.commsT<=0){ a.commsT=22+Math.random()*26; if(!a.def.support&&Math.random()<0.6){
-    if(a.role==='capture'&&a.capIsland&&dP<stand+30) commsShip(a,'Holding off '+(a.capIsland.name||'the island')+' — securing it.','#7fd0a0');
-    else if(tgtShip&&tgtShip.pos.distanceTo(a.pos)<300) commsShip(a,'Engaging enemy contact!','#a8d4f0'); } }
+    if(a.role==='capture'&&a.capIsland&&dP<stand+30) commsShip(a,'Holding off '+(a.capIsland.name||'the island')+' — securing it.','#7fd0a0',4,0);
+    else if(tgtShip&&tgtShip.pos.distanceTo(a.pos)<300) commsShip(a,'Engaging enemy contact!','#a8d4f0',4,0); } }
   a.turnT-=dt; if(a.turnT<=0){ a.jink=(Math.random()-0.5)*0.4; a.turnT=2.5+Math.random()*3; } desired+=a.jink||0;
   desired=steerClearOfIslands(a.pos,a.def,desired);
   desired=steerClearOfShips(a,a.pos,a.def,desired);   // don't sail into friendly or enemy hulls
@@ -10701,6 +10853,56 @@ function renderActions(){
                    + T('   ·   ? what now','   ·   ? 我该干什么');
 }
 let helpOpen=false;
+// ── system menu ─────────────────────────────────────────────────────────────────────────────
+// The exit used to be a button inside the `?` panel. On a keyboard that is merely obscure; on a
+// phone it is unreachable, because the touch pad has no `?` and no keyboard behind it — you got
+// into a battle and there was no way out. This is the same quit, plus the other three panels
+// that were also keyboard-only, behind one button that is always on screen.
+let sysMenuOpen=false;
+function quitToMenu(){
+  const resumable = !quickMode && currentSandboxIdx<0 && phase==='play';
+  if(!confirm(resumable ? T('Save this war and return to the menu? You can carry on from the menu.',
+                            '保存这一局并回到菜单？之后可以从菜单继续。')
+                        : T('Leave this battle? Progress in it is lost.','离开这一局？这局的进度会丢掉。'))) return;
+  if(resumable) saveWar(); else clearSave();
+  location.reload();          // the one guaranteed-clean world reset this single-file game has
+}
+function renderSysMenu(){
+  const m=document.getElementById('sysMenu'); if(!m) return;
+  const resumable = !quickMode && currentSandboxIdx<0 && phase==='play';
+  const label={ resume:T('Back to the battle','回到战斗'),
+                settings:T('Settings  (K)','设置　(K)'),
+                help:T('Help & controls  (?)','帮助与键位　(?)'),
+                board:T('Leaderboard','排行榜'),
+                quit: resumable ? T('Save and quit to the menu','保存并退出到菜单')
+                                : T('Quit to the menu','退出到菜单') };
+  m.querySelectorAll('.sys-item').forEach(b=>{ b.textContent=label[b.dataset.sys]||''; });
+}
+function toggleSysMenu(force){
+  const m=document.getElementById('sysMenu'), b=document.getElementById('sysBtn');
+  if(!m) return;
+  sysMenuOpen = force==null ? !sysMenuOpen : !!force;
+  if(sysMenuOpen) renderSysMenu();
+  m.classList.toggle('on', sysMenuOpen);
+  if(b) b.setAttribute('aria-expanded', sysMenuOpen?'true':'false');
+}
+function wireSysMenu(){
+  const b=document.getElementById('sysBtn'), m=document.getElementById('sysMenu');
+  if(!b||!m||b._wired) return; b._wired=true;
+  b.onclick=e=>{ e.stopPropagation(); toggleSysMenu(); };
+  m.onclick=e=>{ const it=e.target.closest('.sys-item'); if(!it) return;
+    e.stopPropagation(); toggleSysMenu(false);
+    switch(it.dataset.sys){
+      case 'resume':   break;                       // closing the menu IS going back
+      case 'settings': toggleSettings(); break;
+      case 'help':     toggleHelp(true); break;
+      case 'board':    openLeaderboard(); break;
+      case 'quit':     quitToMenu(); break;
+    } };
+  // click anywhere else puts it away — a menu you cannot dismiss is its own trap
+  document.addEventListener('click', ev=>{ if(!sysMenuOpen) return;
+    if(ev.target.closest('#sysMenu')||ev.target.closest('#sysBtn')) return; toggleSysMenu(false); });
+}
 function toggleHelp(force){
   const el=document.getElementById('help'); if(!el) return;
   // Battle help, so only in a battle: at the menu it opened over the picker offering to "quit to
@@ -12021,6 +12223,9 @@ function closePanelsForEnd(){
   if(settingsOpen){ settingsOpen=false; hide('settings'); }
   if(buildOpen) closeBuild();
   if(chatOpen) closeChat();
+  // ...and the system menu, which lives inside #hud: hiding the HUD makes it invisible but leaves
+  // sysMenuOpen true and the .on class set, so it would be sitting open when the next battle began
+  if(typeof toggleSysMenu==='function') toggleSysMenu(false);
 }
 function panelOpen(){ return shopOpen||freezingPanelOpen(); }
 function gamePaused(){ return freezingPanelOpen()||(shopOpen&&gameSettings.pauseInArmory); }
@@ -12110,13 +12315,14 @@ function applyStaticI18n(){
   document.title=T('Iron Tide — Battleship Command','Iron Tide 钢铁怒潮——战舰指挥官');
   const set=(sel,html)=>{ const el=document.querySelector(sel); if(el) el.innerHTML=html; };
   set('#menu .sub',(phase==='respawn'&&menuSubEn)?trText(menuSubEn):T('Choose your command. Buy guns. Hold the line.','选择座舰，买炮装舰，守住防线。'));
+  // The top bar is four separate zones now (objective / alert / stat panel / guidance), so this
+  // rewrites only the words inside each — blowing #objective away and rebuilding the whole stack
+  // here would put every row back in one column the first time anybody switched language.
   const obj=document.getElementById('objective');
-  if(obj) obj.innerHTML='<div id="obtitle" style="color:#ff9a8a;letter-spacing:1px;">'+T('DESTROY THE ENEMY HARBOR','摧毁敌方海港')+'</div>'+
-    '<div style="display:flex;gap:14px;justify-content:center;margin-top:3px;">'+
-    '<span style="color:#ff9a8a;">'+T('Enemy HQ ','敌方总部 ')+'<b id="ehp">100%</b></span>'+
-    '<span style="color:#9fd0ff;">'+T('Your HQ ','我方总部 ')+'<b id="fhp">100%</b></span></div>'+
-    '<div id="nextstep" style="margin-top:4px;color:#a6f2c3;font-size:12px;"></div>'+
-    '<div id="territory" style="margin-top:3px;color:#a9b8c8;font-size:11px;"></div>';
+  if(obj) obj.innerHTML='<div id="obtitle">'+T('DESTROY THE ENEMY HARBOR','摧毁敌方海港')+'</div><div id="quickgoal"></div>';
+  const hq=document.getElementById('hqrow');
+  if(hq) hq.innerHTML='<span class="hq-e">'+T('Enemy HQ ','敌方总部 ')+'<b id="ehp">100%</b></span>'+
+                      '<span class="hq-f">'+T('Your HQ ','我方总部 ')+'<b id="fhp">100%</b></span>';
   set('#shiphpwrap .lab',T('HULL INTEGRITY','船体完整度'));
   const ci=document.getElementById('chatinput');
   if(ci) ci.placeholder=T('Message or /command · Enter to send · Esc to close','输入消息或 /命令 · Enter 发送 · Esc 关闭');
