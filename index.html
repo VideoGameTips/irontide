@@ -232,8 +232,14 @@
     background:linear-gradient(180deg,#2a2212,#1a1408);border-bottom:1px solid #4e3f21;
     color:#ffe6a0;font-size:14px;letter-spacing:.5px;}
   #menu.bridge.respawn #brLeft{display:none;}
-  #menu.bridge.respawn #brBody{grid-template-columns:minmax(0,1fr);}
-  #menu.bridge.respawn #brRight{border-left:none;max-width:520px;margin:0 auto;}
+  #menu.bridge.respawn #brBody{grid-template-columns:minmax(0,1fr);align-items:start;}
+  #menu.bridge.respawn #brRight{border-left:none;max-width:520px;margin:0 auto;max-height:100%;}
+  /* #brDock is margin-top:auto so the launch bar sits at the foot of a full-height column. With
+     the theater column gone this box holds two short sections, so that auto margin pushed the bar
+     to the foot of the WINDOW and left a hole that grew with it: measured 41px at 900px tall,
+     341px at 1200, 641px at 1500. align-items:start above lets the box be only as tall as its
+     contents, and this puts the bar back under them — a flat 24px at every height. */
+  #menu.bridge.respawn #brDock{margin-top:18px;}
   @media (max-width:900px){
     /* One column that scrolls, with the launch bar pinned. flex:1 + min-height:0 is what makes
        the two columns share one non-scrolling screen above 900 — kept here it squeezes the body
@@ -5281,10 +5287,25 @@ function leaveFirstRun(){ _firstRunOpen=false; buildMenu(); }
 // The single switch for "is the pitch up". Two callers, because showRespawnMenu raises #menu
 // mid-battle WITHOUT rebuilding it — so a stale .firstrun class from the last buildMenu would
 // otherwise still be covering the replacement-hull picker.
+// The steps are numbered 01/02/03 across BOTH columns, and the respawn picker hides the column
+// that carries 01 (WHERE YOU FIGHT) — so what was left on screen counted "02, 03" and the player
+// got to wonder what they had missed. Number what is actually visible. This lives in showFirstRun
+// because that is the one place both buildMenu() and showRespawnMenu() pass through, so a language
+// switch mid-respawn (which re-runs buildMenu) cannot put the old numbers back.
+function renumberBridgeSteps(){
+  const menu=document.getElementById('menu'), right=document.getElementById('brRight');
+  if(!menu||!right) return;
+  const respawn=menu.classList.contains('respawn');
+  right.querySelectorAll('.brh .n').forEach((n,i)=>{
+    if(!n.dataset.step) n.dataset.step=n.textContent.trim();   // remember what it says normally
+    n.textContent = respawn ? '0'+(i+1) : n.dataset.step;
+  });
+}
 function showFirstRun(on){
   const menu=document.getElementById('menu'), fr=document.getElementById('firstrun');
   if(menu) menu.classList.toggle('firstrun', on);
   if(fr) fr.classList.toggle('on', on);
+  renumberBridgeSteps();
 }
 const FR_ART={
   sail:'<svg viewBox="0 0 150 46"><path d="M6 34 h138" stroke="#22485f" stroke-width="1.5" stroke-dasharray="3 6"/>'+
@@ -5992,6 +6013,7 @@ function showRespawnMenu(msg){
   showFirstRun(false);        // this menu is a picker, not the front door
   const mn=document.getElementById('menu');
   mn.classList.add('respawn');   // one question only: which hull do you go back out in
+  renumberBridgeSteps();         // ...and showFirstRun ran above, before that class was on
   mn.style.display='flex';
   updateMode();
 }
@@ -6293,8 +6315,18 @@ function buildGroundPlayerTank(worldPos,type,isl){
 }
 function nearestDeckTank(){ let b=null,bd=7; playerTanks.forEach(tk=>{ if(!tk.onDeck)return;
   const d=Math.hypot(walkPos.x-tk.group.position.x, walkPos.z-tk.group.position.z); if(d<bd){bd=d;b=tk;} }); return b; }
-function nearestFieldTank(){ let b=null,bd=8; if(!onFoot)return null;
-  playerTanks.forEach(tk=>{ if(tk.onDeck||tk.hp<=0)return; const p=tk.pos||tk.group.position, d=Math.hypot(footPos.x-p.x,footPos.z-p.z); if(d<bd){bd=d;b=tk;} }); return b; }
+// How close you must stand to crew a tank. The old figure was a flat 8 measured from the tank's
+// CENTRE — but a tank is about 6.7 long, so standing at its nose or tail put you on the wrong side
+// of the line while you were visibly touching the hull. Measured off the model instead, so "walk
+// up to it and press E" means what it says whichever end you walk up to.
+function tankReach(tk){
+  if(tk._reach==null){ const b=new THREE.Box3().setFromObject(tk.group);
+    tk._reach=Math.max(b.max.x-b.min.x, b.max.z-b.min.z)*0.5+6; }
+  return tk._reach;
+}
+function nearestFieldTank(){ let b=null,bd=1e9; if(!onFoot)return null;
+  playerTanks.forEach(tk=>{ if(tk.onDeck||tk.hp<=0)return; const p=tk.pos||tk.group.position;
+    const d=Math.hypot(footPos.x-p.x,footPos.z-p.z); if(d<tankReach(tk)&&d<bd){bd=d;b=tk;} }); return b; }
 function mountTank(tk){ drivingTank=tk; onFoot=false; warRecord('drove');
   camYaw.v = tk.onDeck ? (player.heading + tk.heading) : tk.heading; camPitch.v=0.08;
   flashPrompt(T('Crewing the '+(trName(tk.name)||'tank')+' — WASD drive · Mouse aim · Click fire · E to dismount.','正在操作 '+(trName(tk.name)||'坦克')+' —— WASD 开车 · 鼠标瞄准 · 点击开炮 · 按 E 下车。')); updateMode();
@@ -8015,8 +8047,11 @@ function buyTank(id){
   if(landCampaignMode){
     const surf=footSurfaceAt(footPos,0), isl=landIdentity(surf)||footLand;
     if(!onFoot||!isl){ flashPrompt(T('Stand on dry friendly ground to call in a tank','站在我方的陆地上才能呼叫坦克')); return; }
+    // 5.5, not 8: the drop used to land exactly ON the pickup radius, and with the ±2 jitter that
+    // put 62% of bought tanks out of reach of the very key the message tells you to press. Inside
+    // the ring by a clear margin now, so "delivered beside you — press E" is always true.
     const side=new THREE.Vector3(Math.cos(camYaw.v),0,-Math.sin(camYaw.v));
-    const p=footPos.clone().add(side.multiplyScalar(8)).add(new THREE.Vector3(0,0,Math.random()*4-2));
+    const p=footPos.clone().add(side.multiplyScalar(5.5)).add(new THREE.Vector3(0,0,Math.random()*3-1.5));
     clampToIsland(p,isl,0.82); p.y=groundHeightAt(p,isl);
     if(playerTanks.some(tk=>!tk.onDeck&&tk.hp>0&&(tk.pos||tk.group.position).distanceTo(p)<7)){ flashPrompt(T('Too crowded for a tank drop — move a few steps','这儿太挤，坦克放不下——挪几步')); return; }
     money-=cost; buildGroundPlayerTank(p,id,isl);
@@ -11510,6 +11545,12 @@ function validWarSave(s){
   if(typeof s.money!=='number'||!isFinite(s.money)) return false;
   if(!Array.isArray(s.islands)||!Array.isArray(s.units)) return false;
   if(s.islands.some(i=>typeof i.x!=='number'||typeof i.z!=='number'||typeof i.r!=='number')) return false;
+  // The captain's own hull is not optional. resumeWar reads px/pz/hp straight into player.pos and
+  // player.hp, and the escort fleets spawn RELATIVE to that — so a save missing one of them does
+  // not degrade, it NaNs the entire world and throws on the first frame (positional audio is where
+  // it surfaced: a NaN gain sails past every `g0<=0.02` guard into setValueAtTime). This function
+  // promises "never crash on it", so it has to check the fields the resume actually dereferences.
+  if(!isFinite(s.px)||!isFinite(s.pz)||!isFinite(s.hp)) return false;
   return true;
 }
 function loadSave(){ try{ const s=JSON.parse(localStorage.getItem(SAVE_KEY)); return validWarSave(s)?s:null; }catch(e){ return null; } }
@@ -11562,8 +11603,10 @@ function resumeWar(){
   ownedGuns.clear(); (s.owned&&s.owned.length?s.owned:['pistol']).forEach(g=>{ if(HANDHELD[g]) ownedGuns.add(g); });
   if(!ownedGuns.has('pistol')) ownedGuns.add('pistol');
   equippedGun=HANDHELD[s.eq]?s.eq:'pistol';
-  player.hp=Math.max(1,Math.min(s.hp,player.maxhp));
-  player.pos.set(s.px,0,s.pz); player.heading=s.hd||0;
+  // validWarSave has already refused a save without these, but belt and braces: a NaN here is not
+  // a bad ship, it is a bad world — every fleet below spawns relative to this position.
+  player.hp=Math.max(1,Math.min(isFinite(s.hp)?s.hp:player.maxhp,player.maxhp));
+  player.pos.set(isFinite(s.px)?s.px:0,0,isFinite(s.pz)?s.pz:0); player.heading=isFinite(s.hd)?s.hd:0;
   friendlyBossUsed=!!s.fbu; enemyBossUsed=!!s.ebu;
   if(s.ground){
     deployLandCampaignStart(true);

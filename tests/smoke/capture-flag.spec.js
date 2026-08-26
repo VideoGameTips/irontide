@@ -118,24 +118,33 @@ test('the hint says what actually takes an island', async ({ page }) => {
 });
 
 // resumeWar rebuilds islands with buildIsland() and sets `capturable` itself — it never calls
-// buildTheater(). Hiding the HQ flags at theater-build time therefore covered a fresh war and
+// buildTheater(). Hiding the HQ flags at theatre-build time therefore covered a fresh war and
 // missed every save, so a loaded game flew capture flags over both headquarters.
+//
+// This drives the game's OWN save path. An earlier version of this test hand-wrote a save under
+// the key `ironTideWar` with `sv:3` — but the key is `ironTideSave` and validWarSave() demands
+// `v:1`, so resumeWar() bailed on line one and the test was really just watching a fresh
+// startGame. It passed either way, which is worse than failing.
 test('a loaded save does not fly capture flags over the two headquarters', async ({ page }) => {
   await page.goto('http://localhost:3000/');
-  await page.waitForFunction(() => typeof resumeWar === 'function');
+  await page.waitForFunction(() => typeof resumeWar === 'function' && typeof saveWar === 'function');
   const r = await page.evaluate(([SRC]) => {
     eval('(' + SRC + ')()');
-    const old = { sv: 3, mapIdx: 0, shipId: 'destroyer', money: 1000, sunk: 0,
-      fh: { x: 0, z: 900, hp: 100, maxhp: 100, up: {} }, eh: { x: 0, z: -900, hp: 100, maxhp: 100, up: {} },
-      islands: [{ x: 0, z: -1020, r: 260, name: 'Northwatch', rx: 260, rz: 260, angle: 0, seed: 1, cap: false, owner: 1 },
-                { x: 0, z: 1020, r: 250, name: 'Southhaven', rx: 250, rz: 250, angle: 0, seed: 2, cap: false, owner: 0 },
-                { x: 0, z: 0, r: 120, name: 'Target Cay', rx: 120, rz: 120, angle: 0, seed: 3, cap: true, owner: 1 }],
-      units: [] };
-    try { localStorage.setItem('ironTideWar', JSON.stringify(old)); } catch (e) {}
+    career.wins = 5;                       // past the first war, so this theatre is savable
+    try { localStorage.removeItem('ironTideSave'); } catch (e) {}
+    for (let i = 0; i < 60; i++) { t2 += 0.05; update(0.05, t2); }
+    saveWar();
+    const savedBytes = (localStorage.getItem('ironTideSave') || '').length;
+
+    // dirty the world so a resume that loads nothing cannot pass: hand the HQ islands away and
+    // show every mast, which is the state the bug produced
+    islands.forEach(i => { if (i.capMast) i.capMast.visible = true; if (i.capRing) i.capRing.visible = true; });
+    const dirtyMasts = islands.filter(i => !i.capturable && i.capMast.visible).length;
+
     let err = null; try { resumeWar(); } catch (e) { err = e.message; }
     for (let i = 0; i < 20; i++) { t2 += 0.05; update(0.05, t2); }
     const hq = islands.filter(i => !i.capturable), cap = islands.filter(i => i.capturable);
-    return { err, hqCount: hq.length, capCount: cap.length,
+    return { err, savedBytes, dirtyMasts, hqCount: hq.length, capCount: cap.length,
              hqFlying: hq.filter(i => i.capMast && i.capMast.visible).length,
              hqRings: hq.filter(i => i.capRing && i.capRing.visible).length,
              capFlying: cap.filter(i => i.capMast && i.capMast.visible).length };
@@ -143,6 +152,8 @@ test('a loaded save does not fly capture flags over the two headquarters', async
   console.log('RESUMEFLAG ' + JSON.stringify(r));
 
   expect(r.err).toBeNull();
+  expect(r.savedBytes, 'nothing was saved, so nothing was resumed').toBeGreaterThan(100);
+  expect(r.dirtyMasts, 'the fixture never raised the flags it is meant to check get lowered').toBeGreaterThan(0);
   expect(r.hqCount, 'the save did not restore two uncapturable islands').toBe(2);
   expect(r.hqFlying, 'a loaded save flies a capture flag over a headquarters').toBe(0);
   expect(r.hqRings, 'a loaded save draws a capture ring on a headquarters').toBe(0);

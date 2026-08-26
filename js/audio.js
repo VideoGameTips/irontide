@@ -158,7 +158,13 @@ function musicPlay(mode){
 }
 function musicStart(){ if(!MUSIC.playing) musicPlay('ambient'); }   // (kept for compatibility)
 function playEndMusic(){ musicPlay('ending'); }                     // the score swells up when a battle ends — win or lose
-function _dg(pos,maxD){ if(!pos||!camera) return 1; const d=camera.position.distanceTo(pos); return d>maxD?0:1-d/maxD; }
+// A non-finite distance means something in the world went NaN. Every caller gates on `g0<=0.02`
+// and a NaN fails that test — so the bad number used to travel all the way into setValueAtTime,
+// which throws, which kills the whole frame. Silence is the right answer to a sound we cannot
+// place; this one line covers all eight positional effects.
+function _dg(pos,maxD){ if(!pos||!camera) return 1; const d=camera.position.distanceTo(pos);
+  if(!Number.isFinite(d)) return 0;
+  return d>maxD?0:1-d/maxD; }
 function _voice(t){ if(SFX.voices>14) return false; SFX.voices++; setTimeout(()=>{SFX.voices=Math.max(0,SFX.voices-1);}, t*1000); return true; }
 function _noise(){ const s=SFX.ctx.createBufferSource(); s.buffer=SFX.noiseBuf; return s; }   // reuses the shared buffer (length comes from start/stop, not from here)
 function weaponPersonality(w){
