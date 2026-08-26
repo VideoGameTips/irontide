@@ -1487,7 +1487,7 @@ const ZH_EXACT = {
   // ---- 聊天指令 ----
   'COMMAND: Type /help to list captain commands.': '指挥部：输入 /help 查看舰长指令。',
   'COMMANDS: /status · /map · /shop · /harbor · /sonar · /mine · /damage · /sound · /clear': '指令：/status · /map · /shop · /harbor · /sonar · /mine · /damage · /sound · /clear',
-  'COMMAND: Strategic map toggled.': '指挥部：战略地图已切换。',
+  'COMMAND: Tactical map toggled.': '指挥部：战术地图已切换。',
   'COMMAND: Armory toggled.': '指挥部：军械库已切换。',
   'COMMAND: Harbor command toggled.': '指挥部：海港指挥部已切换。',
 

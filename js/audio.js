@@ -160,7 +160,7 @@ function musicStart(){ if(!MUSIC.playing) musicPlay('ambient'); }   // (kept for
 function playEndMusic(){ musicPlay('ending'); }                     // the score swells up when a battle ends — win or lose
 function _dg(pos,maxD){ if(!pos||!camera) return 1; const d=camera.position.distanceTo(pos); return d>maxD?0:1-d/maxD; }
 function _voice(t){ if(SFX.voices>14) return false; SFX.voices++; setTimeout(()=>{SFX.voices=Math.max(0,SFX.voices-1);}, t*1000); return true; }
-function _noise(dur){ const s=SFX.ctx.createBufferSource(); s.buffer=SFX.noiseBuf; return s; }   // reuses the shared buffer
+function _noise(){ const s=SFX.ctx.createBufferSource(); s.buffer=SFX.noiseBuf; return s; }   // reuses the shared buffer (length comes from start/stop, not from here)
 function weaponPersonality(w){
   w=w||{};const k=w.kind||'gun',d=w.dmg||12,cal=w.size||.5,n=(w.name||'').toLowerCase();
   if(w.nuclear||w.strategic)return {role:'strategic',tracer:0xfff3a6,trail:0.42,core:0xfffbda,flash:0xffe0a0,sound:'strategic'};
@@ -261,7 +261,10 @@ function sfxSplash(pos){
   s.connect(f); f.connect(g); g.connect(SFX.master); s.start(); s.stop(t0+dur);
 }
 function sfxSonar(pos){
-  if(!SFX.on||!SFX.ctx||!_voice(1.1))return;const ctx=SFX.ctx,t0=ctx.currentTime,g0=_dg(pos,1200)*0.42;if(g0<=.015)return;
+  // audibility BEFORE the voice slot: _voice() reserves one of 14 for 1.1 s, and a ping too far
+  // away to hear was still taking one — quietly evicting a gunshot the player could hear.
+  if(!SFX.on||!SFX.ctx)return;const ctx=SFX.ctx,t0=ctx.currentTime,g0=_dg(pos,1200)*0.42;if(g0<=.015)return;
+  if(!_voice(1.1))return;
   for(let i=0;i<3;i++){
     const t=t0+i*.34,o=ctx.createOscillator(),f=ctx.createBiquadFilter(),g=ctx.createGain();
     o.type='sine';o.frequency.setValueAtTime(i?620:520,t);o.frequency.exponentialRampToValueAtTime(i?430:360,t+.28);

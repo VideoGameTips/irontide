@@ -53,6 +53,17 @@ const tokEl = $('tok');
 tokEl.value = sessionStorage.getItem('itAdminTok') || '';
 
 function headers() { return { 'X-Admin-Token': tokEl.value }; }
+
+// Every value rendered below comes out of the database, and one of them is NOT ours: a
+// signed-in captain's row carries the display name Sushi ID reported, which the server
+// stores as-is (it only truncates to 64 chars). Interpolated raw into innerHTML, an account
+// called `<img src=x onerror=…>` would run script on the one page that keeps the admin token
+// in sessionStorage. Escape at the boundary, so this stays safe whatever the accounts service
+// decides a name may contain.
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
 function say(t, bad) { $('msg').textContent = t; $('msg').style.color = bad ? '#ff7a6a' : '#ffd060'; }
 
 async function load() {
@@ -85,15 +96,15 @@ function render(data) {
     tr.className = r.status !== 'ok' ? r.status : '';
     const when = new Date(r.created_at * 1000).toISOString().replace('T', ' ').slice(0, 16);
     const cells = [
-      r.id, when,
-      `${r.callsign_en} / ${r.callsign_zh}`,
-      r.mode, r.map_idx === null ? '—' : r.map_idx, r.difficulty,
+      esc(r.id), esc(when),
+      `${esc(r.callsign_en)} / ${esc(r.callsign_zh)}`,
+      esc(r.mode), r.map_idx === null ? '—' : esc(r.map_idx), esc(r.difficulty),
       r.won ? '✔' : '—',
-      r.duration_s + 's', r.sunk, r.war_score, r.career_score,
-      `<span class="${r.status === 'ok' ? 'ok' : 'flags'}">${r.status}</span>`,
-      `<span class="flags">${r.flags || ''}</span>`,
-      `<button data-act="status" data-id="${r.id}" data-status="${r.status === 'hidden' ? 'ok' : 'hidden'}">${r.status === 'hidden' ? 'show' : 'hide'}</button>
-       <button data-act="ban" data-player="${r.player_id}" data-banned="${r.banned ? 0 : 1}">${r.banned ? 'unban' : 'ban'}</button>`,
+      esc(r.duration_s) + 's', esc(r.sunk), esc(r.war_score), esc(r.career_score),
+      `<span class="${r.status === 'ok' ? 'ok' : 'flags'}">${esc(r.status)}</span>`,
+      `<span class="flags">${esc(r.flags || '')}</span>`,
+      `<button data-act="status" data-id="${esc(r.id)}" data-status="${r.status === 'hidden' ? 'ok' : 'hidden'}">${r.status === 'hidden' ? 'show' : 'hide'}</button>
+       <button data-act="ban" data-player="${esc(r.player_id)}" data-banned="${r.banned ? 0 : 1}">${r.banned ? 'unban' : 'ban'}</button>`,
     ];
     tr.innerHTML = cells.map((c) => `<td>${c}</td>`).join('');
     body.appendChild(tr);

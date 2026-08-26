@@ -195,8 +195,7 @@
   .brh{display:flex;align-items:baseline;gap:11px;margin-bottom:11px;}
   .brh .n{font-size:11px;letter-spacing:3px;color:#ffd060;}
   .brh .t{font-size:16px;letter-spacing:4px;color:#cfe6fb;white-space:nowrap;}
-  .brh .hint{min-width:0;}
-  .brh .hint{margin-left:auto;font-size:11px;color:#5f7a90;letter-spacing:.5px;}
+  .brh .hint{min-width:0;margin-left:auto;font-size:11px;color:#5f7a90;letter-spacing:.5px;}
   #brTabs{display:flex;border-bottom:1px solid #21384e;margin-bottom:12px;flex-wrap:wrap;}
   #brTabs button{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;
     color:#7e93a8;font:inherit;font-size:13px;letter-spacing:1px;padding:8px 15px 9px;cursor:pointer;transition:.14s;}
@@ -381,7 +380,7 @@
     box-shadow:0 0 40px rgba(0,0,0,.75);}
   #tactical h2{font-size:17px;letter-spacing:3px;color:#9fd8ff;margin-bottom:4px;}
   #tacticalHint{font-size:12px;color:#b7c7d5;margin-bottom:10px;}
-  #tacticalCanvas{display:block;width:100%;height:min(72vh,620px);border:1px solid #29465d;background:#07111a;cursor:crosshair;}
+  #tacticalCanvas{display:block;width:100%;height:min(72vh,620px);border:1px solid #29465d;background:#07111a;}
 
   /* ---- Shop ---- */
   #shop{position:fixed;top:0;right:0;bottom:0;width:300px;z-index:15;background:rgba(9,16,24,.94);
@@ -606,8 +605,8 @@
 
 <div id="tactical">
   <div class="panel">
-    <h2>☢ STRATEGIC MISSILE COMMAND</h2>
-    <div id="tacticalHint">Select a friendly R-36M silo, then select a target area. Press N to close.</div>
+    <h2>🗺 TACTICAL MAP</h2>
+    <div id="tacticalHint">The whole theater at a glance. Press N to close.</div>
     <canvas id="tacticalCanvas" width="860" height="620"></canvas>
   </div>
 </div>
@@ -2532,7 +2531,7 @@ function addIslandBuildingGraphicDetails(g,kind,team){
   if(kind==='dock'){for(const sx of[-1,1]){const crane=mkBox(.4,8,.4,SILVER(0xd0a63c));crane.position.set(sx*6,4,0);g.add(crane);const arm=mkBox(5,.35,.35,SILVER(0xd0a63c));arm.position.set(sx*4,8,0);g.add(arm);}}
   if(kind==='bridge'){for(const z of[-9,9])for(const sx of[-1,1]){const pier=mkBox(1.2,7,1.2,conc);pier.position.set(sx*4,3.5,z);g.add(pier);}}
   if(kind==='supergun'||kind==='railgun'){for(const sx of[-1,1]){const rail=mkBox(.45,.25,34,dark);rail.position.set(sx*4,.3,0);g.add(rail);}}
-  if(kind==='silo'||kind==='vls'||kind==='rocket'){for(let i=0;i<8;i++){const a=i/8*Math.PI*2,rad=kind==='nukesilo'?10:kind==='vls'?7:6,post=mkBox(.12,2,.12,dark);post.position.set(Math.sin(a)*rad,1,Math.cos(a)*rad);g.add(post);}}
+  if(kind==='silo'||kind==='vls'||kind==='rocket'){for(let i=0;i<8;i++){const a=i/8*Math.PI*2,rad=kind==='vls'?7:6,post=mkBox(.12,2,.12,dark);post.position.set(Math.sin(a)*rad,1,Math.cos(a)*rad);g.add(post);}}
   if(kind==='radar'||kind==='sonar'){const hut=mkBox(5,2.8,4,conc);hut.position.set(4,1.4,-3);g.add(hut);const door=mkBox(1.2,2,.15,dark);door.position.set(4,1.2,-5.05);g.add(door);}
 }
 function buildLand(kind,team,pos,type){
@@ -2754,7 +2753,7 @@ function buildLand(kind,team,pos,type){
   addIslandBuildingGraphicDetails(g,kind,team);
   scene.add(g);
   const u={ kind, team, pos:pos.clone(), hp, maxhp:hp, group:g, turret:g.userData.turret, barrelLen:g.userData.barrelLen||1, fireT:Math.random()*2, range, dmg, fireRate, tank:g.userData.tank, aa:g.userData.aa,
-    artillery:g.userData.artillery, silo:g.userData.silo, nukesilo:g.userData.nukesilo, siloMissile:g.userData.siloMissile,
+    artillery:g.userData.artillery, silo:g.userData.silo,
     torp:g.userData.torp, tesla:g.userData.tesla, radar:g.userData.radar, wall:g.userData.wall, coil:g.userData.coil, dish:g.userData.dish,
     needsPower:!!(STRUCTS[kind]&&STRUCTS[kind].power),footprint:(STRUCTS[kind]&&STRUCTS[kind].footprint)||4,light:g.userData.light,
     marker:g.userData.teamMarker,markerScale:g.userData.markerScale||0,revealT:0,
@@ -2951,7 +2950,6 @@ function buildPlane(def){
   if(def.gunCount&&shape!=='heli')for(let i=0;i<Math.min(8,def.gunCount);i++){const x=(i-(Math.min(8,def.gunCount)-1)/2)*.18,gun=mkCyl(.03,.04,1.05,intakeMat,10);
     gun.rotation.x=Math.PI/2;gun.position.set(x,-.1,length*.49);g.add(gun);}
   const pitot=shape==='heli'?null:mkCyl(.012,.018,.65,SILVER(0x20252a),8);if(pitot){pitot.rotation.x=Math.PI/2;pitot.position.set(0,0,length*.55);g.add(pitot);}
-  aircraftLandingGear(g,span,length,shape,m);
   g.userData.airMeta={span,length,shape};addAircraftGraphicDetails(g,def,shape);addAircraftInterior(g,def,shape,length);
   if(def.scale)g.scale.setScalar(def.scale);
   g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
@@ -3344,19 +3342,17 @@ function ownsMarketItem(cat,id){ensureCareerMarket();return career.marketOwned.i
 function marketLevel(cat,id,def){
   const key=cat+':'+id;if(MARKET_LEVELS[key])return MARKET_LEVELS[key];
   const cost=def&&def.cost?def.cost:0;if(cost<=0)return 1;
-  if(def&&(def.nuke||def.strategicBomb||def.nukesilo))return Math.max(24,Math.min(31,Math.ceil(cost/1300)));
+  if(def&&(def.nuke||def.strategicBomb))return Math.max(24,Math.min(31,Math.ceil(cost/1300)));
   if(cost>=9000)return 24;if(cost>=5200)return 18;if(cost>=3000)return 12;if(cost>=1800)return 8;if(cost>=1000)return 5;if(cost>=600)return 3;
   return 2;
 }
 function marketUnlocked(cat,id,def){return def&&def.marketOnly?ownsMarketItem(cat,id):mapsUnlocked()>=unlockLevel(marketLevel(cat,id,def));}
-function marketLicensed(cat,id,def){return marketUnlocked(cat,id,def);}
-function marketCost(cat,id,def){
-  const base=priceOf(def&&def.cost?def.cost:0),lvl=marketLevel(cat,id,def);
-  if(base<=0)return 0;
-  let mult=cat==='struct'?2.2:cat==='gun'?1.8:cat==='tank'?2.5:3;
-  if(def&&(def.nuke||def.strategicBomb||def.nukesilo))mult=5.5;
-  return Math.max(120,Math.round((base*mult+lvl*90)/10)*10);
-}
+// (marketLicensed / marketCost lived here. They belonged to an in-battle "buy the licence with
+// market credits" path that was never wired up: marketLicensed was a straight alias for
+// marketUnlocked, so the credits branch in refreshShop/refreshBuild — `!licensed && credits <
+// marketCost(...)` — could not be true unless !unlocked, which the clause beside it already
+// covered. Four call sites, two functions, all of it unreachable. Blueprints are bought with
+// credits on the MENU, in buyCampaignMarketItem; in battle a thing is unlocked or it is not.)
 function marketLabel(cat,id,def,normal){
   if(!marketUnlocked(cat,id,def))return '🔒 L'+marketLevel(cat,id,def);
   return normal;
@@ -3374,7 +3370,7 @@ function buyMarketLicense(cat,id,def){
 }
 function marketBlocked(cat,id,def){return !buyMarketLicense(cat,id,def);}
 // Nukes are pointless on a pure-land assault (no fleet) and absurd overkill on the tiny warm-up
-// theatres, so the strategic arsenal (def.nuke / strategicBomb / nukesilo) is unavailable when a
+// theatres, so the strategic arsenal (def.nuke / def.strategicBomb) is unavailable when a
 // theatre fields two or fewer enemy ships — covers The Landing, Island Hopping, Training Bay, etc.
 function theaterEnemies(){ return ((typeof quickMode!=='undefined'&&quickMode)?QUICK_BATTLE:(currentSandboxIdx>=0?(SANDBOX_MAPS[currentSandboxIdx]||{}):(CAMPAIGN[currentMapIdx]||{}))).enemies||0; }
 // Strategic weapons stay locked for the first five operations — levels 1-5 are where you're
@@ -3406,7 +3402,7 @@ function nukeBanMessage(){
         '战略武器要到第 '+NUKE_UNLOCK_LEVEL+' 号作战才解锁——你现在是第 '+(currentMapIdx+1)+' 号。')
     : T('No strategic weapons on this theater','本战区禁用战略武器');
 }
-function isNuclear(def){ return !!(def&&(def.nuke||def.strategicBomb||def.nukesilo)); }
+function isNuclear(def){ return !!(def&&(def.nuke||def.strategicBomb)); }
 const MARKET_CATALOG=[
   {cat:'ship',id:'fletcher',cost:4500,level:5,tag:'SHIP',desc:'USS Fletcher — quick historic destroyer with practical gun space.'},
   {cat:'ship',id:'type055',cost:12000,level:18,tag:'SHIP',desc:'Type 055 — modern missile cruiser-style command hull.'},
@@ -3813,6 +3809,10 @@ const DMG_MERGE_MS=500, DMG_MAX=8;
 // target inside half a second add into the number already floating instead of stacking new
 // ones, and at most DMG_MAX are alive: on overflow the OLDEST goes, so your latest shot is
 // always the one you can still read.
+// `target` is the IDENTITY the merge below keys on, so it has to be the thing that was hit.
+// Aircraft, ground units and the harbour all used to pass the literal `true`, which made them
+// all the same target: two hits on two different things half a second apart collapsed into a
+// single number. Measured: 10 on a plane and 25 on a bunker rendered as one "-35".
 function showDamageNumber(pos,dmg,target,kill){
   if(!gameSettings.damageNumbers||!camera||!pos)return;
   const now=performance.now();
@@ -4026,7 +4026,7 @@ let tankSpots=[];          // free deck slots for bought tanks {pos, taken}
 let shopOpen=false;
 let harborOpen=false;
 let buildOpen=false;
-let tacticalOpen=false,selectedNukeSilo=null,tacticalMapT=0;
+let tacticalOpen=false,tacticalMapT=0;
 let sonarCooldown=0,sonarPulse=0;
 // ---- island defenses you can emplace while ashore (the enemy auto-builds these too) ----
 const STRUCTS = {
@@ -4098,9 +4098,16 @@ function turnWeather(){
   if(typeof weather!=='object' || (window._MAP&&window._MAP.weatherLock)) return;
   const opts=['clear','overcast','fog','storm'].filter(w=>w!==weather.type);
   const w=opts[Math.floor(Math.random()*opts.length)]; weather.type=w; weather.t=70+Math.random()*40;
-  const label={clear:'skies clearing',overcast:'cloud rolling in',fog:'a fog bank closing in',storm:'a storm bearing down'}[w]||w;
-  flashPrompt(T('⛅ Weather shifting — ','⛅ 天气变了——')+label);
-  if(typeof comms==='function') comms(T('WEATHER','气象'),T(label.charAt(0).toUpperCase()+label.slice(1)+' — adjust your gunnery.',trName(label)+'——注意修正射击。'),'#a8c8e0');
+  // The label needs BOTH languages here, not just English. It used to be English-only and was
+  // pasted straight into the Chinese half of the T() pair, so a Chinese player read
+  // "⛅ 天气变了——a storm bearing down" and "a storm bearing down——注意修正射击。". The whole-sentence
+  // entries in js/i18n-zh.js that were meant to catch it could never fire: T() had already chosen
+  // the zh branch before trText ever saw the string. Carry the pair and the seam disappears.
+  const L={clear:['skies clearing','天要放晴了'],overcast:['cloud rolling in','乌云压过来了'],
+           fog:['a fog bank closing in','大雾正在围上来'],storm:['a storm bearing down','风暴正朝我们扑来']}[w]||[w,w];
+  const cap=L[0].charAt(0).toUpperCase()+L[0].slice(1);
+  flashPrompt(T('⛅ Weather shifting — '+L[0],'⛅ 天气转变——'+L[1]));
+  if(typeof comms==='function') comms(T('WEATHER','气象'),T(cap+' — adjust your gunnery.',L[1]+'——重新校准你的火炮吧。'),'#a8c8e0');
 }
 function dropSupplyCrates(){
   if(!player||!player.pos) return;
@@ -4511,7 +4518,7 @@ function runChatCommand(raw){
   if(cmd==='clear'){const log=document.getElementById('chatlog');if(log)log.innerHTML='';return;}
   if(cmd==='status'){const hp=player?Math.max(0,Math.ceil(player.hp/player.maxhp*100)):0;
     chatMessage(`STATUS: Hull ${hp}% · $${money} · Fleet ${allies.length+1}v${enemies.length} · Islands ${controlledIslandCount(0)}/${islands.filter(i=>i.capturable).length}`,'system');return;}
-  if(cmd==='map'){toggleTacticalMap();chatMessage('COMMAND: Strategic map toggled.','system');return;}
+  if(cmd==='map'){toggleTacticalMap();chatMessage('COMMAND: Tactical map toggled.','system');return;}
   if(cmd==='shop'){toggleShop();chatMessage('COMMAND: Armory toggled.','system');return;}
   if(cmd==='harbor'){toggleHarbor();chatMessage('COMMAND: Harbor command toggled.','system');return;}
   if(cmd==='sonar'){sonarPing();return;}
@@ -4647,8 +4654,7 @@ function refreshTouchControls(){
   document.querySelectorAll('#touchControls .tbtn').forEach(b=>{
     const act=b.dataset.act;b.textContent=touchButtonLabel(act);
     b.classList.toggle('on',(act==='view'&&fpv)||(act==='shop'&&shopOpen)||(act==='harbor'&&harborOpen)||(act==='build'&&buildOpen)||(act==='map'&&tacticalOpen));
-    const deadHere=(act==='special'&&piloting&&(!piloting.plane.def.bomb))
-      || (act==='map'&&(contentFilterOn()||nukesBannedHere()));   // MAP is the R-36M targeting screen; it cannot open here
+    const deadHere=(act==='special'&&piloting&&(!piloting.plane.def.bomb));
     b.style.visibility=deadHere?'hidden':'visible';
   });
   const hint=document.getElementById('touchHint');
@@ -5049,7 +5055,7 @@ function buildAlmanac(){
         '<span style="color:#ffd060;font-size:13px;letter-spacing:1px">'+trName(s.name)+'</span>'+
         '<span style="color:#5f7a90;font-size:11px">'+trName(s.cls)+'</span></div>'+
       '<div style="margin-top:4px;color:#7e93a8;font-size:11px">'+trText('Length')+' '+s.len+'m · '+trText('Hull')+' '+s.hp+' HP · '+Math.round(s.mounts*1.5)+' '+trText('mounts')+' · '+trText(s.kind==='carrier'?'Flat-top':s.kind==='sub'?'Submersible':'Surface')+'</div>'+
-      '<div style="margin-top:6px;font-size:13px;line-height:1.6;color:#cfe0ee">'+(isZh()&&typeof SHIPS_ZH!=='undefined'&&Object.values(SHIPS).indexOf(s)>=0?(SHIPS_ZH[Object.keys(SHIPS)[Object.values(SHIPS).indexOf(s)]]||{}).desc||s.desc||'':(s.desc||''))+'</div></div>'; };
+      '<div style="margin-top:6px;font-size:13px;line-height:1.6;color:#cfe0ee">'+catTr(typeof SHIPS_ZH!=='undefined'?SHIPS_ZH:null,k,'desc',s.desc||'')+'</div></div>'; };
   let html='<div style="color:#9fc6e8;font-size:12px;text-align:center;margin-bottom:4px">'+keys.length+' '+trText('hulls in commission — browse the fleet')+'</div>';
   if(legendary.length){ html+='<div style="margin-top:16px;text-align:center;color:#ff9a6a;letter-spacing:2px;font-size:11px">'+trText('⚓ LEGENDARY FLAGSHIPS')+'</div>'+legendary.map(card).join(''); }
   html+='<div style="margin-top:'+(legendary.length?20:14)+'px;text-align:center;color:#8fb8d8;letter-spacing:2px;font-size:11px">'+trText('STANDARD FLEET')+'</div>'+standard.map(card).join('');
@@ -5565,6 +5571,23 @@ function makePlayerShip(shipId){
   player={ build, hp:def.hp*hpMul, maxhp:def.hp*hpMul, def, shipId, submerged:false, air:100, diveY:0, _spawnShield:SPAWN_SHIELD_SECS };
   const spawnZ = friendlyHarbor ? friendlyHarbor.pos.z-240 : 0;
   player.pos=new THREE.Vector3(0,0,spawnZ); player.heading=Math.PI; player.throttle=0; player.speed=0;
+  fitOutPlayerHull();
+  walkPos.set(0, deckEyeY(), def.len*0.28); camYaw.v=player.heading; camPitch.v=0.04;
+}
+
+// Everything that turns a bare hull into the one the CAPTAIN sails: the helm station, the
+// flight-deck layout, the deck crew, the tank slots and the free starter battery.
+//
+// Shared because there are TWO ways to end up standing on a hull — building one
+// (makePlayerShip) and taking one off your own fleet (takeCommandOf) — and only the first
+// used to do any of this. A ship you boarded had no player.helm at all, so nearestHelm()
+// could never match and E could not put you at the wheel of the ship the game had just told
+// you that you commanded. Measured on a taken hull before this: helm undefined, deckPlan
+// null, 0 mountable guns, 0 tank slots, 0 aircraft spots — and nextStepHint() cheerfully
+// saying "Press E to take the wheel".
+function fitOutPlayerHull(){
+  const def=player.def, build=player.build;
+  planeSpots.length=0; crew.length=0;
   // helm / bridge station
   const helmLocal=new THREE.Vector3(0, def.deckY+0.05, def.kind==='carrier'? build.halfBeam*0.7 : build.halfLen*0.06);
   player.helm=helmLocal; player.helmEye=new THREE.Vector3(helmLocal.x, def.deckY+3.4, helmLocal.z+0.2);
@@ -5689,7 +5712,6 @@ function makePlayerShip(shipId){
   // a missile ship that starts with two deck guns is a missile ship in name only
   else if(def.vls) installStarterGuns(build,[WEAPONS.kh35,WEAPONS.sam,WEAPONS.deckgun]);   // her own round is fitted from the off
   else installStarterGuns(build, (def.len0||def.len)>60?[WEAPONS.deckgun,WEAPONS.deckgun,WEAPONS.aa]:[WEAPONS.deckgun,WEAPONS.deckgun]);
-  walkPos.set(0, deckEyeY(), def.len*0.28); camYaw.v=player.heading; camPitch.v=0.04;
 }
 // ---- deck markings ------------------------------------------------------------------
 // The runway has to be *visible*, or the rule "taxi onto the strip before you pull up" is a
@@ -6214,7 +6236,7 @@ function buildAndPushLand(kind,team,pos,yOverride,islOverride,typeOverride,force
   landUnits.push(u); if(kind==='radar') _radar[team]++; return u; }
 // ---------- piloted (drivable) tanks ----------
 function buildDeckTank(localPos, type){
-  const u=buildLand('tank',0,new THREE.Vector3(0,0,0),type); const T=u.group.userData.tank||TANKS.sherman;   // u.tank is clobbered to `true` by buildLand's u[kind]=true flag; the def lives on userData
+  const u=buildLand('tank',0,new THREE.Vector3(0,0,0),type); const T=u.tank||TANKS.sherman;   // buildLand's `if(!u[kind]) u[kind]=true` leaves a truthy field alone, so u.tank IS the TANKS def
   scene.remove(u.group); player.build.group.add(u.group); u.group.position.copy(localPos);
   playerTanks.push({ group:u.group, heading:0, onDeck:true, fireCd:0, turret:u.turret, barrelLen:u.barrelLen||3,
     name:T.name, dmg:T.dmg, fireRate:T.fireRate, speed:T.speed, turn:T.turn,
@@ -6938,7 +6960,6 @@ function nearestDamagedShip(team,p,exclude){let b=null,bd=1e9;shipsOf(team).forE
 function nearestPlaneOf(team,p){ let b=null,bd=1e9;
   aiPlanes.forEach(pl=>{ if(pl.team===team&&pl.hp>0){ const d=pl.pos.distanceTo(p); if(d<bd){bd=d;b=pl;} } });
   if(team===0 && piloting && piloting.hp>0){ const d=piloting.pos.distanceTo(p); if(d<bd){bd=d;b=piloting;} }  // player flying counts as a blue plane
-  shells.forEach(m=>{if(m.nuclear&&!m.detonated&&m.team===team&&m.hp>0){const d=m.pos.distanceTo(p);if(d<bd){bd=d;b=m;}}});
   return b; }
 function nearestAnyOf(team,p){ const s=nearestShipOf(team,p), a=nearestPlaneOf(team,p);
   let best=s||a,bd=best?best.pos.distanceTo(p):1e9;
@@ -6995,7 +7016,6 @@ function trackEnemy(eye, fwd, maxR){
   aiPlanes.forEach(p=>{ if(p.team===1&&p.hp>0&&enemyDetectedAt(p.pos,1.15)){ // lead aircraft a touch
     const lead=new THREE.Vector3(Math.sin(p.heading||0),0,Math.cos(p.heading||0)).multiplyScalar((p.def.maxSpeed||60)*0.14);
     consider(p.pos.clone().add(lead)); } });
-  shells.forEach(m=>{if(m.nuclear&&!m.detonated&&m.team===1)consider(m.pos.clone().add(m.vel.clone().multiplyScalar(.12)));});
   landUnits.forEach(u=>{ if(u.team===1&&!u.dead&&enemyDetectedAt(u.pos,1)) consider(u.pos.clone().setY(2.5)); });
   if(enemyHarbor&&enemyHarbor.hp>0) consider(enemyHarbor.pos.clone().setY(7));
   return best;
@@ -7229,8 +7249,8 @@ function buildShopUI(){
   const fillPane=(key,pane,obj,renderItem)=>{
     let hidden=0;
     recFirst(obj).forEach(k=>{
-      if(contentFilterOn()&&((obj===PLANES&&FILTERED_PLANES.has(k))||(obj===STRUCTS&&k==='nukesilo'))) return;   // kid-safe mode
-      if(nukesBannedHere()&&(k==='nukesilo'||isNuclear(obj[k]))) return;   // no strategic arsenal on small / land theatres
+      if(contentFilterOn()&&obj===PLANES&&FILTERED_PLANES.has(k)) return;   // kid-safe mode
+      if(nukesBannedHere()&&isNuclear(obj[k])) return;   // no strategic arsenal on small / land theatres
       if(obj===WEAPONS&&obj[k].vlsOnly&&!vlsHull()) return;                // launch-cell rounds need a hull with launch cells
       const fold=!SHOP_REC.has(k)&&(obj[k].cost||0)>SHOP_HIDE_COST[key];
       if(fold) hidden++;
@@ -7330,17 +7350,17 @@ function refreshShop(){
   }
   document.querySelectorAll('.witem').forEach(el=>{
     if(el.dataset.gun){ const id=el.dataset.gun, owned=ownedGuns.has(id);
-      const W=HANDHELD[id], licensed=marketLicensed('gun',id,W), unlocked=marketUnlocked('gun',id,W);
+      const W=HANDHELD[id], unlocked=marketUnlocked('gun',id,W);
       el.classList.toggle('sel', id===equippedGun);
-      el.classList.toggle('poor', !owned && (!unlocked || (!licensed&&career.credits<marketCost('gun',id,W)) || (licensed&&money<priceOf(W.cost)))); return; }
-    if(el.dataset.struct){ const id=el.dataset.struct,s=STRUCTS[id],licensed=marketLicensed('struct',id,s),unlocked=marketUnlocked('struct',id,s);
-      el.classList.toggle('poor', !unlocked || (!licensed&&career.credits<marketCost('struct',id,s)) || (licensed&&money<priceOf(s.cost))); return; }
+      el.classList.toggle('poor', !owned && (!unlocked || money<priceOf(W.cost))); return; }
+    if(el.dataset.struct){ const id=el.dataset.struct,s=STRUCTS[id],unlocked=marketUnlocked('struct',id,s);
+      el.classList.toggle('poor', !unlocked || money<priceOf(s.cost)); return; }
     const cat=el.dataset.plane?'plane':el.dataset.tank?'tank':'weapon';
     const id=el.dataset.plane||el.dataset.tank||el.dataset.id;
     const w = el.dataset.plane ? PLANES[id] : el.dataset.tank ? TANKS[id] : WEAPONS[id];
     if(!el.dataset.plane && !el.dataset.tank) el.classList.toggle('sel', selectedWeapon===el.dataset.id);
-    const licensed=marketLicensed(cat,id,w),unlocked=marketUnlocked(cat,id,w);
-    el.classList.toggle('poor', !unlocked || (!licensed&&career.credits<marketCost(cat,id,w)) || (licensed&&money<priceOf(w.cost)));
+    const unlocked=marketUnlocked(cat,id,w);
+    el.classList.toggle('poor', !unlocked || money<priceOf(w.cost));
   });
 }
 function toggleShop(){
@@ -7402,8 +7422,7 @@ function applyUpgrade(k, harbor){
 function buildBuildUI(){
   const list=document.getElementById('buildList'); if(!list) return; list.innerHTML='';
   Object.keys(STRUCTS).forEach(k=>{
-    if(contentFilterOn()&&k==='nukesilo') return;   // kid-safe mode
-    if(nukesBannedHere()&&(k==='nukesilo'||isNuclear(STRUCTS[k]))) return;   // no nukes on small / land theatres
+    if(nukesBannedHere()&&isNuclear(STRUCTS[k])) return;   // no nukes on small / land theatres
     const s=STRUCTS[k]; const d=document.createElement('div'); d.className='uitem'; d.dataset.struct=k;
     d.onclick=()=>buildStructure(k); list.appendChild(d);
   });
@@ -7412,8 +7431,8 @@ function buildBuildUI(){
 function refreshBuild(){
   document.querySelectorAll('.uitem[data-struct]').forEach(el=>{
     const k=el.dataset.struct, s=STRUCTS[k], cost=priceOf(s.cost);
-    const licensed=marketLicensed('struct',k,s),unlocked=marketUnlocked('struct',k,s);
-    el.classList.toggle('poor', !unlocked || (!licensed&&career.credits<marketCost('struct',k,s)) || (licensed&&money<cost));
+    const unlocked=marketUnlocked('struct',k,s);
+    el.classList.toggle('poor', !unlocked || money<cost);
     const zh=typeof STRUCTS_ZH!=='undefined'?STRUCTS_ZH:null;
     el.innerHTML=`<div class="un"><span>${catTr(zh,k,'name',s.name)}</span><span class="uc">${marketLabel('struct',k,s,'$'+cost)}</span></div><div class="ud">${catTr(zh,k,'desc',s.desc)}</div>`;
   });
@@ -7432,7 +7451,6 @@ function toggleBuild(){
   updateMode();
 }
 function buildStructure(k){
-  if(contentFilterOn()&&k==='nukesilo') return;   // kid-safe mode
   if(nukesBannedHere()&&isNuclear(STRUCTS[k])){ flashPrompt(nukeBanMessage()); return; }   // locked by level, or small / land theatres
   if(!onFoot){ flashPrompt(keyPrompt('Go ashore on an island (G) to emplace '+STRUCTS[k].name,'Go ashore first — tap Ashore alongside an island to emplace '+STRUCTS[k].name,'先靠岛点「登岸」上岛，才能架设'+trName(STRUCTS[k].name))); return; }
   if(!footLand){ flashPrompt(T('Swim to dry land before building ','先游到陆地上才能建造 ')+STRUCTS[k].name); return; }
@@ -7440,7 +7458,6 @@ function buildStructure(k){
   const s=STRUCTS[k], cost=priceOf(s.cost);
   if(marketBlocked('struct',k,s))return;
   if(money<cost){ flashPrompt(T('Not enough funds','钱不够')); return; }
-  if(k==='nukesilo'&&landUnits.some(u=>!u.dead&&u.team===0&&u.nukesilo)){flashPrompt(T('Only one operational R-36M silo is permitted per side','每一方只能有一座能用的 R-36M 发射井'));return;}
   const isl=footLand&&footLand.capRing?footLand:null;
   if(!isl){flashPrompt(T('These enormous structures require a proper island','这么大的建筑需要一座像样的岛'));return;}
   if(k==='command'&&islandStructures(isl,0,'command').length){flashPrompt(T('This island already has a command post','这座岛已经有指挥所了'));return;}
@@ -7470,7 +7487,6 @@ function aiIslandBuild(dt){
   if(!enemyIsles.length) return;
   const isl=enemyIsles[Math.floor(Math.random()*enemyIsles.length)];
   let kinds=['barracks','tankdepot','hospital','ammo','workshop','coastal','torpbat','aa','silo','radar','sonar','searchlight','bunker','airstrip','helipad','dock','fuel','bridge','artillery','rocket','fortress','supergun','tesla','wall'];
-  if(contentFilterOn()||nukesBannedHere()||landUnits.some(u=>!u.dead&&u.team===1&&u.nukesilo))kinds=kinds.filter(k=>k!=='nukesilo');
   // The super-gun is the only enemy weapon that lobs a map-wide 'SUPER-HEAVY ARTILLERY INBOUND'
   // strike with a red warning — as unfair on a warm-up theatre as the nuke above, and the player
   // can't field one there either. Hold the enemy to the same warm-up ban.
@@ -7817,6 +7833,14 @@ function takeCommandOf(a){
   const marks=[]; a.build.group.traverse(o=>{ if(o.isSprite&&o.renderOrder===999) marks.push(o); });
   marks.forEach(m=>destroyObject3D(m));
   if(a._whiteFlag){ destroyObject3D(a._whiteFlag); a._whiteFlag=null; }
+  // Her AI battery and her ranged air wing were the FLEET's, and both sit exactly where the
+  // captain's own guns and aircraft are about to go. Left in place they double-stack: a bought
+  // turret clips through a decorative one (freeMountLocal only knows about `placed`) and a
+  // parked aircraft lands inside an NPC model.
+  (a.build.npcTurrets||[]).forEach(t=>destroyObject3D(t));
+  (a.build.deckPlanes||[]).forEach(g=>destroyObject3D(g));
+  a.build.npcTurrets=[]; a.build.deckPlanes=[]; a.build.deckSpots=null;
+  a.loadout=[]; a._gunKo=null; a._gunHp=null;
   player=a; player.shipId=player.shipId||null; player.throttle=0; player.speed=0;
   player.crit=player.crit||critOf(player);
   playerShipLost=false; player._convertedToAlly=false;
@@ -7824,6 +7848,9 @@ function takeCommandOf(a){
   deckPlan=null;
   manning=null; piloting=null; drivingTank=null; boarding=null;
   onFoot=false; driving=false; footLand=null;
+  // ...and she becomes a hull the captain can actually sail: helm, flight deck, tank slots and
+  // a free starter battery, exactly as if she had been picked from the menu.
+  fitOutPlayerHull();
   walkPos.set(0, deckEyeY(), (player.build.halfLen||20)*0.4);
   camPitch.v=0.04; mouseDownFire=false;
   updateHUD(); refreshShop(); updateMode(); sfxClick();
@@ -7928,7 +7955,7 @@ function spinProp(pa,dt){
   // the deck, and every phase that is not simply "flying".
   const ph = (piloting && piloting.plane===pa) ? piloting.phase : (pa.phase||null);
   const y  = pa.group.position.y - (typeof deckTopWorldY==='function' ? deckTopWorldY() : 0);
-  setAircraftGear(pa.group, !!pa.parked || (ph && ph!=='fly') || y < 14);
+  setPlaneGearVisual(pa, !!pa.parked || (ph && ph!=='fly') || y < 14);
 }
 function deckTopWorldY(){ return player.build.group.position.y + player.def.deckY + (player.def.kind==='carrier'?0.5:0); }
 // Anything on deck that is not flat is a hazard while taxiing: mounted turrets, other parked
@@ -8050,7 +8077,10 @@ function flyPlane(pa){
   flashPrompt(T('Takeoff roll…','滑跑起飞中……')); updateMode();
   startPlaneTutorial();
 }
-function setPlaneGearVisual(pa,shown){if(pa&&pa.group.userData.gearVisuals)pa.group.userData.gearVisuals.forEach(g=>g.visible=shown);}
+// A leg that has already been torn off (parts.gear destroyed) is no longer part of the aircraft —
+// it is a piece of smoking debris in the fx list, and hiding it would make wreckage blink out.
+function setPlaneGearVisual(pa,shown){if(pa&&pa.group&&pa.group.userData.gearVisuals)
+  pa.group.userData.gearVisuals.forEach(g=>{ if(!g.userData.detached) g.visible=shown; });}
 function applyPlaneDamageVisual(P){
   if(!P||!P.plane||!P.parts)return;const g=P.plane.group,pr=P.parts,wl=g.userData.wingL,wr=g.userData.wingR;
   if(wl&&wr&&wl!==wr){wl.visible=pr.wingL<3;wr.visible=pr.wingR<3;}
@@ -8193,8 +8223,7 @@ function spawnShell(w,pos,dir,team,owner,enemyArc,velOverride){
   let geo, col=w.col||0xffe0a0;
   const tone=weaponPersonality(w);
   const tracerCol=w.tracerCol||tone.tracer;
-  if(w.nuclear){geo=new THREE.CylinderGeometry(1.2,1.55,8,18);}
-  else if(w.strategic){geo=new THREE.CylinderGeometry(.65,.9,3.4,14);}
+  if(w.strategic){geo=new THREE.CylinderGeometry(.65,.9,3.4,14);}
   else if(w.kind==='torpedo'){ geo=new THREE.CylinderGeometry(0.18,0.18,1.6,8); }
   else if(w.kind==='missile'||w.kind==='cannon'||w.kind==='bomb'){ geo=new THREE.ConeGeometry(0.22,0.9,8); }
   else geo=new THREE.SphereGeometry(0.22,8,8);
@@ -8206,10 +8235,9 @@ function spawnShell(w,pos,dir,team,owner,enemyArc,velOverride){
   if(lob) vel.y += lob;
   if(w.kind==='torpedo'){ m.position.y=0.6; vel.y=0; }
   const sh={ mesh:m, pos:m.position, vel, dmg:w.dmg, team, splash:w.splash||0, homing:!!w.homing, water:w.kind==='torpedo',
-    arc:!!lob||!!velOverride, owner, life:w.life||9, col, aa:!!w.aa, strategic:!!w.strategic, nuclear:!!w.nuclear,
-    hp:w.hp||0, fixedTarget:w.targetPos?w.targetPos.clone():null, spareHarbors:!!w.spareHarbors, antiShip:!!w.antiShip, plasma:!!w.plasma,
+    arc:!!lob||!!velOverride, owner, life:w.life||9, col, aa:!!w.aa, strategic:!!w.strategic,
+    antiShip:!!w.antiShip, plasma:!!w.plasma,
     turn:w.turn||2.4, maxDist:w.range||0, dist:0, kind:w.kind||'gun', weaponName:w.name||'', size:w.size||0.5, tracerCol, tone, spawnIsl:islandUnderPos(pos) };  // spawnIsl exempts shore weapons from detonating on their own launch island
-  if(w.nuclear){const mark=teamMarker(team,12);mark.position.y=7;m.add(mark);}
   // flame streak / tracer trail — white-hot core sheathed in an orange glow (skip torpedoes — they're in the water)
   if(w.kind!=='torpedo'){
     const heavy = tone.role==='cannon'||tone.role==='capital'||tone.role==='mortar'||tone.role==='missile'||tone.role==='rail'||w.splash;
@@ -8787,7 +8815,7 @@ function update(dt,t){
     if(f.fade&&f.mesh.material){ f.mesh.material.transparent=true; f.mesh.material.opacity = f.op!=null ? Math.max(0,f.life/f.max)*f.op : Math.max(0,f.life*2.5); }
     if(f.light) f.mesh.intensity=Math.max(0,f.life*(f.li||14));
     if(f.life<=0) removeFxAt(i); }
-  updatePrompt();
+  updatePrompt(dt);
   updateClaude(dt);
   updateComms(dt);
   _distressT-=dt; if(_distressT<=0){ _distressT=4; checkDistress(); }
@@ -9098,24 +9126,17 @@ function updateEnemy(e,dt){
   }
 }
 let t2=0;
-function detonateNuclearShell(s){
-  if(!s||s.detonated)return;
-  s.detonated=true;s.mesh.visible=false;
-  blastAll(s.pos.clone(),9999,900,true,true,(s.team||0)===0); // five times the Tu-95V Tsar Bomba radius; harbors are protected objectives
-  if((s.team||0)===0) warRecord('nukes');
-  flashPrompt(T('☢ R-36M WARHEAD DETONATED','☢ R-36M 弹头已引爆'));
-}
 // Scratch vectors for the shell loop. Up to MAX_SHELLS projectiles are integrated every
 // frame, and each used to allocate two or three Vector3s — homing steer, mesh orientation,
 // trail orientation. Reused instances instead: same maths, no per-frame garbage.
 const _shUp=new THREE.Vector3(0,1,0), _shWant=new THREE.Vector3(), _shDir=new THREE.Vector3();
 function updateShells(dt){
   for(let i=shells.length-1;i>=0;i--){
-    const s=shells[i];if(s.detonated){removeShellAt(i);continue;} s.life-=dt;
+    const s=shells[i]; s.life-=dt;
     if(s.homing){ // tracking shells seek the OPPOSITE team — AA-flagged ones prefer aircraft
       const foe=1-s.team;
-      const tgt=s.fixedTarget?{pos:s.fixedTarget}:(s.aa ? (nearestPlaneOf(foe,s.mesh.position) || nearestAnyOf(foe,s.mesh.position))
-                       : nearestAnyOf(foe,s.mesh.position));
+      const tgt=s.aa ? (nearestPlaneOf(foe,s.mesh.position) || nearestAnyOf(foe,s.mesh.position))
+                     : nearestAnyOf(foe,s.mesh.position);
       if(tgt){ const want=_shWant.copy(tgt.pos).sub(s.mesh.position).normalize().multiplyScalar(s.vel.length());
         s.vel.lerp(want,Math.min(1,s.turn*dt)); }
     }
@@ -9123,7 +9144,6 @@ function updateShells(dt){
     const step=s.vel.length()*dt; s.dist+=step;
     s.mesh.position.addScaledVector(s.vel,dt);
     s.travel=(s.travel||0)+s.vel.length()*dt;   // for range falloff — machine guns lose bite downrange
-    if(s.nuclear&&s.fixedTarget&&s.mesh.position.distanceTo(s.fixedTarget)<18){detonateNuclearShell(s);removeShellAt(i);continue;}
     if(s.maxDist && s.dist>s.maxDist){ boom(s.mesh.position.clone(),0.5); removeShellAt(i); continue; } // out of range — self-destruct
     if(s.mesh.geometry.type==='ConeGeometry'||s.mesh.geometry.type==='CylinderGeometry') s.mesh.quaternion.setFromUnitVectors(_shUp, _shDir.copy(s.vel).normalize());
     if(s.water) s.mesh.position.y=0.6;
@@ -9135,17 +9155,12 @@ function updateShells(dt){
       if(s.heavy&&Math.random()<dt*7) shellSmoke(s.mesh.position); }                // heavy shells shed a smoke line along the arc
     // hit test
     let hit=false;
-    if(!s.nuclear){ // guns, aircraft and SAMs can intercept a strategic missile
-      for(const m of shells){if(m===s||!m.nuclear||m.detonated||m.team===s.team)continue;
-        if(s.mesh.position.distanceTo(m.pos)<5.5){m.hp-=s.dmg;hitSpark(m.pos.clone());if(m.hp<=0)detonateNuclearShell(m);hit=true;break;}}
-    }
-    if(hit){removeShellAt(i);continue;}
     if(s.team===0){
       for(const e of enemies){ if(e.sinkT>0)continue; if(s.mesh.position.distanceTo(e.pos)< e.def.beam/2+2){ onShellHit(s,e.pos.clone(),e); hit=true; break; } }
-      if(!hit) for(const ep of aiPlanes){ if(ep.team!==1||ep.hp<=0)continue; if(s.mesh.position.distanceTo(ep.pos)<3.2){ if(playerCausedShell(s))creditPlayerHit(ep); ep.hp-=s.dmg; impactFx(s,s.mesh.position.clone()); showDamageNumber(s.mesh.position.clone(),s.dmg,true,s.aa||s.dmg>=40); showHit(ep.def&&ep.def.name?ep.def.name:'AIRCRAFT',false,'aa'); if(ep.hp<=0) killAIPlane(ep); hit=true; break; } }
+      if(!hit) for(const ep of aiPlanes){ if(ep.team!==1||ep.hp<=0)continue; if(s.mesh.position.distanceTo(ep.pos)<3.2){ if(playerCausedShell(s))creditPlayerHit(ep); ep.hp-=s.dmg; impactFx(s,s.mesh.position.clone()); showDamageNumber(s.mesh.position.clone(),s.dmg,ep,s.aa||s.dmg>=40); showHit(ep.def&&ep.def.name?ep.def.name:'AIRCRAFT',false,'aa'); if(ep.hp<=0) killAIPlane(ep); hit=true; break; } }
       if(!hit && s.mesh.position.y<20) for(const u of landUnits){ if(u.team!==1||u.dead)continue; if(s.mesh.position.distanceTo(u.pos)<Math.max(3.5,(u.footprint||4)*.38)){
-        if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{if(playerCausedShell(s))creditPlayerHit(u);const dealt=s.dmg*wallShield(u);u.hp-=dealt;impactFx(s,s.mesh.position.clone());showDamageNumber(s.mesh.position.clone(),dealt,true,s.dmg>=55);showHit((u.name||u.kind||'GROUND TARGET').toUpperCase(),false,s.dmg>=55?'crit':'');if(s.splash)explodeAt(s.mesh.position.clone(),0,s.dmg,s.splash,s.owner);if(u.hp<=0)killLandUnit(u);}hit=true;break;} }
-      if(!hit && enemyHarbor && enemyHarbor.hp>0 && s.mesh.position.distanceTo(enemyHarbor.pos)<enemyHarbor.r){ if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{damageHarbor(enemyHarbor,shellShipDmg(s,enemyHarbor));impactFx(s,s.mesh.position.clone());showDamageNumber(s.mesh.position.clone(),s.dmg,true,s.dmg>=55);showHit('ENEMY HARBOR',false,s.dmg>=55?'crit':'');}hit=true; }
+        if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,false,playerCausedShell(s));else{if(playerCausedShell(s))creditPlayerHit(u);const dealt=s.dmg*wallShield(u);u.hp-=dealt;impactFx(s,s.mesh.position.clone());showDamageNumber(s.mesh.position.clone(),dealt,u,s.dmg>=55);showHit((u.name||u.kind||'GROUND TARGET').toUpperCase(),false,s.dmg>=55?'crit':'');if(s.splash)explodeAt(s.mesh.position.clone(),0,s.dmg,s.splash,s.owner);if(u.hp<=0)killLandUnit(u);}hit=true;break;} }
+      if(!hit && enemyHarbor && enemyHarbor.hp>0 && s.mesh.position.distanceTo(enemyHarbor.pos)<enemyHarbor.r){ if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,false,playerCausedShell(s));else{damageHarbor(enemyHarbor,shellShipDmg(s,enemyHarbor));impactFx(s,s.mesh.position.clone());showDamageNumber(s.mesh.position.clone(),s.dmg,enemyHarbor,s.dmg>=55);showHit('ENEMY HARBOR',false,s.dmg>=55?'crit':'');}hit=true; }
     }
     else {
       if(onFoot&&footHP>0&&s.mesh.position.distanceTo(footPos)<2.2){ damageFoot(s.dmg,s.mesh.position); hitSpark(s.mesh.position.clone()); hit=true; }
@@ -9157,8 +9172,8 @@ function updateShells(dt){
       if(!hit) for(const ap of aiPlanes){ if(ap.team!==0||ap.hp<=0)continue; if(s.mesh.position.distanceTo(ap.pos)<3.2){ ap.hp-=s.dmg; hitSpark(s.mesh.position.clone()); if(ap.hp<=0) killAIPlane(ap); hit=true; break; } }
       if(!hit) for(const a of allies){ if(a.sinkT>0)continue; if(s.mesh.position.distanceTo(a.pos)< a.def.beam/2+2){ damageAlly(a,shellShipDmg(s,a),s.mesh.position.clone()); hitSpark(s.mesh.position.clone()); hit=true; break; } }
       if(!hit && s.mesh.position.y<20) for(const u of landUnits){ if(u.team!==0||u.dead)continue; if(s.mesh.position.distanceTo(u.pos)<Math.max(3.5,(u.footprint||4)*.38)){
-        if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{u.hp-=s.dmg*wallShield(u);hitSpark(s.mesh.position.clone());if(u.hp<=0)killLandUnit(u);}hit=true;break;} }
-      if(!hit && friendlyHarbor && friendlyHarbor.hp>0 && s.mesh.position.distanceTo(friendlyHarbor.pos)<friendlyHarbor.r){if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else{damageHarbor(friendlyHarbor,shellShipDmg(s,friendlyHarbor));hitSpark(s.mesh.position.clone());}hit=true;}
+        if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,false,playerCausedShell(s));else{u.hp-=s.dmg*wallShield(u);hitSpark(s.mesh.position.clone());if(u.hp<=0)killLandUnit(u);}hit=true;break;} }
+      if(!hit && friendlyHarbor && friendlyHarbor.hp>0 && s.mesh.position.distanceTo(friendlyHarbor.pos)<friendlyHarbor.r){if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,false,playerCausedShell(s));else{damageHarbor(friendlyHarbor,shellShipDmg(s,friendlyHarbor));hitSpark(s.mesh.position.clone());}hit=true;}
     }
     if(!hit&&s.mesh.position.y<4)for(const m of mines){if(m.team===s.team||m.arm>0)continue;
       if(s.mesh.position.distanceTo(m.pos)<3.2){hitSpark(m.pos.clone().setY(1));detonateMine(m);hit=true;break;}}
@@ -9167,11 +9182,11 @@ function updateShells(dt){
       if(s.spawnIsl && isl!==s.spawnIsl) s.spawnIsl=null;   // the pass expires the moment it clears home ground — a shore torpedo that swims away and circles back must not phase through the island it came from
       if(isl && isl!==s.spawnIsl){ const surf=islandSurfaceY(s.mesh.position,isl);   // spawnIsl exemption: a shell never detonates on the island it launched from
         if(surf!=null && s.mesh.position.y<surf){ boom(s.mesh.position.clone(),s.heavy?1.2:0.7);
-          if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true; } } }
+          if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,false,playerCausedShell(s));else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true; } } }
     if(!hit && s.mesh.position.y<0.3){
       const nearFoe=(!s.strategic && playerCausedShell(s))?nearestShipOf(1,s.mesh.position):null;
       if(nearFoe && nearFoe.pos.distanceTo(s.mesh.position)<35) nearMissSplash(s.mesh.position.clone()); else splashAt(s.mesh.position.clone(),s.strategic?8:1);
-      if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,s.spareHarbors,playerCausedShell(s));else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true;}
+      if(s.strategic)blastAll(s.mesh.position.clone(),s.dmg,s.splash,true,false,playerCausedShell(s));else if(s.splash)explodeAt(s.mesh.position.clone(),s.team,s.dmg,s.splash,s.owner);hit=true;}
     if(hit||s.life<=0) removeShellAt(i);
   }
 }
@@ -9241,7 +9256,7 @@ function onShellHit(s,pos,target){
   const mode=s.aa?'aa':(s.kind==='missile'?'missile':(s.dmg>=115||/rail/i.test(s.weaponName||'')?'rail':(s.dmg>=70?'crit':'')));
   if(playerCausedShell(s))showHit(target&&target.def?target.def.name:'TARGET',false,mode);   // your shell, not merely your side's
   impactFx(s,pos);
-  if(s.strategic)blastAll(pos,s.dmg,s.splash,true,s.spareHarbors);
+  if(s.strategic)blastAll(pos,s.dmg,s.splash,true,false);
   else if(s.splash) explodeAt(pos,s.team,shellShipDmg(s,target),s.splash,s.owner);
   else { damageTarget(target,shellShipDmg(s,target),s.owner,pos); boom(pos, 0.7); }
 }
@@ -9703,24 +9718,13 @@ function resupplyEmplacement(u,dt){
   if(u.ammoLeft==null||u.ammoLeft>=10||!nearbyStructure(u,'ammo',120))return;
   u.supplyT=(u.supplyT||0)+dt;if(u.supplyT>=5){u.supplyT=0;u.ammoLeft++;}
 }
-function launchNuclearMissile(u,target){
-  if(!u||u.dead||!u.nukesilo||u.fireT>0||!structurePowered(u))return false;
-  u.fireT=200;
-  if(u.siloMissile)u.siloMissile.visible=false;
-  const from=u.pos.clone().setY(28),dir=new THREE.Vector3(0,1,0);
-  spawnShell({dmg:9999,spd:210,splash:900,kind:'missile',homing:true,turn:.62,range:14000,life:90,
-    col:0xd6d1b7,strategic:true,nuclear:true,hp:180,targetPos:target.clone().setY(3),spareHarbors:true},from,dir,u.team,u);
-  boom(from,3.2);
-  flashPrompt(u.team===0?T('☢ R-36M LAUNCHED — WARHEAD IN FLIGHT','☢ R-36M 已发射——弹头飞行中'):T('☢ ENEMY R-36M LAUNCH DETECTED — INTERCEPT IT!','☢ 侦测到敌方 R-36M 发射——拦截它！'));
-  return true;
-}
-function updateNuclearSilo(u,dt){
-  if(u.siloMissile)u.siloMissile.visible=u.fireT<=0;
-  if(u.fireT>0){u.fireT=Math.max(0,u.fireT-dt);return;}
-  if(u.team===0)return; // friendly strategic weapons require a human tactical-map launch
-  const target=nearestSurfaceTarget(u.team,u.pos,14000,true,false); // never auto-target either harbor
-  if(target)launchNuclearMissile(u,target.pos.clone());
-}
+// (launchNuclearMissile / updateNuclearSilo / detonateNuclearShell lived here, with the R-36M
+// silo that fired them. The silo was removed from STRUCTS long ago and buildAndPushLand refuses
+// unknown kinds, so u.nukesilo could never be true again and the whole chain was unreachable:
+// nothing built a silo, so nothing launched, so no shell ever carried nuclear:true, so the
+// intercept branch in updateShells and the tracking in nearestPlaneOf/trackEnemy never ran.
+// The nuclear AIRCRAFT are untouched — the strike drone and the strategic bombers still work,
+// through def.nuke in playerKamikaze and strategic:true shells. See tests/smoke/no-r36m.spec.js.)
 function incomingWarning(pos,team,life){
   if(team!==1)return;
   const ring=new THREE.Mesh(new THREE.RingGeometry(20,29,32),new THREE.MeshBasicMaterial({color:0xff432e,transparent:true,opacity:.8,side:THREE.DoubleSide,depthWrite:false}));
@@ -9776,7 +9780,6 @@ function updateLandUnit(u,dt){
   const foe=1-u.team;
   if(u.needsPower&&!structurePowered(u)){if(u.light)u.light.material.opacity=.08;return;}
   resupplyEmplacement(u,dt);
-  if(u.nukesilo){updateNuclearSilo(u,dt);return;}
   if(updateSupportBuilding(u,dt))return;
   if(u.supergun||u.fortress||u.rocket){
     const surf=nearestSurfaceTarget(u.team,u.pos,u.range,false,false);if(!surf)return;
@@ -9892,8 +9895,7 @@ function killLandUnit(u,quiet=false){
     setIslandOwner(u.island,null,true);flashPrompt(T('⚠ '+u.island.name.toUpperCase()+' COMMAND POST DESTROYED — ISLAND NEUTRALIZED','⚠ '+trName(u.island.name)+' 的指挥所被摧毁——该岛已中立'));
   }
   destroyObject3D(u.group); u.group=null; const i=landUnits.indexOf(u); if(i>=0) landUnits.splice(i,1);
-  if(selectedNukeSilo===u)selectedNukeSilo=null;
-  if(u.team===1){ const pay={coastal:200,tank:120,aa:90,soldier:50,artillery:220,silo:260,nukesilo:8000,torpbat:190,tesla:180,radar:180,wall:180,
+  if(u.team===1){ const pay={coastal:200,tank:120,aa:90,soldier:50,artillery:220,silo:260,torpbat:190,tesla:180,radar:180,wall:180,
       command:420,barracks:180,tankdepot:300,hospital:160,ammo:220,workshop:240,sonar:180,searchlight:90,bunker:220,airstrip:350,helipad:220,dock:300,fuel:180,power:300,bridge:180,rocket:360,fortress:520,supergun:1000};
     if(!quiet)showHit((u.name||u.kind||'ENEMY').toUpperCase(),true);
     const _base=pay[u.kind]||60; money += playerCredited(u)?_base:Math.max(10,Math.round(_base*0.25));   // your kill pays full; the fleet's, a commander's share
@@ -10191,14 +10193,17 @@ function shipWayback(near){
     : T('   ·   '+arrow+' ship '+m+'m away — walk to it and press G',
         '   ·   '+arrow+' 军舰在 '+m+' 米外——走过去按 G 上舰');
 }
-function updatePrompt(){
+function updatePrompt(dt){
   const el=document.getElementById('prompt'); let msg='';
   const capIsl=!piloting&&player?islands.find(i=>i.capturable&&i.owner!==0&&
     ((onFoot&&footLand===i)||insideIslandRange(player.pos,i,65))):null;
   const capMsg=()=>{ if(!capIsl) return ''; const iNm=isZh()?trName(capIsl.name):capIsl.name.toUpperCase();
     return capIsl.contested?T('🏝 '+iNm+' CONTESTED — clear enemy ships and defenders','🏝 '+iNm+' 争夺中——清除敌舰和守军'):
       capIsl.captureTeam===0?T('🏝 SECURING '+iNm+' — ','🏝 正在占领 '+iNm+'——')+Math.floor(capIsl.capture/ISLAND_CAPTURE_TIME*100)+'%':T('🏝 HOLD POSITION TO CAPTURE '+iNm,'🏝 停在这里即可占领 '+iNm); };
-  if(promptT>0){ promptT-=0.016; msg=promptMsg; }
+  // dt, not a hardcoded 16 ms: this runs once per FRAME, so a fixed decrement made a prompt's
+  // life depend on the display. Measured at exactly 0.016 a frame — a 2-second prompt lasted 4
+  // seconds on a 30 fps tablet and 1 second on a 120 Hz screen.
+  if(promptT>0){ promptT-=(dt||0.016); msg=promptMsg; }
   else if(capIsl && !onFoot && !drivingTank){ msg=capMsg(); }   // ashore it becomes a suffix, never a replacement
   else if(drivingTank){ const t=drivingTank; msg=T('Tank ','坦克 ')+Math.max(0,Math.ceil(t.hp/t.maxhp*100))+T('% — W/S drive · Click fire · R repair · ','% — W/S 驾驶 · 点击开火 · R 修理 · ')+(t.onDeck?T('G land ashore','G 开上岸'):(playerShipLost?T('Ship lost','船已沉没'):T('G re-embark','G 回到船上')))+T(' · T view · E dismount',' · T 视角 · E 下车')+tankPartSummary(t); }
   else if(onFoot){ const near=!landCampaignMode&&Math.hypot(footPos.x-player.pos.x,footPos.z-player.pos.z)<boardRange(), hp=' · HP '+Math.ceil(footHP)+'%', ftk=nearestFieldTank(), prize=boardableEnemyShip();
@@ -10319,22 +10324,27 @@ function drawMinimap(){
   g.moveTo(R+hx*8, R+hz*8); g.lineTo(R-hx*4+perpx*4.5, R-hz*4+perpz*4.5); g.lineTo(R-hx*4-perpx*4.5, R-hz*4-perpz*4.5);
   g.closePath(); g.fill();
 }
-function tacticalSilos(){return landUnits.filter(u=>!u.dead&&u.team===0&&u.nukesilo);}
+// A theater is 4-5 km across and the minimap only reaches 1.7 km, so "where is everything" had
+// no answer anywhere in the game. This panel is that answer — a plain chart of the whole map.
+//
+// It used to be the R-36M's targeting screen and NOTHING else, so when the silo was removed the
+// whole thing was closed off with an early `return`. What that left behind was six live entrances
+// to a panel that could not open: N, clicking the minimap, the touch MAP button, /map (which
+// cheerfully replied "strategic map toggled"), a row in the action panel, and two steps of the
+// training course teaching a key that did nothing — in a game whose own action panel is built on
+// the rule that a key which does nothing is worse than a key you never knew about.
+// So: it opens again, as the map it always drew. No launching, and no kid-safe/theater gate —
+// those guarded a nuclear weapon, and a chart of the sea is not one.
 function toggleTacticalMap(force){
   if(phase!=='play')return;
-  // The tactical map was the R-36M's targeting screen and nothing else — with the silo gone it
-  // would open on an empty island chart, which is worse than not opening at all.
-  if(!tacticalOpen){ return; }
   // these panels freeze the sim, so tickActions inside update() stops running — the controls
   // list would otherwise sit there showing helm keys that do nothing while the war is paused
   if(typeof renderActions==='function') setTimeout(renderActions,0);
-  if(contentFilterOn()&&!tacticalOpen){ flashPrompt(T('Strategic weapons are disabled in kid-safe mode','家长模式下战略武器已关闭')); return; }
-  if(nukesBannedHere()&&!tacticalOpen){ flashPrompt(nukeBanMessage()); return; }
   tacticalOpen=force==null?!tacticalOpen:!!force;
   const panel=document.getElementById('tactical');panel.style.display=tacticalOpen?'flex':'none';
   if(tacticalOpen){
     if(document.pointerLockElement)document.exitPointerLock();
-    const silos=tacticalSilos();if(!selectedNukeSilo||selectedNukeSilo.dead)selectedNukeSilo=silos.find(s=>s.fireT<=0)||silos[0]||null;
+    mouseDownFire=false;                  // the war is frozen behind this; don't hold the guns down
     drawTacticalMap();
   }
 }
@@ -10353,32 +10363,17 @@ function drawTacticalMap(){
     g.strokeStyle=c;g.lineWidth=2;g.strokeRect(x-6,y-6,12,12);g.beginPath();g.arc(x,y,70,0,Math.PI*2);g.strokeStyle='rgba(255,90,90,.13)';g.stroke();});
   const dot=(p,c,r)=>{const [x,y]=to(p.x,p.z);g.fillStyle=c;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();};
   allies.forEach(s=>{if(s.sinkT===0)dot(s.pos,'#45cfff',3);});enemies.forEach(s=>{if(s.sinkT===0&&enemyDetected(s))dot(s.pos,'#ff5151',3);});
-  shells.forEach(m=>{if(m.nuclear&&!m.detonated)dot(m.pos,m.team===0?'#fff07a':'#ff8d45',6);});
-  landUnits.forEach(u=>{if(u.dead||!u.nukesilo)return;const [x,y]=to(u.pos.x,u.pos.z),sel=u===selectedNukeSilo;
-    g.fillStyle=u.team===0?'#77ddff':'#ff6868';g.fillRect(x-6,y-6,12,12);
-    if(sel){g.strokeStyle='#fff36d';g.lineWidth=3;g.beginPath();g.arc(x,y,12,0,Math.PI*2);g.stroke();}});
-  const hint=document.getElementById('tacticalHint'),s=selectedNukeSilo;
-  hint.textContent=(!s?T('No friendly R-36M silo exists. Build one on a controlled island.','我方还没有 R-36M 发射井。先在已控制的岛屿上建造一座。'):
-    !structurePowered(s)?T('Selected silo is OFFLINE — build or repair its island power station.','选中的发射井离线——需要修好或建造岛上的发电站。'):
-    s.fireT>0?T('R-36M reloading: '+Math.ceil(s.fireT)+' seconds. Select another silo or press N to close.','R-36M 装填中：还需 '+Math.ceil(s.fireT)+' 秒。可选择其他发射井，或按 N 关闭。'):
-    T('R-36M READY — click a target area. Harbors and their exclusion zones cannot be targeted.','R-36M 就绪——点击目标区域。海港及其禁区无法作为目标。'))
+  // your own position, so the chart answers "where am I" as well as "where is everything"
+  { const me=activePlayerWorldPos(), [x,y]=to(me.x,me.z);
+    g.strokeStyle='#ffffff';g.lineWidth=2;g.beginPath();g.arc(x,y,7,0,Math.PI*2);g.stroke();
+    g.fillStyle='#ffffff';g.beginPath();g.arc(x,y,2.5,0,Math.PI*2);g.fill(); }
+  const hint=document.getElementById('tacticalHint');
+  const blue=controlledIslandCount(0), red=controlledIslandCount(1);
+  hint.textContent=T('The whole theater — you ◯ · your fleet ● · contacts ● · islands you hold in blue.',
+                     '整个战区——你 ◯ · 我方舰队 ● · 敌方目标 ● · 蓝色是你占下的岛。')
+    +T('  ·  islands '+blue+' vs '+red,'  ·  岛屿 '+blue+' 比 '+red)
     +T('  ·  ⏸ war paused while this map is open','  ·  ⏸ 地图打开时战斗暂停');
 }
-function tacticalMapClick(e){
-  if(!tacticalOpen)return;
-  const cv=e.currentTarget,r=cv.getBoundingClientRect(),mx=(e.clientX-r.left)/r.width*cv.width,my=(e.clientY-r.top)/r.height*cv.height;
-  const X=5600,Z=5200,world=new THREE.Vector3((mx/cv.width*2-1)*X,3,(my/cv.height*2-1)*Z);
-  let picked=null,bd=18;
-  tacticalSilos().forEach(s=>{const sx=cv.width/2+s.pos.x/X*cv.width/2,sy=cv.height/2+s.pos.z/Z*cv.height/2,d=Math.hypot(mx-sx,my-sy);if(d<bd){bd=d;picked=s;}});
-  if(picked){selectedNukeSilo=picked;drawTacticalMap();return;}
-  const s=selectedNukeSilo;if(!s){flashPrompt(T('Build an R-36M silo before opening strategic fire','先造一座 R-36M 发射井才能进行战略打击'));return;}
-  if(!structurePowered(s)){flashPrompt(T('R-36M silo offline — island power required','R-36M 发射井离线——需要岛上供电'));return;}
-  if(s.fireT>0){flashPrompt(T('R-36M reloading — '+Math.ceil(s.fireT)+' seconds','R-36M 装填中——还要 '+Math.ceil(s.fireT)+' 秒'));return;}
-  const blocked=[friendlyHarbor,enemyHarbor].some(h=>h&&h.pos.distanceTo(world)<1050);
-  if(blocked){flashPrompt(T('Nuclear targeting prohibited inside a harbor exclusion zone','海港禁区内禁止核打击'));return;}
-  if(launchNuclearMissile(s,world)){toggleTacticalMap(false);}
-}
-document.getElementById('tacticalCanvas').addEventListener('click',tacticalMapClick);
 document.getElementById('minimap').addEventListener('click',()=>toggleTacticalMap(true));
 // =====================================================================
 //  "WHAT CAN I DO RIGHT NOW" PANEL
@@ -10409,15 +10404,12 @@ function actionPlan(){
       R('WASD','fly the camera','移动镜头'), R('Space','up','上升'), R('Shift','down','下降'),
       R('Mouse','look','鼠标转视角'), R('L','exit','退出')], more:[], panel:true};
 
-  // Only the keys that will actually DO something from where you are standing. The tactical map
-  // refuses on theatres with strategic weapons barred, and the island engineers refuse unless you
-  // are ashore on ground you hold — listing either one there is exactly the "pressed it, nothing
-  // happened" this panel exists to prevent.
-  const mapAllowed = !(typeof contentFilterOn==='function' && contentFilterOn()) &&
-                     !(typeof nukesBannedHere==='function' && nukesBannedHere());
+  // Only the keys that will actually DO something from where you are standing. The island
+  // engineers refuse unless you are ashore on ground you hold — listing B there is exactly the
+  // "pressed it, nothing happened" this panel exists to prevent.
   const canBuild = onFoot && footLand && !((footLand.capRing && footLand.owner!==0) || footLand.team===1);
   // A key earns its row by being able to DO something from where you are standing — the same
-  // test canBuild and mapAllowed already apply. Three of these used to print unconditionally
+  // test canBuild already applies. Three of these used to print unconditionally
   // and then do nothing: there is no fleet to upgrade, order or radio when you are sailing alone.
   const hasFleet = allies.length>0;
   const always = [];
@@ -10429,7 +10421,7 @@ function actionPlan(){
   }
   always.push(R('K', 'settings', '设置'), R('L','photo mode','拍照模式'),
               R('M', 'sound on/off', '音效开关'), R('J','music on/off','音乐开关'));
-  if(mapAllowed) always.unshift(R('N','big map of the battle','整场战斗的大地图'));
+  always.unshift(R('N','big map of the battle','整场战斗的大地图'));   // a chart of the sea is always legal
   if(canBuild)   always.push(R('B','build something on this island','在这座岛上盖东西'));
 
   if(drivingTank) return {t:zh?'开坦克':'DRIVING A TANK', rows:[
@@ -11447,7 +11439,7 @@ function resumeWar(){
     const gunner=buildSailor('gunner'); gunner.scale.setScalar(.85); gunner.position.set(0,(w.size||1)*.35,-.45); (t.userData.yawG||t).add(gunner);
     placed.push({def:w,group:t,yaw:0,pitch:.1,cd:0,gunner,free:!!gd.free,ko:!!gd.ko}); });
   (s.planes||[]).forEach(pd=>{ const def=PLANES[pd.id], spot=planeSpots[pd.sp]; if(!def||!spot||spot.taken) return;
-    const g=buildPlane(def); g.position.copy(spot.pos); g.rotation.y=0; player.build.group.add(g);
+    const g=buildPlane(def); g.position.copy(spot.pos); g.rotation.y=parkYaw(spot); player.build.group.add(g);   // ranged on the slant, as every other code path parks them
     planes.push({def,group:g,spot,parked:true,bombsLeft:pd.b||0,gunAmmo:pd.ga==null?null:pd.ga}); spot.taken=true; });
   (s.tanks||[]).forEach(td=>{ const spot=tankSpots.find(sp=>!sp.taken); if(!spot||!TANKS[td.tt]) return;
     buildDeckTank(spot.pos,td.tt); spot.taken=true;
@@ -11892,7 +11884,7 @@ function loop(){
     if(!gamePaused()){ t2+=dt; update(dt,t2); updateHUD();
       if(shopOpen) armoryT+=dt;                                          // the armory no longer stops the clock, so bank the time and take it off the star par
       _saveT+=dt; if(_saveT>=30){ _saveT=0; saveWar(); } }               // autosave the war twice a minute
-    else { sfxEngine(); updatePrompt(); updateCamera(); updateHUD(); }   // audio ramps down; prompts/HUD/camera stay correct in menus
+    else { sfxEngine(); updatePrompt(dt); updateCamera(); updateHUD(); }   // audio ramps down; prompts/HUD/camera stay correct in menus
     updateMountPreview();                   // shop stays open while this runs, so the ghost/ring must update even while paused
     updateBanners(dt);
     updateTutorial(dt);                     // tutorial keeps ticking so menu steps can complete while paused
@@ -11947,8 +11939,10 @@ function applyStaticI18n(){
   set('#shiphpwrap .lab',T('HULL INTEGRITY','船体完整度'));
   const ci=document.getElementById('chatinput');
   if(ci) ci.placeholder=T('Message or /command · Enter to send · Esc to close','输入消息或 /命令 · Enter 发送 · Esc 关闭');
-  set('#tactical h2',T('☢ STRATEGIC MISSILE COMMAND','☢ 战略导弹指挥部'));
-  set('#tacticalHint',T('Select a friendly R-36M silo, then select a target area. Press N to close.','先选中我方 R-36M 发射井，再选择目标区域。按 N 关闭。'));
+  set('#tactical h2',T('🗺 TACTICAL MAP','🗺 战术地图'));
+  // ...and only the title: the hint line is rebuilt from live state every time the map is
+  // redrawn, so writing a static string over it here would be undone a fifth of a second later.
+  if(!tacticalOpen) set('#tacticalHint',T('The whole theater at a glance. Press N to close.','一眼看完整个战区。按 N 关闭。'));
   set('#shop h2',T('ARMORY','军械库'));
   set('#shop .hint',T('Click a weapon, then '+installHint()+' to install it.','点一件武器，再'+installHint()+'安装。'));
   shopBalance();   // the pause badge is state-dependent — let its owner re-render it in the new language
@@ -11994,7 +11988,15 @@ if(window.THREE){ start3D(); }
 else { let n=0, cdnTried=false; (function wait(){ if(window.THREE){ start3D(); }
   else if(n++<200){
     if(n===40 && !cdnTried){ cdnTried=true;   // local copy missing/blocked after ~2s — fall back to the CDN
-      const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; document.head.appendChild(s); }
+      // Pinned by hash. This is the one script the game will ever fetch from a host we do not
+      // control, and it is the whole renderer — a compromised copy would own the page. The digest
+      // is sha384 of the exact r128 build cdnjs serves, verified byte-for-byte against the
+      // vendor/three.min.js in this repo (same sha256), so if the two ever diverge the browser
+      // refuses the file and the "Three.js failed to load" message below is what the player gets:
+      // a broken game rather than a hostile one. crossorigin is required for integrity to apply.
+      const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+      s.integrity='sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu'; s.crossOrigin='anonymous';
+      document.head.appendChild(s); }
     setTimeout(wait,50); }
   else { const sub=document.querySelector('#menu .sub'); if(sub) sub.textContent=trText('Three.js failed to load (check connection / use GitHub Pages).'); } })(); }
 </script>

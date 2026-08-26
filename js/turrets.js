@@ -394,36 +394,13 @@ function aircraftPropeller(radius,blades,dark,contra=false){
   const disc=new THREE.Mesh(new THREE.CircleGeometry(radius,32),new THREE.MeshBasicMaterial({color:0x82909a,transparent:true,opacity:.08,side:THREE.DoubleSide,depthWrite:false}));
   pg.add(disc);return pg;
 }
-// Nothing in the game had wheels. Aircraft spend a lot of their life PARKED on your deck, a few
-// metres from where you stand, and an aeroplane resting on its belly is the sort of thing you
-// notice immediately without being able to say why. Struts fold up into the wing in flight.
-function aircraftLandingGear(g,span,length,shape,mat){
-  if(shape==='heli'||shape==='quad') return;      // skids and legs already come with those bodies
-  const strutM=SILVER(0x9aa2aa), tyreM=surfaceMaterial(0x1c2024,'paint',.95,.02);
-  const legs=[];
-  const leg=(x,z,drop,r)=>{
-    const pivot=new THREE.Group(); pivot.position.set(x,-.06,z); g.add(pivot);
-    const strut=mkCyl(.045,.055,drop,strutM,8); strut.position.y=-drop*.5; pivot.add(strut);
-    const hub=mkCyl(.05,.05,r*.55,strutM,8); hub.rotation.z=Math.PI/2; hub.position.y=-drop; pivot.add(hub);
-    const tyre=new THREE.Mesh(new THREE.TorusGeometry(r,r*.42,7,14), tyreM);
-    tyre.rotation.y=Math.PI/2; tyre.position.y=-drop; pivot.add(tyre);
-    legs.push(pivot); return pivot;
-  };
-  const heavy=shape==='heavyjet'||shape==='heavyprop';
-  const mainX=Math.min(span*.20, heavy?2.4:1.35), drop=heavy?.95:.72, r=heavy?.26:.19;
-  for(const sx of [-1,1]) leg(sx*mainX, -length*.06, drop, r);
-  leg(0, shape==='wing'?length*.22:length*.34, drop*.92, r*.78);      // nose leg
-  g.userData.gear=legs;
-}
-// Down when the wheels have any business being down — parked, taxiing, taking off, landing, or
-// simply close enough to the deck that they would be. Folded outward and up otherwise.
-function setAircraftGear(group, down){
-  const legs=group.userData.gear; if(!legs) return;
-  const t=group.userData._gearT==null ? (down?1:0) : group.userData._gearT;
-  const want=down?1:0, now=t+(want-t)*0.14;                 // eases, so it never snaps
-  group.userData._gearT=now;
-  for(const l of legs){ l.rotation.x=(1-now)*1.35; l.visible=now>0.02; }
-}
+// AIRCRAFT UNDERCARRIAGE lives in addAircraftGraphicDetails() below, as `userData.gearVisuals`.
+// There used to be a SECOND set here — `aircraftLandingGear()` / `setAircraftGear()`, storing its
+// own legs in `userData.gear` — and both were built onto every non-helicopter airframe, so every
+// aircraft in the game carried six wheels where it should carry three. Worse, only the piloted
+// aircraft ever reached setAircraftGear (it is called from spinProp), so on every AI fighter that
+// second set stayed permanently DOWN: the whole enemy air wing flew with its wheels out.
+// One set now, the one that is wired into component damage and into the debris that tears off it.
 function addAircraftControlSurfaces(g,span,length,shape,dark){
   const ailerons=[],elevators=[];
   if(shape!=='heli'&&shape!=='wing'){

@@ -42,37 +42,45 @@ test('curved airframe bodies are smooth-shaded, folded panels are not', async ({
 
 // Nothing in the game had wheels, and aircraft spend a lot of their life parked on your deck a
 // few metres from where you stand.
-test('aircraft have landing gear, and it retracts in flight', async ({ page }) => {
+//
+// There used to be TWO undercarriages on every airframe: aircraftLandingGear()'s `userData.gear`
+// and addAircraftGraphicDetails()'s `userData.gearVisuals`, both built, both drawn — six wheels
+// where an aeroplane has three. And only the first was ever animated, from spinProp, which runs
+// only for the aircraft the PLAYER is flying, so the whole AI air wing flew with its wheels down.
+// One set now; this pins that there is exactly one, and that it follows the aircraft's phase.
+test('aircraft have one set of landing gear, and it retracts in flight', async ({ page }) => {
   await page.goto('http://localhost:3000/');
-  await page.waitForFunction(() => typeof buildPlane === 'function' && typeof setAircraftGear === 'function');
+  await page.waitForFunction(() => typeof buildPlane === 'function' && typeof setPlaneGearVisual === 'function');
   const r = await page.evaluate(() => {
     const g = buildPlane(PLANES.f22);
-    const legs = g.userData.gear || [];
-    const settle = (down) => { for (let i = 0; i < 90; i++) setAircraftGear(g, down); };
+    const legs = g.userData.gearVisuals || [];
+    const pa = { group: g };
 
-    const builtDown = legs.every(l => l.visible && Math.abs(l.rotation.x) < 0.05);   // parked out of the box
-    settle(false);
+    // count the actual wheels in the scene graph, not the bookkeeping array — the duplicate
+    // system was invisible to any check that only looked at one of the two arrays
+    let wheels = 0; g.traverse(o => { if (o.geometry && o.geometry.type === 'TorusGeometry') wheels++; });
+
+    const builtDown = legs.every(l => l.visible);            // parked out of the box
+    setPlaneGearVisual(pa, false);
     const upHidden = legs.every(l => !l.visible);
-    settle(true);
-    const backDown = legs.every(l => l.visible && Math.abs(l.rotation.x) < 0.05);
+    setPlaneGearVisual(pa, true);
+    const backDown = legs.every(l => l.visible);
 
-    // it must EASE — a leg that teleports between up and down reads as a glitch
-    for (let i = 0; i < 90; i++) setAircraftGear(g, true);
-    setAircraftGear(g, false);
-    const oneStep = g.userData._gearT;
+    // helicopters and quadcopters carry skids/legs of their own and must not get wheels bolted on
+    const heli = buildPlane(PLANES.apache);
+    let heliWheels = 0; heli.traverse(o => { if (o.geometry && o.geometry.type === 'TorusGeometry') heliWheels++; });
 
-    // helicopters and quadcopters already carry skids/legs and must not get wheels bolted on
-    const heli = buildPlane(PLANES.apache).userData.gear;
-    return { legCount: legs.length, builtDown, upHidden, backDown, oneStep, heliGear: heli || null };
+    return { legCount: legs.length, wheels, builtDown, upHidden, backDown,
+             legacyGear: (g.userData.gear || []).length, heliWheels };
   });
 
   expect(r.legCount, 'no landing gear at all').toBe(3);      // two main, one nose
+  expect(r.wheels, 'an aeroplane has three wheels, not six').toBe(3);
+  expect(r.legacyGear, 'the second, duplicate undercarriage is back').toBe(0);
   expect(r.builtDown, 'a freshly built aircraft should sit on its wheels').toBe(true);
   expect(r.upHidden, 'gear never retracts').toBe(true);
   expect(r.backDown, 'gear will not come back down').toBe(true);
-  expect(r.oneStep).toBeGreaterThan(0.5);                    // one frame of retract, not a jump to 0
-  expect(r.oneStep).toBeLessThan(1);
-  expect(r.heliGear, 'a helicopter does not need wheels').toBeNull();
+  expect(r.heliWheels, 'a helicopter does not need wheels').toBe(0);
 });
 
 // 98 aircraft types and a sky full of them at once — detail on an airframe multiplies faster

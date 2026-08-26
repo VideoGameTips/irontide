@@ -146,20 +146,24 @@ test('the panel never lists an action that would be refused', async ({ page }) =
       return [...document.querySelectorAll('#actList .actgrp.more .actrow')]
         .map(x => x.querySelector('.actkey').textContent); };
     currentSandboxIdx = -1;
+    // Operation 2 bars strategic weapons; Midnight Raid does not. The MAP is offered on both,
+    // because it is a chart of the sea and not a weapon — this pair used to assert the opposite,
+    // while the very next line asserted N was offered "where it works". Both could not be true:
+    // the panel refused everywhere. It opens everywhere now, so N is honest on both.
     currentMapIdx = 1;  startGame('destroyer'); skipBanner(); const banned = keysOf();
     currentMapIdx = 14; startGame('destroyer'); skipBanner(); const naval  = keysOf();
     // and prove the refusals are real, not imagined
-    promptMsg=''; const t0=tacticalOpen; currentMapIdx = 1; startGame('destroyer'); skipBanner();
-    toggleTacticalMap(); const mapRefused = tacticalOpen === t0; if(tacticalOpen) toggleTacticalMap();
+    const t0 = tacticalOpen; currentMapIdx = 1; startGame('destroyer'); skipBanner();
+    toggleTacticalMap(); const mapOpensOnBannedTheatre = tacticalOpen !== t0; if(tacticalOpen) toggleTacticalMap();
     currentMapIdx = 14; startGame('destroyer'); skipBanner();
     const b0 = buildOpen; toggleBuild(); const buildRefused = buildOpen === b0; if(buildOpen) toggleBuild();
-    return { banned, naval, mapRefused, buildRefused };
+    return { banned, naval, mapOpensOnBannedTheatre, buildRefused };
   });
-  expect(r.mapRefused).toBe(true);            // strategic weapons barred on that theatre
-  expect(r.banned).not.toContain('N');        // ...so N is not offered there
-  expect(r.naval).toContain('N');             // ...but is where it works
-  expect(r.buildRefused).toBe(true);          // engineers need you ashore
-  expect(r.naval).not.toContain('B');         // ...so B is not offered from the deck
+  expect(r.mapOpensOnBannedTheatre).toBe(true);   // a chart is not a strategic weapon
+  expect(r.banned).toContain('N');                // ...so N is offered there too
+  expect(r.naval).toContain('N');                 // ...and here
+  expect(r.buildRefused).toBe(true);              // engineers need you ashore
+  expect(r.naval).not.toContain('B');             // ...so B is not offered from the deck
 });
 
 // NPC aircraft are a real inventory now: the aircraft you can SEE ranged on the deck is the one

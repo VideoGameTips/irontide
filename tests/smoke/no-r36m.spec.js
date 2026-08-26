@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 // The R-36M silo is removed from the game. It was a 9,999-damage warhead with a 900 m blast,
 // launched from a screen that paused the war — one per side, and whoever fired first ended the
 // fight. The nuclear AIRCRAFT are untouched; only the silo is gone.
-test('nobody can build an R-36M, and the tactical map that aimed it stays shut', async ({ page }) => {
+test('nobody can build an R-36M, and nothing can launch one', async ({ page }) => {
   await page.goto('http://localhost:3000/');
   await page.waitForFunction(() => typeof STRUCTS !== 'undefined' && typeof aiIslandBuild === 'function');
   const r = await page.evaluate(() => {
@@ -26,20 +26,25 @@ test('nobody can build an R-36M, and the tactical map that aimed it stays shut',
     const enemySilos = landUnits.filter(u => !u.dead && u.nukesilo).length;
     const enemyBuiltOtherThings = landUnits.filter(u => !u.dead && u.team === 1).length;
 
-    // the targeting screen existed only for the silo, so it must not open on an empty chart
-    tacticalOpen = false; toggleTacticalMap();
-    const mapOpened = tacticalOpen;
+    // The panel that USED to aim the silo is now a plain chart of the theater (see
+    // tests/smoke/tactical-map.spec.js), so "does it open" says nothing about the removal.
+    // What matters here is that nothing can still fire: no silo exists to launch from, and
+    // no nuclear shell is in the water however long the battle runs.
+    for (let n = 0; n < 200; n++) { t2 += 0.1; update(0.1, t2); }
+    const nukeShells = shells.filter(m => m.nuclear).length;
+    const liveSilos = landUnits.filter(u => !u.dead && (u.nukesilo || u.kind === 'nukesilo')).length;
 
     // nuclear AIRCRAFT are deliberately still in the game — this removal was the silo only
     const nukePlanes = Object.keys(PLANES).filter(k => isNuclear(PLANES[k])).length;
-    return { inCatalogue, playerBuilt, enemySilos, enemyBuiltOtherThings, mapOpened, nukePlanes };
+    return { inCatalogue, playerBuilt, enemySilos, enemyBuiltOtherThings, nukeShells, liveSilos, nukePlanes };
   });
 
   expect(r.inCatalogue).toBe(false);
   expect(r.playerBuilt).toBe(false);
   expect(r.enemySilos).toBe(0);
   expect(r.enemyBuiltOtherThings).toBeGreaterThan(10);   // the AI was building — 0 silos isn't 0 activity
-  expect(r.mapOpened).toBe(false);
+  expect(r.nukeShells, 'something put a strategic warhead in the water').toBe(0);
+  expect(r.liveSilos, 'a silo exists after 20 s of live battle').toBe(0);
   expect(r.nukePlanes).toBeGreaterThan(0);               // aircraft untouched, as intended
 });
 

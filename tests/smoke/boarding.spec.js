@@ -67,7 +67,16 @@ test('a silenced ship stops shooting back', async ({ page }) => {
     const e = enemies[0];
     for (let i = 0; i < 40; i++) { t2 += 0.05; update(0.05, t2);
       e.pos.copy(player.pos).add(new THREE.Vector3(150, 0, 0)); }
-    if (!e.loadout || !e.loadout.length) e.loadout = [WEAPONS.deckgun, WEAPONS.deckgun];
+    // FORCE the armament, don't merely default it. enemies[0] is always the Fleet Tender
+    // (chooseNPCShipDef hands every fleet its support ship first), so she already had a
+    // loadout and this line never ran — leaving the measurement on her single Dual Purpose
+    // gun, whose role:'both' gate is 260 x radarFactor. On this theater (Midnight Raid,
+    // tod 0) that is 123 m, and the fixture parks her at 150 — so she only ever fired when
+    // an ALLY happened to drift inside 123 m of her. Measured on unmodified main: 1 failure
+    // in 30 runs, "she never fired even with her guns intact", every time with the nearest
+    // blue target at exactly 150 m. A deck gun has no `role`, so it takes the surface branch
+    // and its 360 x radarFactor = 170 m reach, which covers the 150 m the fixture uses.
+    e.loadout = [WEAPONS.deckgun, WEAPONS.deckgun];
     // Freeze her armament. growLoadout runs all battle long and buying a gun mid-measurement made
     // this flaky — she really was firing, from a battery she had just bought. The game handles
     // that now (a silenced ship stops upgrading); this pins the fixture so the test measures the
@@ -291,4 +300,77 @@ test('an aircraft can set down on a friendly deck, a surrendered enemy, or a sho
   expect(r.healthyEnemyOffered).toBe(false); // shoot her guns off first
   expect(r.surrenderedEnemyOffered).toBe(true);
   expect(r.silencedEnemyHp, 'she should be takeable at full health now').toBeGreaterThan(0.9);
+});
+
+// "She is yours" has to mean you can SAIL her. takeCommandOf swaps the `player` object for the
+// ally's, and everything that makes a hull sailable — the helm station, the flight deck, the
+// tank slots, a battery you can fire — was only ever built by makePlayerShip. So a hull you
+// boarded had no player.helm at all: nearestHelm() never matched, E could not put you at the
+// wheel, and nextStepHint() sat there saying "Press E to take the wheel" of a ship that had no
+// wheel. Every assertion below failed before fitOutPlayerHull() was shared between the two.
+test('a ship you take command of can actually be sailed, armed and flown from', async ({ page }) => {
+  await boot(page);
+  const r = await page.evaluate(() => {
+    career.mapsUnlocked = 30; currentSandboxIdx = -1; currentMapIdx = 14;
+    startGame('destroyer'); skipBanner();
+    for (let i = 0; i < 30; i++) { t2 += 0.05; update(0.05, t2); }
+
+    // a surface ally with a visible AI battery and aircraft ranged on her deck — both belong
+    // to the fleet and both sit exactly where the captain's own are about to go
+    const ally = allies.find(a => a.build && (a.sinkT || 0) === 0 && !a.def.support && a.def.kind === 'surface');
+    if (!ally) return { noSurfaceAlly: true };
+    if (!ally.loadout || !ally.loadout.length) ally.loadout = [AI_WEAPS[0], AI_WEAPS[2]];
+    syncNPCDeck(ally);
+    const before = { npcTurrets: (ally.build.npcTurrets || []).length,
+                     deckPlanes: (ally.build.deckPlanes || []).length };
+
+    onFoot = true; driving = false; footPos.copy(ally.pos);
+    const took = takeCommandOf(ally);
+
+    // walk to the wheel and press E, exactly as a player would
+    walkPos.copy(player.helm || new THREE.Vector3());
+    const foundHelm = !!nearestHelm();
+    toggleMan();
+
+    // ...and see whether she moves
+    const from = player.pos.clone();
+    keys['KeyW'] = 1;
+    for (let i = 0; i < 60; i++) { t2 += 0.05; update(0.05, t2); }
+    keys['KeyW'] = 0;
+
+    // the deck has to be a real deck: buy an aircraft and a tank onto it
+    money = 99999;
+    buyPlane('fighter'); buyTank('sherman');
+    for (let i = 0; i < 20; i++) { t2 += 0.05; update(0.05, t2); }
+
+    return { took, isAlly: player === ally, before,
+      helm: !!player.helm, helmEye: !!player.helmEye, foundHelm, driving,
+      sailed: from.distanceTo(player.pos),
+      guns: placed.length, deckPlan: !!deckPlan,
+      planeSpots: planeSpots.length, tankSpots: tankSpots.length,
+      npcTurretsLeft: (player.build.npcTurrets || []).length,
+      deckPlanesLeft: (player.build.deckPlanes || []).length,
+      planes: planes.length, tanks: playerTanks.length };
+  });
+
+  expect(r.noSurfaceAlly, 'no surface ally to board — the fixture found nothing to take').toBeFalsy();
+  expect(r.took).toBe(true);
+  expect(r.isAlly).toBe(true);
+  // the wheel
+  expect(r.helm, 'the hull you took has no helm station').toBe(true);
+  expect(r.helmEye).toBe(true);
+  expect(r.foundHelm, 'standing on the helm, nearestHelm() still found nothing').toBe(true);
+  expect(r.driving, 'pressing E at the wheel did not take the helm').toBe(true);
+  expect(r.sailed, 'she did not move under full throttle').toBeGreaterThan(10);
+  // her own guns are the fleet's, so they go — and the captain's crew fit their own
+  expect(r.before.npcTurrets, 'the fixture gave her no AI battery to strip').toBeGreaterThan(0);
+  expect(r.npcTurretsLeft, 'the fleet battery stayed on deck under the new guns').toBe(0);
+  expect(r.deckPlanesLeft, 'the fleet air wing stayed parked on the captain\'s spots').toBe(0);
+  expect(r.guns, 'you took command of a ship that cannot shoot').toBeGreaterThan(0);
+  // and the deck works
+  expect(r.deckPlan, 'a surface hull you took has no flight deck').toBe(true);
+  expect(r.planeSpots).toBeGreaterThan(0);
+  expect(r.tankSpots).toBeGreaterThan(0);
+  expect(r.planes, 'could not buy an aircraft onto the deck').toBe(1);
+  expect(r.tanks, 'could not buy a tank onto the deck').toBe(1);
 });

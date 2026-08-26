@@ -7,10 +7,20 @@ const PROBE = () => {
   startGame('destroyer'); skipBanner();
   shells.length = 0;
   const target = new THREE.Vector3(100, 20, 300);
+  // ONE red contact, sitting exactly on the old fixture's aim point, and nothing else afloat.
+  // This used to pin the target with a `fixedTarget` field on the shell — a hook that existed
+  // only for the R-36M, went with it, and was never anything a real weapon set. Homing reads
+  // `tgt.pos` straight off the contact (nearestAnyOf returns the ship, not an aim point), so
+  // putting the contact ON the old target keeps the geometry — and therefore the dot and speed
+  // numbers below — comparable with every earlier run of this test. beam 1 keeps it from being
+  // "hit" during the ten frames measured; it starts ~316 m away.
+  enemies.length = 0; allies.length = 0; aiPlanes.length = 0;
+  enemies.push({ pos: target.clone(), def: { deckY: 19, beam: 1, len: 1 },
+                 sinkT: 0, hp: 1e9, maxhp: 1e9, vel: null, proxy: false });
   const sh = { mesh:{ position:new THREE.Vector3(0,20,0), geometry:{type:'ConeGeometry'},
                  quaternion:new THREE.Quaternion() },
     vel:new THREE.Vector3(0,0,60), life:9, dist:0, team:0, dmg:5, homing:true, turn:2.4,
-    fixedTarget:target, detonated:false, trail:null };
+    trail:null };
   shells.push(sh);
   const dirTo = () => target.clone().sub(sh.mesh.position).normalize();
   const dot0 = sh.vel.clone().normalize().dot(dirTo());
