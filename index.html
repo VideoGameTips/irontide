@@ -2401,8 +2401,18 @@ function buildIsland(pos,r,name,preset){   // preset {rx,rz,angle,seed} restores
   const capRing=new THREE.Mesh(new THREE.RingGeometry(7,10,28),capMat); capRing.rotation.x=-Math.PI/2; capRing.position.y=5; capRing.scale.setScalar(capScale); g.add(capRing);
   const beaconMat=new THREE.MeshStandardMaterial({color:0xb8c0c8,emissive:0xb8c0c8,emissiveIntensity:1.1});
   const beacon=new THREE.Mesh(new THREE.SphereGeometry(2,10,8),beaconMat); beacon.position.y=24; g.add(beacon);
+  // The capture point was a 2 m bead 24 m up and a translucent ring on the ground — on a 120 m
+  // island you could see neither from the beach, and the ring is at the centre, so "drive onto
+  // the flag" sent you looking for something that was not there. Now there is an actual flag on
+  // an actual mast, tall enough to spot from the water. It shares beaconMat, so setIslandOwner
+  // already recolours it: grey neutral, blue yours, red theirs.
+  const capMast=new THREE.Group();
+  const pole=mkCyl(0.34,0.34,25,new THREE.MeshStandardMaterial({color:0xdfe6ec,emissive:0x2a3a44,emissiveIntensity:0.4}));
+  pole.position.y=12.5; capMast.add(pole);
+  const capFlag=mkBox(0.22,4.4,7.2,beaconMat); capFlag.position.set(0,20.2,3.7); capMast.add(capFlag);
+  g.add(capMast);   // grouped so the two HQ islands, which nobody can capture, can hide the pair
   scene.add(g); islands.push({name:name||ISLAND_NAMES[islandNameIndex++%ISLAND_NAMES.length],pos:pos.clone(),r,rx,rz,angle,seed,top:2.1,
-    group:g,owner:null,captureTeam:null,capture:0,capturable:true,capRing,capScale,beacon,serviceT:0});
+    group:g,owner:null,captureTeam:null,capture:0,capturable:true,capRing,capScale,beacon,capFlag,capMast,serviceT:0});
   return islands[islands.length-1];
 }
 // islandLocal/World/Norm/insideIslandRange/EdgeDistance/EdgeMul/LayerNorm/SurfaceY/Point now live in js/terrain.js (pure geometry, unit-tested there)
@@ -4212,6 +4222,18 @@ function nextIslandTarget(){
     const d=Math.hypot(i.pos.x-from.x,i.pos.z-from.z); if(d<bd){ bd=d; best=i; } }
   return best?{isl:best,dist:Math.round(bd)}:null;
 }
+// What actually takes an island: be standing on it, with nothing of theirs left shooting. There
+// is no spot to stand on and nothing to hold still for — the hints promised both, and sent people
+// hunting a flag that did not exist. The flag exists now, and this says what it is really for.
+function islandCaptureLine(isl){
+  const nm=trName(isl.name)||T('this island','这座岛');
+  if(islandHasDefenders(isl,1))
+    return T('Knock out the guns on '+nm+' — it will not change hands while they are still shooting.',
+             '先把「'+nm+'」上的敌军火力点打掉——它们还在开火，岛就易不了手。');
+  const pct=isl.captureTeam===0&&isl.capture>0?' — '+Math.round(isl.capture/ISLAND_CAPTURE_TIME*100)+'%':'';
+  return T('You are on '+nm+' — that is all it takes. Stay ashore and the flag turns your colour'+pct+'.',
+           '你已经在「'+nm+'」上了——这就够了。待在岛上别走，旗子会自己变成我们的颜色'+pct+'。');
+}
 function nextStepHint(){
   const ground=window._MAP&&window._MAP.ground, cap=islands.filter(i=>i.capturable);
   const left=cap.length-cap.filter(i=>i.owner===0).length;
@@ -4219,14 +4241,24 @@ function nextStepHint(){
     return T('Your ship is gone. Swim to a friendly harbour and press P for a replacement.',
              '你的船没了。游回我方海港，按 P 领一条新船。');
   if(piloting) return T('Fly back over your own ship and press E to land.','飞回自己船的上空，按 E 降落。');
-  if(drivingTank)
-    return footLand ? T('Drive onto the flag and stop — standing still is what takes an island.',
-                        '把坦克开到旗子那儿停住——站着不动就能占岛。')
-                    : T('Press G to float, then drive up onto the beach.','按 G 让坦克浮起来，然后开上沙滩。');
+  if(drivingTank){
+    // the tank's OWN island, not footLand — footLand is wherever you last walked, which in a tank
+    // is wherever you climbed in, possibly a different island entirely
+    if(drivingTank.onDeck) return T('Press G to float the tank off the deck, then drive up onto the beach.',
+                                    '按 G 让坦克从甲板下水，然后开上沙滩。');
+    const isl=drivingTank.island;
+    // afloat: "press G to float" was the old line here, and it is advice for a tank that is
+    // already floating — G re-embarks from the water, it does not launch you again
+    if(!isl) return T('You are afloat — drive to the nearest beach, or alongside your ship and press G to re-embark.',
+                      '坦克正浮在水上——开向最近的沙滩，或者开到自己船边按 G 回船。');
+    if(!isl.capturable||isl.owner===0){ const nx=nextIslandTarget();
+      return nx?T('This ground is already yours — head for '+(trName(nx.isl.name)||'the next island')+' ('+nx.dist+'m).',
+                  '这片地已经是我们的了——开去「'+(trName(nx.isl.name)||'下一座岛')+'」（'+nx.dist+'m）。')
+               :T('Every island is yours — the theater is won.','所有岛都拿下了——这一战赢了。'); }
+    return islandCaptureLine(isl);
+  }
   if(onFoot&&footLand){
-    if(footLand.capturable&&footLand.owner!==0)
-      return T('Stand near the flag on '+(trName(footLand.name)||'this island')+' and hold still — that is how an island changes hands.',
-               '走到「'+(trName(footLand.name)||'这座岛')+'」的旗子旁站着别动——岛就是这么占下来的。');
+    if(footLand.capturable&&footLand.owner!==0) return islandCaptureLine(footLand);
     if(left<=0) return T('Every island is yours — the theater is won.','所有岛都拿下了——这一战赢了。');
     // How to LEAVE matters as much as where to go: an airborne assault hides your ship, so "sail
     // to the next island" is advice the player cannot act on. The tank is the way across.
@@ -4608,13 +4640,9 @@ function applyTouchMove(){
   clearMoveKeys();
   const x=touchMove.x,y=touchMove.y, dead=.18;
   if(Math.abs(x)<dead&&Math.abs(y)<dead)return;
-  if(drivingTank){
-    const forward=y<-dead, reverse=y>dead, left=x<-dead, right=x>dead;
-    if(forward)setKey('KeyW',1); if(reverse)setKey('KeyS',1);
-    if(forward&&!left&&!right){setKey('KeyA',1);setKey('KeyD',1);} // both tracks = straight
-    else { if(left)setKey('KeyA',1); if(right)setKey('KeyD',1); }
-    return;
-  }
+  // The tank used to need its own branch here, pressing A+D together to fake "both tracks" —
+  // and it still could not reverse, because pushing the stick back sent S with no track engaged.
+  // Now that W/S drive the tank, the thumbstick maps the same way as everything else.
   if(y<-dead)setKey('KeyW',1); if(y>dead)setKey('KeyS',1);
   if(x<-dead)setKey('KeyA',1); if(x>dead)setKey('KeyD',1);
 }
@@ -4658,7 +4686,7 @@ function refreshTouchControls(){
     b.style.visibility=deadHere?'hidden':'visible';
   });
   const hint=document.getElementById('touchHint');
-  if(hint)hint.textContent=drivingTank?T('left stick controls tracks · right pad aims','左摇杆控制履带 · 右侧区域瞄准'):piloting?T('left stick throttle/turn · right pad pitch/look','左摇杆油门/转向 · 右侧区域俯仰视角'):T('left stick moves · right pad aims','左摇杆移动 · 右侧区域瞄准');
+  if(hint)hint.textContent=drivingTank?T('left stick drives · right pad aims','左摇杆开车 · 右侧区域瞄准'):piloting?T('left stick throttle/turn · right pad pitch/look','左摇杆油门/转向 · 右侧区域俯仰视角'):T('left stick moves · right pad aims','左摇杆移动 · 右侧区域瞄准');
 }
 function touchActionDown(act){
   touchMark();sfxResume();
@@ -6091,6 +6119,8 @@ function buildTheater(){
   const enemyBaseIsland=buildIsland(new THREE.Vector3(0,0,-hq-120),260,'Northwatch');
   const friendlyBaseIsland=buildIsland(new THREE.Vector3(0,0,hq+120),250,'Southhaven');
   enemyBaseIsland.capturable=false; friendlyBaseIsland.capturable=false;
+  // (the flag and ring are hidden off `capturable` in updateIslandControl, not here — resumeWar
+  //  rebuilds islands without going through this function, so doing it here misses every save)
   setIslandOwner(enemyBaseIsland,1,true); setIslandOwner(friendlyBaseIsland,0,true);
   const authored=authoredTheaterIslands(M);
   if(authored) authored.forEach(([x,z,r,name])=>buildIsland(new THREE.Vector3(x,0,z),r,name));
@@ -6136,7 +6166,17 @@ function islandHasDefenders(isl,team){
 function updateIslandControl(dt){
   islands.forEach(isl=>{
     if(isl.beacon){ const pulse=1+Math.sin(t2*3+isl.pos.x)*0.16; isl.beacon.scale.setScalar(pulse); }
+    // A flag means "you can take this", so it hangs off `capturable` rather than being switched
+    // off once at theater build: resumeWar rebuilds islands and sets capturable itself, so a
+    // loaded save would otherwise fly capture flags over both HQs. Driving it from the flag here
+    // is self-healing whoever sets it, and reverses if an island ever becomes capturable again.
+    if(isl.capMast&&isl.capMast.visible!==isl.capturable) isl.capMast.visible=isl.capturable;
+    if(isl.capRing&&isl.capRing.visible!==isl.capturable) isl.capRing.visible=isl.capturable;
     if(!isl.capturable) return;
+    // the flag waves, and waves harder while the island is changing hands — visible from the water
+    if(isl.capFlag){ const gust=isl.capture>0?7:2.2;
+      isl.capFlag.rotation.y=Math.sin(t2*gust+isl.pos.x)*0.30;
+      isl.capFlag.rotation.z=Math.sin(t2*gust*0.7+isl.pos.z)*0.07; }
     const visualFrac=Math.min(1,isl.capture/ISLAND_CAPTURE_TIME);
     if(isl.capRing){ const shown=isl.capture>0?isl.captureTeam:isl.owner;
       isl.capRing.material.color.setHex(shown===0?0x39d0ff:shown===1?0xff4f4f:0xb8c0c8);
@@ -6390,16 +6430,34 @@ function updateTank(dt){
   const trackF=bothTracks?0:Math.max(0,1-(pr.trackL+pr.trackR)*0.13);
   const turn=(tk.turn||1.4)*driverF*Math.max(0.25,1-(pr.trackL+pr.trackR)*0.07);
   const sp=(tk.speed||18)*engF*trackF;
-  // tank track controls: A engages the LEFT track, D the RIGHT track (hold both = drive straight);
-  // W/S set which way the tracks turn — W (or default) = forward, S = reverse.
-  const dir = (keys['KeyS'] && !keys['KeyW']) ? -0.7*(1-pr.trans*0.25) : 1;   // reverse is slower; damaged transmission worsens it
-  let L = keys['KeyA'] ? dir : 0;
-  let R = keys['KeyD'] ? dir : 0;
+  // W/S drive BOTH tracks; A/D steer. This was a literal differential-track rig — A drove the
+  // left track, D the right, and W/S only chose which way they turned — so W on its own moved the
+  // tank exactly nowhere. Measured before this: W 0 m and 0°, S 0 m and 0°, A alone 12.6 m while
+  // spinning 172° in two seconds. Every label in the game says otherwise: the HUD prompt, the
+  // action panel, the first-tank tutorial and the training course all read "W/S drive · A/D turn",
+  // and applyTouchMove even carried a patch that pressed A+D for you so the thumbstick would work.
+  // The keyboard was the only input that did not. A is left and D is right, the same way round as
+  // the ship's rudder — the old rig turned the opposite way from every other vehicle.
+  const rev = -0.7*(1-pr.trans*0.25);                              // reverse is slower; a damaged transmission worsens it
+  const thr = (keys['KeyW']?1:0) - (keys['KeyS']?1:0);
+  const st  = (keys['KeyD']?1:0) - (keys['KeyA']?1:0);             // +1 = turn right
+  let L, R;
+  if(thr){ L = R = thr>0 ? 1 : rev;
+    // Slowing the INSIDE track is what turns a tank, so steering under power still reads as
+    // tracks rather than as a steering wheel — it just no longer requires them to drive it.
+    if(st>0) R*=0.15; else if(st<0) L*=0.15; }
+  // No throttle: counter-rotate and pivot on the spot. 0.6 rather than 1 because counter-rotating
+  // tracks double the steer term — at full deflection the tank spun 172°/s and a tap overshot the
+  // target. This gives ~103°/s, still quicker than the ~73°/s you turn at while driving, which is
+  // the reason to stop and pivot in the first place.
+  else if(st){ L = st>0 ? 0.6 : -0.6; R = -L; }
+  else { L = R = 0; }
   L *= (1-Math.min(1,pr.trackL*0.34));                             // a wrecked track puts out no drive → the tank slews toward it
   R *= (1-Math.min(1,pr.trackR*0.34));
   const mv=(L+R)/2, steer=(L-R)/2;                                 // net forward = both tracks; turn = their difference
-  // crew repair tracks & fight fires while halted (hold R)
-  if(keys['KeyR'] && mv===0){ tk.repT=(tk.repT||0)+dt;
+  // crew repair tracks & fight fires while halted (hold R). A pivot has mv 0 but is not halted,
+  // so the steer term has to be in the test too.
+  if(keys['KeyR'] && mv===0 && steer===0){ tk.repT=(tk.repT||0)+dt;
     if(tk.fire>0){ if(tk.repT>0.8){ tk.repT=0; tk.fire--; flashPrompt(tk.fire>0?T('Fighting the fire…','正在灭火……'):T('🧯 Fire out.','🧯 火扑灭了。')); } }
     else if(tk.repT>2.6){ tk.repT=0; const t=['trackL','trackR'].filter(k=>pr[k]>0).sort((a,b)=>pr[b]-pr[a])[0];
       if(t){ pr[t]--; flashPrompt(T('🔧 '+TPART_NAME[t]+' repaired','🔧 '+trName(TPART_NAME[t])+' 修好了')); } }
@@ -6895,25 +6953,54 @@ function sonarPing(){
   sfxSonar(p); warRecord('sonars');
   flashPrompt(T('◉ SONAR PING — contacts revealed for 4 seconds','◉ 声呐一响——水下目标暴露 4 秒'));
 }
-// Beyond this the model is a couple of pixels, so its marker would float over empty ground.
+// A marker is a "something is there" hint for what you cannot read yet, so it is culled at BOTH
+// ends. Beyond MARKER_FAR the model is a couple of pixels and the marker would float over empty
+// ground; inside MARKER_NEAR you are looking straight at the thing and a 6 m triangle hanging over
+// it just blocks the view — which on a friendly island meant a screenful of them, because until
+// now only team 1 was culled at all and friendly markers showed at every range.
 const MARKER_FAR=BASE_SIGHT;   // markers travel as far as the eye now, or they vanish off visible ships
+// The near cull is not the same on both sides, because the two markers do different jobs. Your
+// own bunker does not need announcing from ten metres away — that was the screenful of cyan. An
+// enemy one does: at night or in fog the triangle is how you know it is there at all, so theirs
+// only fades out at knife range. Fades rather than snaps, so driving up to something doesn't
+// flash at you; every marker builds its own SpriteMaterial, so opacity is per-marker.
+const MARKER_NEAR=55;          // your own: about three tank-lengths, close enough to just look
+const MARKER_NEAR_FOE=22;      // theirs: you are practically touching it before the cue goes
+function markerFade(dist,revealed,foe){
+  if(revealed) return 1;       // a sonar/spotter reveal always shows — that pulse is the point
+  if(dist>=MARKER_FAR) return 0;
+  return Math.max(0, Math.min(1, dist/(foe?MARKER_NEAR_FOE:MARKER_NEAR)-1));
+}
+function applyMarkerFade(mk,dist,revealed,foe){
+  const f=markerFade(dist,revealed,foe);
+  mk.material.opacity=f; mk.visible=f>0.02; return f;
+}
 function updateFogOfWar(dt){
   sonarCooldown=Math.max(0,sonarCooldown-dt);sonarPulse=Math.max(0,sonarPulse-dt);
   enemies.forEach(e=>{if(e.build)e.build.group.visible=enemyDetected(e);});
-  landUnits.forEach(u=>{if(u.team===1&&u.group){
-    u.revealT=Math.max(0,(u.revealT||0)-dt);
-    const sameIsland=onFoot&&footLand&&u.island===footLand;
-    const groundTheater=!!(window._MAP&&window._MAP.ground);
-    const dist=u.pos.distanceTo(activePlayerWorldPos());
-    const close=groundTheater&&dist<1700,threatening=dist<Math.max(170,Math.min(1800,(u.range||0)+100));
-    const seen=u.revealT>0||threatening||sameIsland||close||enemyDetectedAt(u.pos,groundTheater?1.8:1);
-    u.group.visible=seen;
+  const eye=activePlayerWorldPos();
+  landUnits.forEach(u=>{if(!u.group)return;
+    const dist=u.pos.distanceTo(eye);
+    let seen=true;
+    if(u.team===1){
+      u.revealT=Math.max(0,(u.revealT||0)-dt);
+      const sameIsland=onFoot&&footLand&&u.island===footLand;
+      const groundTheater=!!(window._MAP&&window._MAP.ground);
+      const close=groundTheater&&dist<1700,threatening=dist<Math.max(170,Math.min(1800,(u.range||0)+100));
+      seen=u.revealT>0||threatening||sameIsland||close||enemyDetectedAt(u.pos,groundTheater?1.8:1);
+      u.group.visible=seen;
+    }
+    // Your own units were never culled here at all — hence a beach full of cyan triangles once
+    // you had a garrison up. A land theatre also reveals every enemy within 1700 m, and a tank at
+    // that range is a couple of pixels, so its marker would hover over apparently empty ground.
     if(u.marker){const pulse=u.revealT>0?1.2+Math.abs(Math.sin(t2*9))*.35:1,sc=(u.markerScale||5)*pulse;u.marker.scale.set(sc,sc,1);
-      // A land theatre reveals everything within 1700m, but a tank at that range is a couple of
-      // pixels — leaving a row of red triangles hovering over apparently empty ground (it reads
-      // as "invisible boats"). Past MARKER_FAR the marker goes with the model it belongs to.
-      u.marker.visible = seen && (dist<MARKER_FAR || u.revealT>0);}
-  }});
+      applyMarkerFade(u.marker,dist,u.revealT>0,u.team===1); if(!seen) u.marker.visible=false;}
+  });
+  // Player tanks aren't in landUnits, so nothing culled theirs — including the one you are sitting
+  // in, whose marker hung directly in front of the camera the whole time you drove.
+  playerTanks.forEach(tk=>{ const mk=tk.group&&tk.group.userData&&tk.group.userData.teamMarker; if(!mk)return;
+    if(tk.onDeck||tk===drivingTank){ mk.visible=false; return; }   // parked on your own deck, or you're in it
+    applyMarkerFade(mk,(tk.pos||tk.group.position).distanceTo(eye),false); });
   aiPlanes.forEach(p=>{if(p.team!==1)return;const seen=enemyDetectedAt(p.pos,1.15);p.group.visible=seen;if(p.marker)p.marker.visible=seen;});
 }
 function shipEngagingActivePlayer(s,p){
@@ -10271,6 +10358,20 @@ function updateHUD(){
   drawMinimap();
 }
 // ---------- tactical minimap: top-down radar, player-centred ----------
+// The capture point, drawn as the same flag that now stands on the island itself, so the chart
+// and the world agree. A plain dot would have read as "a ship parked there".
+function mapFlag(g,x,y,col,s){
+  g.save();
+  g.strokeStyle='rgba(5,16,24,.9)'; g.lineWidth=3*s;                      // dark keyline: readable on any island tint
+  g.beginPath(); g.moveTo(x,y+4*s); g.lineTo(x,y-6.5*s); g.stroke();
+  g.strokeStyle=col; g.lineWidth=1.4*s;
+  g.beginPath(); g.moveTo(x,y+4*s); g.lineTo(x,y-6.5*s); g.stroke();
+  g.fillStyle=col; g.strokeStyle='rgba(5,16,24,.9)'; g.lineWidth=1*s;
+  g.beginPath(); g.moveTo(x,y-6.5*s); g.lineTo(x+6.4*s,y-4.6*s); g.lineTo(x,y-2.7*s); g.closePath();
+  g.fill(); g.stroke();
+  g.restore();
+}
+function flagColor(i){ return i.owner===0?'#8ce7ff':i.owner===1?'#ff9292':'#eef3f7'; }
 function drawMinimap(){
   const cv=document.getElementById('minimap'); if(!cv||!player||!player.pos) return;
   const g=cv.getContext('2d'), S=cv.width, R=S/2;
@@ -10287,6 +10388,7 @@ function drawMinimap(){
   g.clearRect(0,0,S,S);
   g.save(); g.beginPath(); g.arc(R,R,R-1,0,6.2832); g.clip();   // round mask
   g.fillStyle='rgba(10,22,32,0.55)'; g.fillRect(0,0,S,S);
+  const objective=(nextIslandTarget()||{}).isl;
   // islands — ownership tint makes the front line readable at a glance
   islands.forEach(i=>{ if(!inR(i.pos.x,i.pos.z))return; const [mx,my]=to(i.pos.x,i.pos.z);
     g.fillStyle=i.owner===0?'rgba(57,208,255,.65)':i.owner===1?'rgba(255,79,79,.62)':'rgba(110,140,100,.55)';
@@ -10294,7 +10396,11 @@ function drawMinimap(){
     g.ellipse(0,0,Math.max(1.5,(i.rx||i.r)*sc),Math.max(1.5,(i.rz||i.r)*sc),0,0,6.2832); g.fill();
     if(i.capture>0){ g.strokeStyle=i.captureTeam===0?'#8ce7ff':'#ff9292'; g.lineWidth=1.5;
       g.globalAlpha=0.35+0.65*Math.min(1,i.capture/ISLAND_CAPTURE_TIME); g.stroke(); }
-    g.restore(); });
+    g.restore();
+    // where the flag is, and which one the hints are sending you to
+    if(i.capturable){ mapFlag(g,mx,my,flagColor(i),1);
+      if(i===objective){ g.save(); g.strokeStyle='#ffd050'; g.lineWidth=1.6; g.setLineDash([3,3]);
+        g.beginPath(); g.arc(mx,my,10,0,6.2832); g.stroke(); g.restore(); } } });
   // harbors (squares)
   [[friendlyHarbor,'#39d0ff'],[enemyHarbor,'#ff5a5a']].forEach(p=>{ const h=p[0]; if(!h||h.hp<=0||!inR(h.pos.x,h.pos.z))return;
     const [mx,my]=to(h.pos.x,h.pos.z); g.fillStyle=p[1]; g.fillRect(mx-3.5,my-3.5,7,7); });
@@ -10356,9 +10462,18 @@ function drawTacticalMap(){
   g.strokeStyle='rgba(95,150,185,.16)';g.lineWidth=1;
   for(let x=-5000;x<=5000;x+=1000){const a=to(x,-Z),b=to(x,Z);g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);g.stroke();}
   for(let z=-5000;z<=5000;z+=1000){const a=to(-X,z),b=to(X,z);g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(b[0],b[1]);g.stroke();}
+  const objective=(nextIslandTarget()||{}).isl;
   islands.forEach(i=>{const [x,y]=to(i.pos.x,i.pos.z),sx=W/(X*2),sy=H/(Z*2);g.save();g.translate(x,y);g.rotate(-(i.angle||0));
     g.fillStyle=i.owner===0?'rgba(45,151,196,.72)':i.owner===1?'rgba(175,58,58,.72)':'rgba(85,112,79,.65)';
-    g.beginPath();g.ellipse(0,0,Math.max(2,(i.rx||i.r)*sx),Math.max(2,(i.rz||i.r)*sy),0,0,Math.PI*2);g.fill();g.restore();});
+    g.beginPath();g.ellipse(0,0,Math.max(2,(i.rx||i.r)*sx),Math.max(2,(i.rz||i.r)*sy),0,0,Math.PI*2);g.fill();g.restore();
+    if(!i.capturable)return;
+    if(i===objective){ g.save();g.strokeStyle='#ffd050';g.lineWidth=2;g.setLineDash([5,4]);
+      g.beginPath();g.arc(x,y,17,0,Math.PI*2);g.stroke();g.restore(); }
+    mapFlag(g,x,y,flagColor(i),1.5);
+    // the island's name, so the chart can answer "where is the one the hint just named"
+    if(i.name){ g.save();g.font='11px system-ui';g.textAlign='center';
+      g.lineWidth=3;g.strokeStyle='rgba(5,16,24,.85)';g.strokeText(trName(i.name),x,y+20);
+      g.fillStyle=i===objective?'#ffd050':'rgba(214,232,244,.9)';g.fillText(trName(i.name),x,y+20);g.restore(); }});
   [[friendlyHarbor,'#39d0ff'],[enemyHarbor,'#ff5151']].forEach(([h,c])=>{if(!h)return;const [x,y]=to(h.pos.x,h.pos.z);
     g.strokeStyle=c;g.lineWidth=2;g.strokeRect(x-6,y-6,12,12);g.beginPath();g.arc(x,y,70,0,Math.PI*2);g.strokeStyle='rgba(255,90,90,.13)';g.stroke();});
   const dot=(p,c,r)=>{const [x,y]=to(p.x,p.z);g.fillStyle=c;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();};
@@ -10369,8 +10484,8 @@ function drawTacticalMap(){
     g.fillStyle='#ffffff';g.beginPath();g.arc(x,y,2.5,0,Math.PI*2);g.fill(); }
   const hint=document.getElementById('tacticalHint');
   const blue=controlledIslandCount(0), red=controlledIslandCount(1);
-  hint.textContent=T('The whole theater — you ◯ · your fleet ● · contacts ● · islands you hold in blue.',
-                     '整个战区——你 ◯ · 我方舰队 ● · 敌方目标 ● · 蓝色是你占下的岛。')
+  hint.textContent=T('The whole theater — you ◯ · your fleet ● · contacts ● · a flag ⚑ marks every island you can take, and the dashed ring is the nearest one left.',
+                     '整个战区——你 ◯ · 我方舰队 ● · 敌方目标 ● · 每座能占的岛上都插着旗 ⚑，黄圈是离你最近的那座。')
     +T('  ·  islands '+blue+' vs '+red,'  ·  岛屿 '+blue+' 比 '+red)
     +T('  ·  ⏸ war paused while this map is open','  ·  ⏸ 地图打开时战斗暂停');
 }
