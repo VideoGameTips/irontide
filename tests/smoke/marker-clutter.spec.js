@@ -21,7 +21,10 @@ test('friendly markers fade in with distance instead of covering the view', asyn
   await page.waitForFunction(() => typeof startGame === 'function' && typeof updateFogOfWar === 'function');
   const r = await page.evaluate(([SRC]) => {
     eval('(' + SRC + ')()');
-    const isl = islands.slice().sort((a, c) => c.r - a.r)[0];
+    // capturable, NOT merely the biggest: the two HQ islands are the largest on the map, and
+    // picking one put friendly guns on the enemy's home island — its garrison shot one down
+    // inside a second, about one run in eight, which read as a flaky marker test.
+    const isl = islands.filter(i => i.capturable).sort((a, c) => c.r - a.r)[0];
     setIslandOwner(isl, 0, true);
     const RANGES = [12, 40, 80, 110, 400, 1600];
     RANGES.forEach((rr, i) => {
@@ -61,7 +64,7 @@ test('enemy markers still show at the ranges that matter', async ({ page }) => {
   await page.waitForFunction(() => typeof startGame === 'function');
   const r = await page.evaluate(([SRC]) => {
     eval('(' + SRC + ')()');
-    const isl = islands.slice().sort((a, c) => c.r - a.r)[0];
+    const isl = islands.filter(i => i.capturable).sort((a, c) => c.r - a.r)[0];
     setIslandOwner(isl, 1, true);
     const p = isl.pos.clone(); p.y = groundHeightAt(p, isl);
     const foe = buildAndPushLand('coastal', 1, p, undefined, isl, undefined, true);

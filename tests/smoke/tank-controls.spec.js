@@ -14,7 +14,10 @@ const DRIVE = () => {
   startGame('destroyer'); skipBanner();
 
   // A wide, empty island: nothing to bump into, and 1.5 s at full speed stays well ashore.
-  const isl = islands.slice().sort((a, c) => c.r - a.r)[0];
+    // capturable, NOT merely the biggest: the two HQ islands are the largest on the map, and
+    // picking one put friendly guns on the enemy's home island — its garrison shot one down
+    // inside a second, about one run in eight, which read as a flaky marker test.
+  const isl = islands.filter(i => i.capturable).sort((a, c) => c.r - a.r)[0];
   landUnits.length = 0;                       // no garrison, so groundVehicleBlocked can't skew a run
   const spot = isl.pos.clone(); spot.y = groundHeightAt(spot, isl);
   buildGroundPlayerTank(spot, 'sherman', isl);

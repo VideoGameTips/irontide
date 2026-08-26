@@ -4571,6 +4571,8 @@ function submitChat(){
   if(raw.startsWith('/'))runChatCommand(raw);else chatMessage('CAPTAIN: '+raw,'captain');
 }
 
+// World actions that must reach the world even with the armory up (see the note where it is used).
+const ARMORY_PASSTHROUGH=new Set(['KeyE','KeyG','KeyC','KeyR','KeyV','KeyY','KeyX']);
 addEventListener('keydown',e=>{
   if(chatOpen){
     if(e.code==='Enter'){e.preventDefault();submitChat();}
@@ -4597,6 +4599,14 @@ addEventListener('keydown',e=>{
     if(tutIdx>=0&&phase==='play') skipTutorial();
   }
   keys[e.code]=1; if(e.code==='Tab'){ e.preventDefault(); toggleShop(); } if(e.code==='Space') e.preventDefault();
+  // The armory is a BROWSING panel: unlike the harbour, build, map, chat and settings panels it
+  // does not freeze the war — the battle carries on behind it. But seven world actions guard on
+  // panelOpen(), which counts the armory, so E/G/C/R/V/Y/X were dead keys while it was up, with
+  // no message explaining why — at the same time the armory itself says "walk over and press E
+  // to drive" and the HUD underneath says "Press E to crew ...". toggleHarbor already used this
+  // idiom; these keys just never got it. F is absent on purpose: it has no panel guard, so
+  // buy-then-place already works without shutting the armory you are shopping in.
+  if(shopOpen && !freezingPanelOpen() && ARMORY_PASSTHROUGH.has(e.code)) toggleShop();
   if(e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='ArrowLeft'||e.code==='ArrowRight') e.preventDefault();   // the elevator/aileron keys must not scroll the page
   if(e.code==='KeyF') tryPlace(); if(e.code==='KeyE') toggleMan(); if(e.code==='KeyG'){ if(drivingTank) tankLandToggle(); else toggleFoot(); }
   if(e.code==='KeyH') toggleHarbor(); if(e.code==='KeyM') sfxToggle(); if(e.code==='KeyC') toggleDive();
@@ -4696,7 +4706,13 @@ function refreshTouchControls(){
 }
 function touchActionDown(act){
   touchMark();sfxResume();
-  if(panelOpen())return;                       // a panel owns the screen — mouse and gamepad are held off too
+  // A panel that freezes the war owns the screen. The armory does not — and on a keyboard the
+  // held-key flags are set at the top of the keydown handler, BEFORE any guard, so holding R to
+  // repair a tank or Space to drop works with the armory up there. Touch has to match it.
+  // `fire` is the deliberate exception: opening the armory drops pointer lock (so the desktop
+  // trigger releases too) and toggleShop() clears mouseDownFire on purpose.
+  if(freezingPanelOpen())return;
+  if(shopOpen&&act==='fire')return;
   if(act==='fire'){ mouseDownFire=true;
     if(driving&&!manning) flashPrompt(T('The crew works the deck guns. Tap Exit, walk to a gun, then tap Use to aim it yourself.','甲板炮由船员开火。点「离开」下舵位，走到炮位再点「使用」就能自己瞄。'));
     return; }
@@ -4713,7 +4729,11 @@ function touchActionTap(act){
   if(phase!=='play'&&act!=='shop')return;
   // the panel's own buttons must keep working (that is how you close it on a tablet);
   // everything else is world input and belongs to the panel while it is up
-  if(panelOpen()&&!(act==='shop'||act==='harbor'||act==='build'||act==='map'))return;
+  // Same rule as the keyboard: a freezing panel owns the screen, but the armory does not pause
+  // the war, so a thumb tap meant for the world closes it and goes through instead of vanishing.
+  const panelAct=act==='shop'||act==='harbor'||act==='build'||act==='map';
+  if(freezingPanelOpen()&&!panelAct)return;
+  if(shopOpen&&!panelAct) toggleShop();
   if(act==='action'){toggleMan();return;}
   if(act==='special'){
     if(piloting||drivingTank)return;
@@ -6318,10 +6338,13 @@ function nearestDeckTank(){ let b=null,bd=7; playerTanks.forEach(tk=>{ if(!tk.on
 // How close you must stand to crew a tank. The old figure was a flat 8 measured from the tank's
 // CENTRE — but a tank is about 6.7 long, so standing at its nose or tail put you on the wrong side
 // of the line while you were visibly touching the hull. Measured off the model instead, so "walk
-// up to it and press E" means what it says whichever end you walk up to.
+// up to it and press E" means what it says whichever end you walk up to. The +10 margin is
+// deliberately generous — this check is the LAST thing E tries on foot, after boarding an enemy
+// or a friendly ship, so a wide radius cannot steal another action; and the HUD prompt is driven
+// off this same function, so "press E to crew" appears exactly where the key works.
 function tankReach(tk){
   if(tk._reach==null){ const b=new THREE.Box3().setFromObject(tk.group);
-    tk._reach=Math.max(b.max.x-b.min.x, b.max.z-b.min.z)*0.5+6; }
+    tk._reach=Math.max(b.max.x-b.min.x, b.max.z-b.min.z)*0.5+10; }
   return tk._reach;
 }
 function nearestFieldTank(){ let b=null,bd=1e9; if(!onFoot)return null;
