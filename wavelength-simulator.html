@@ -1,0 +1,436 @@
+<div id="wavelength-simulator" class="wl-sim" aria-label="Interactive wavelength simulator">
+  <style>
+    #wavelength-simulator {
+      --sim-bg: #000000;
+      --sim-line: #39ff6a;
+      --sim-grid: rgba(57, 255, 106, 0.16);
+      --sim-text: #dfffea;
+      --sim-muted: rgba(223, 255, 234, 0.72);
+      --sim-panel: rgba(8, 18, 11, 0.92);
+      --sim-border: rgba(57, 255, 106, 0.34);
+      color: var(--sim-text);
+      width: 100%;
+      box-sizing: border-box;
+      font: inherit;
+    }
+
+    #wavelength-simulator * {
+      box-sizing: border-box;
+    }
+
+    #wavelength-simulator .sim-shell {
+      background: var(--sim-bg);
+      border: 1px solid var(--sim-border);
+      border-radius: 8px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    #wavelength-simulator .stage {
+      position: relative;
+      min-height: 260px;
+      background: var(--sim-bg);
+    }
+
+    #wavelength-simulator canvas {
+      display: block;
+      width: 100%;
+      height: 330px;
+      background: var(--sim-bg);
+    }
+
+    #wavelength-simulator .readout {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    #wavelength-simulator .metric {
+      border: 1px solid var(--sim-border);
+      background: rgba(0, 0, 0, 0.72);
+      border-radius: 6px;
+      padding: 8px 10px;
+      min-width: 0;
+    }
+
+    #wavelength-simulator .metric span {
+      display: block;
+      color: var(--sim-muted);
+      overflow-wrap: anywhere;
+    }
+
+    #wavelength-simulator .metric strong {
+      display: block;
+      color: var(--sim-text);
+      font-weight: 500;
+      overflow-wrap: anywhere;
+    }
+
+    #wavelength-simulator .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 14px;
+      background: var(--sim-panel);
+      border-top: 1px solid var(--sim-border);
+    }
+
+    #wavelength-simulator label {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      color: var(--sim-text);
+      min-width: 0;
+    }
+
+    #wavelength-simulator label span:first-child {
+      overflow-wrap: anywhere;
+    }
+
+    #wavelength-simulator output {
+      color: var(--sim-muted);
+      white-space: nowrap;
+    }
+
+    #wavelength-simulator input[type="range"] {
+      grid-column: 1 / -1;
+      width: 100%;
+      accent-color: var(--sim-line);
+    }
+
+      #wavelength-simulator .control {
+      min-width: 0;
+    }
+
+    #wavelength-simulator .spectrum {
+      grid-column: 1 / -1;
+      min-width: 0;
+      border: 1px solid var(--sim-border);
+      border-radius: 6px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.34);
+    }
+
+    #wavelength-simulator .spectrum-track {
+      position: relative;
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #12315c, #2366aa, #2aa654, #d5d23a, #e37a34, #9c35c9, #f6f6f6);
+      border: 1px solid rgba(223, 255, 234, 0.36);
+      margin-top: 8px;
+    }
+
+    #wavelength-simulator .spectrum-marker {
+      position: absolute;
+      top: -5px;
+      width: 4px;
+      height: 20px;
+      border-radius: 999px;
+      background: var(--sim-line);
+      box-shadow: 0 0 10px var(--sim-line);
+      transform: translateX(-2px);
+    }
+
+    @media (max-width: 620px) {
+      #wavelength-simulator canvas {
+        height: 280px;
+      }
+
+      #wavelength-simulator .controls,
+      #wavelength-simulator .readout {
+        grid-template-columns: 1fr;
+      }
+
+      #wavelength-simulator .readout {
+        position: static;
+        padding: 0 12px 12px;
+        background: var(--sim-bg);
+      }
+    }
+  </style>
+
+  <div class="sim-shell">
+    <div class="stage">
+      <canvas aria-label="Animated green wave on a black background"></canvas>
+      <div class="readout" aria-live="polite">
+        <div class="metric"><span>String wavelength</span><strong id="wl-lambda">--</strong></div>
+        <div class="metric"><span>Wave speed</span><strong id="wl-speed">--</strong></div>
+        <div class="metric"><span>Period</span><strong id="wl-period">--</strong></div>
+        <div class="metric"><span>EM wavelength</span><strong id="wl-em-lambda">--</strong></div>
+        <div class="metric"><span>EM band</span><strong id="wl-radiation">--</strong></div>
+        <div class="metric"><span>Photon energy</span><strong id="wl-energy">--</strong></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="control">
+        <label for="wl-frequency">
+          <span>Frequency</span>
+          <output id="wl-frequency-value">2.0 Hz</output>
+          <input id="wl-frequency" type="range" min="0.2" max="40" step="0.1" value="2">
+        </label>
+      </div>
+      <div class="control">
+        <label for="wl-tension">
+          <span>Tension</span>
+          <output id="wl-tension-value">36 N</output>
+          <input id="wl-tension" type="range" min="4" max="100" step="1" value="36">
+        </label>
+      </div>
+      <div class="control">
+        <label for="wl-density">
+          <span>Linear density</span>
+          <output id="wl-density-value">0.12 kg/m</output>
+          <input id="wl-density" type="range" min="0.04" max="0.4" step="0.01" value="0.12">
+        </label>
+      </div>
+      <div class="control">
+        <label for="wl-amplitude">
+          <span>Amplitude</span>
+          <output id="wl-amplitude-value">42 px</output>
+          <input id="wl-amplitude" type="range" min="8" max="82" step="1" value="42">
+        </label>
+      </div>
+      <div class="control">
+        <label for="wl-em-wavelength">
+          <span>EM wavelength</span>
+          <output id="wl-em-wavelength-value">316 nm</output>
+          <input id="wl-em-wavelength" type="range" min="-17" max="5" step="0.01" value="-6.5">
+        </label>
+      </div>
+      <div class="spectrum" aria-label="Electromagnetic spectrum position">
+        <span>Electromagnetic spectrum</span>
+        <div class="spectrum-track">
+          <div id="wl-spectrum-marker" class="spectrum-marker"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      const root = document.getElementById("wavelength-simulator");
+      const canvas = root.querySelector("canvas");
+      const ctx = canvas.getContext("2d");
+      const controls = {
+        frequency: root.querySelector("#wl-frequency"),
+        tension: root.querySelector("#wl-tension"),
+        density: root.querySelector("#wl-density"),
+        amplitude: root.querySelector("#wl-amplitude"),
+        emWavelength: root.querySelector("#wl-em-wavelength")
+      };
+      const labels = {
+        frequency: root.querySelector("#wl-frequency-value"),
+        tension: root.querySelector("#wl-tension-value"),
+        density: root.querySelector("#wl-density-value"),
+        amplitude: root.querySelector("#wl-amplitude-value"),
+        emWavelength: root.querySelector("#wl-em-wavelength-value"),
+        emLambda: root.querySelector("#wl-em-lambda"),
+        lambda: root.querySelector("#wl-lambda"),
+        speed: root.querySelector("#wl-speed"),
+        period: root.querySelector("#wl-period"),
+        radiation: root.querySelector("#wl-radiation"),
+        energy: root.querySelector("#wl-energy"),
+        marker: root.querySelector("#wl-spectrum-marker")
+      };
+
+      let width = 0;
+      let height = 0;
+      let pixelRatio = 1;
+      let phase = 0;
+      let lastTime = performance.now();
+      let cached = readState();
+
+      function readState() {
+        const frequency = Number(controls.frequency.value);
+        const tension = Number(controls.tension.value);
+        const density = Number(controls.density.value);
+        const amplitude = Number(controls.amplitude.value);
+        const emWavelength = Math.pow(10, Number(controls.emWavelength.value));
+        const emFrequency = 299792458 / emWavelength;
+        const speed = Math.sqrt(tension / density);
+        const wavelength = speed / frequency;
+        return { frequency, tension, density, amplitude, emWavelength, emFrequency, speed, wavelength };
+      }
+
+      function formatMeters(value) {
+        if (value >= 10) return `${value.toFixed(1)} m`;
+        return `${value.toFixed(2)} m`;
+      }
+
+      function formatFrequency(value) {
+        const units = [
+          { limit: 1e18, scale: 1e18, unit: "EHz" },
+          { limit: 1e15, scale: 1e15, unit: "PHz" },
+          { limit: 1e12, scale: 1e12, unit: "THz" },
+          { limit: 1e9, scale: 1e9, unit: "GHz" },
+          { limit: 1e6, scale: 1e6, unit: "MHz" },
+          { limit: 1e3, scale: 1e3, unit: "kHz" }
+        ];
+        const found = units.find((entry) => value >= entry.limit);
+        if (!found) return `${value.toFixed(0)} Hz`;
+        return `${(value / found.scale).toPrecision(3)} ${found.unit}`;
+      }
+
+      function formatLength(value) {
+        const units = [
+          { limit: 1e3, scale: 1e3, unit: "km" },
+          { limit: 1, scale: 1, unit: "m" },
+          { limit: 1e-2, scale: 1e-2, unit: "cm" },
+          { limit: 1e-3, scale: 1e-3, unit: "mm" },
+          { limit: 1e-6, scale: 1e-6, unit: "um" },
+          { limit: 1e-9, scale: 1e-9, unit: "nm" },
+          { limit: 1e-12, scale: 1e-12, unit: "pm" }
+        ];
+        const found = units.find((entry) => value >= entry.limit);
+        if (!found) return `${value.toExponential(2)} m`;
+        return `${(value / found.scale).toPrecision(3)} ${found.unit}`;
+      }
+
+      function radiationBand(frequency) {
+        if (frequency < 3e9) return "Radio";
+        if (frequency < 3e12) return "Microwave";
+        if (frequency < 4.3e14) return "Infrared";
+        if (frequency < 7.5e14) return "Visible";
+        if (frequency < 3e16) return "Ultraviolet";
+        if (frequency < 3e19) return "X-ray";
+        return "Gamma ray";
+      }
+
+      function formatEnergy(frequency) {
+        const electronVolts = (6.62607015e-34 * frequency) / 1.602176634e-19;
+        if (electronVolts < 1e-3) return `${(electronVolts * 1e6).toPrecision(3)} microeV`;
+        if (electronVolts < 1) return `${(electronVolts * 1e3).toPrecision(3)} meV`;
+        if (electronVolts < 1e3) return `${electronVolts.toPrecision(3)} eV`;
+        if (electronVolts < 1e6) return `${(electronVolts / 1e3).toPrecision(3)} keV`;
+        return `${(electronVolts / 1e6).toPrecision(3)} MeV`;
+      }
+
+      function updateLabels() {
+        cached = readState();
+        labels.frequency.value = `${cached.frequency.toFixed(1)} Hz`;
+        labels.tension.value = `${cached.tension.toFixed(0)} N`;
+        labels.density.value = `${cached.density.toFixed(2)} kg/m`;
+        labels.amplitude.value = `${cached.amplitude.toFixed(0)} px`;
+        labels.emWavelength.value = formatLength(cached.emWavelength);
+        labels.emLambda.textContent = formatLength(cached.emWavelength);
+        labels.lambda.textContent = formatMeters(cached.wavelength);
+        labels.speed.textContent = `${cached.speed.toFixed(1)} m/s`;
+        labels.period.textContent = `${(1 / cached.frequency).toFixed(2)} s`;
+        labels.radiation.textContent = `${radiationBand(cached.emFrequency)} (${formatFrequency(cached.emFrequency)})`;
+        labels.energy.textContent = formatEnergy(cached.emFrequency);
+        const spectrumPosition = Math.max(0, Math.min(100, ((Math.log10(cached.emFrequency) - 3) / 22) * 100));
+        labels.marker.style.left = `${spectrumPosition}%`;
+      }
+
+      function resizeCanvas() {
+        const rect = canvas.getBoundingClientRect();
+        pixelRatio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+        width = Math.max(320, Math.floor(rect.width));
+        height = Math.max(220, Math.floor(rect.height));
+        canvas.width = Math.floor(width * pixelRatio);
+        canvas.height = Math.floor(height * pixelRatio);
+        ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      }
+
+      function drawGrid(midY) {
+        ctx.strokeStyle = "rgba(57, 255, 106, 0.16)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 48) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+        }
+        for (let y = midY % 48; y <= height; y += 48) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(57, 255, 106, 0.3)";
+        ctx.beginPath();
+        ctx.moveTo(0, midY);
+        ctx.lineTo(width, midY);
+        ctx.stroke();
+      }
+
+      function drawWavelengthBrace(midY, wavelengthPx) {
+        const visible = Math.min(wavelengthPx, width - 48);
+        if (visible < 36) return;
+        const startX = 24;
+        const endX = startX + visible;
+        const y = Math.max(28, midY - cached.amplitude - 36);
+
+        ctx.strokeStyle = "rgba(223, 255, 234, 0.78)";
+        ctx.fillStyle = "rgba(223, 255, 234, 0.78)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+        ctx.moveTo(startX, y - 6);
+        ctx.lineTo(startX, y + 6);
+        ctx.moveTo(endX, y - 6);
+        ctx.lineTo(endX, y + 6);
+        ctx.stroke();
+        ctx.fillText("lambda", startX + visible / 2 - 18, y - 8);
+      }
+
+      function drawWave(time) {
+        const dt = Math.min(0.05, (time - lastTime) / 1000);
+        lastTime = time;
+        phase += dt * cached.frequency * Math.PI * 2;
+
+        ctx.clearRect(0, 0, width, height);
+        const midY = Math.round(height * 0.46);
+        const pixelsPerMeter = 32;
+        const wavelengthPx = cached.wavelength * pixelsPerMeter;
+        const k = (Math.PI * 2) / Math.max(24, wavelengthPx);
+
+        drawGrid(midY);
+
+        ctx.shadowColor = "rgba(57, 255, 106, 0.75)";
+        ctx.shadowBlur = 10;
+        ctx.strokeStyle = "#39ff6a";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 2) {
+          const envelope = 0.88 + 0.12 * Math.sin((x / width) * Math.PI);
+          const y = midY + Math.sin(x * k - phase) * cached.amplitude * envelope;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = "rgba(57, 255, 106, 0.22)";
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 5) {
+          const y = midY + Math.sin(x * k - phase) * cached.amplitude;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        ctx.font = "500 13px system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+        drawWavelengthBrace(midY, wavelengthPx);
+        requestAnimationFrame(drawWave);
+      }
+
+      Object.values(controls).forEach((control) => {
+        control.addEventListener("input", updateLabels);
+      });
+
+      window.addEventListener("resize", resizeCanvas);
+      updateLabels();
+      resizeCanvas();
+      requestAnimationFrame(drawWave);
+    })();
+  </script>
+</div>
