@@ -2,6 +2,46 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>
+// The same files are also published at videogametips.github.io, where accounts and the
+// leaderboards cannot work: their APIs only exist on sushigamelab.com. Send players to the real
+// address — and bring their progress, which lives in THIS origin's localStorage and would
+// otherwise be left behind. The leaderboard identity (device id, callsign, consent) is
+// deliberately not carried: anyone can craft a #carry link, and it must not be able to plant a
+// device id in someone else's browser. Arriving data never overwrites a career already here.
+(function(){
+  var CARRY=['ironTideCareer','ironTideSave','ironTideSettings','ironTideLastShip','ironTideLang','ironTideDifficulty',
+             'ironTideTutorialDone','ironTideTutorialPlaneDone','ironTideTutorialTankDone','ironTideCourseSeen'];
+  function b64(s){ return btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  function unb64(s){ s=s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4) s+='='; return decodeURIComponent(escape(atob(s))); }
+  if(location.hostname==='videogametips.github.io'){
+    var out={}, frag='';
+    try{ CARRY.forEach(function(k){ var v=localStorage.getItem(k); if(v!==null) out[k]=v; }); }catch(e){}
+    try{
+      frag=Object.keys(out).length ? b64(JSON.stringify(out)) : '';
+      if(frag.length>60000){ delete out.ironTideSave; frag=b64(JSON.stringify(out)); }   // an unfinished war is the first thing to leave behind
+      if(frag.length>60000) frag='';
+    }catch(e){ frag=''; }
+    location.replace('https://sushigamelab.com/irontide/'+(frag?'#carry='+frag:''));
+    return;
+  }
+  var m=/^#carry=([A-Za-z0-9_-]+)$/.exec(location.hash||'');
+  if(!m) return;
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){}
+  // Only the old address itself may hand progress over. A #carry link anyone crafted and sent
+  // around would otherwise write whatever strings they like into a fresh player's save, and the
+  // game was never written to distrust its own save. The redirect above leaves the old origin as
+  // the referrer (no referrer policy is set there, so the browser default keeps the origin), and
+  // nobody but the owner can publish on videogametips.github.io.
+  if(!/^https:\/\/videogametips\.github\.io\//.test(document.referrer||'')) return;
+  try{
+    if(localStorage.getItem('ironTideCareer')!==null) return;
+    var data=JSON.parse(unb64(m[1])), n=0;
+    CARRY.forEach(function(k){ if(data&&typeof data[k]==='string'&&data[k].length<500000){ localStorage.setItem(k,data[k]); n++; } });
+    if(n) sessionStorage.setItem('ironTideCarried','1');
+  }catch(e){}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Iron Tide — Battleship Command</title>
 <meta name="description" content="Free browser naval-action game. Command a battleship, bolt extra cannons onto your own deck, then fly the planes, drive the tanks and storm the beach yourself. 31-theater campaign. No account, no ads, no install.">
@@ -136,7 +176,7 @@
   #firstrun.on{display:flex;}
   /* One flag hides the rest of the menu instead of ten inline styles: buildCampaignPicker can
      rebuild #maps from several places, and an inline display:none does not survive that. */
-  #menu.firstrun > *:not(#firstrun):not(#langBtn):not(#frGear){display:none!important;}
+  #menu.firstrun > *:not(#firstrun):not(#langBtn):not(#frGear):not(#sidBtn){display:none!important;}
   #firstrun .fwm{font-size:clamp(24px,4.6vw,38px);letter-spacing:.28em;color:#9fc6e8;
     text-shadow:0 0 24px rgba(120,180,240,.4);margin-bottom:20px;}
   #firstrun .pitch{font-size:clamp(19px,3.2vw,33px);line-height:1.32;color:#eaf6ff;max-width:19em;}
@@ -187,7 +227,7 @@
   #brTop #menuNav{margin:0!important;line-height:1!important;white-space:nowrap;}
   #brTop #menuNav .pl:not(.keep){display:none;}
   #brTop #menuNav span[id]{padding:5px 10px!important;margin:0 2px!important;}
-  #brTop #langBtn,#brTop #frGear{position:static!important;right:auto!important;top:auto!important;flex:none;}
+  #brTop #langBtn,#brTop #frGear,#brTop #sidBtn{position:static!important;right:auto!important;top:auto!important;flex:none;}
   #brBody{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 392px;}
   #brLeft{min-height:0;overflow-y:auto;padding:16px 20px 18px;}
   #brRight{min-height:0;overflow-y:auto;display:flex;flex-direction:column;
@@ -841,7 +881,8 @@ function catTr(zh,id,field,en){ if(!isZh()||!zh) return en; const d=zh[id]; retu
 function trRank(n){ if(!isZh()) return n; return (typeof RANKS_ZH!=='undefined'&&RANKS_ZH[n])||trName(n); }  // 'Commander' means 中校 as a rank, 指挥官 as tank crew
 let menuSubEn=null;   // last contextual respawn/refusal message shown in #menu .sub — survives language switches
 function setLang(l){ if(l===I18N.lang)return; I18N.lang=l; NAME_ZH_CI=null; _trK=null; _trV=null;
-  try{localStorage.setItem('ironTideLang',l);}catch(e){} refreshLanguage(); }
+  try{localStorage.setItem('ironTideLang',l);}catch(e){} refreshLanguage();
+  try{ if(window.SushiID) window.SushiID.setLang(l); }catch(e){} }
 
 // ---------- difficulty presets ----------
 // One config object so every knob lives in one place. playerDmg scales all damage the
@@ -5545,6 +5586,7 @@ function layoutBridge(){
   // top bar: rank line, then the nav pills, then language and settings
   put(document.getElementById('career'), top);
   put(document.getElementById('menuNav'), top);
+  put(document.getElementById('sidBtn'), top);
   put(document.getElementById('langBtn'), top);
   const gr=document.getElementById('frGear');
   if(gr) put(gr, top);   // in the bridge the gear is a normal top-bar button, not a floating one
@@ -5593,6 +5635,15 @@ function buildMenu(){
     menu.appendChild(b);
   }
   const lb=document.getElementById('langBtn'); if(lb) lb.textContent=isZh()?'🌐 English':'🌐 中文';
+  // Sushi ID: sign in without leaving the game (it used to be home-page only)
+  if(menu && !document.getElementById('sidBtn')){
+    const b=document.createElement('button'); b.id='sidBtn';
+    b.style.cssText='position:absolute;top:14px;z-index:21;padding:7px 12px;font-size:13px;letter-spacing:.5px;max-width:200px;'+
+      'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:#1d1a14;border:1px solid #5a4630;color:#ffd9b0;border-radius:8px;cursor:pointer;';
+    b.onclick=()=>sidOpen('login');
+    menu.appendChild(b);
+  }
+  sidRefreshButton();
   // Settings live behind the gear on the first screen too — the only other thing a stranger is
   // offered besides the language. It hands them the full menu with the settings row already open.
   if(menu && !document.getElementById('frGear')){
@@ -5758,6 +5809,12 @@ function buildMenu(){
   // there: renderDiffRow's own gear would be a second door to the same panel two inches away.
   const gear=document.getElementById('frGear');
   if(gear) gear.style.display=(onFirst||menu.classList.contains('bridge'))?'block':'none';
+  // on the first-run screen it floats left of the gear (or of the language button when the gear is away)
+  { const b=document.getElementById('sidBtn');
+    if(b && !menu.classList.contains('bridge')){
+      const gv=gear&&gear.style.display!=='none';
+      b.style.right=(gv ? (parseFloat(gear.style.right)||0)+gear.offsetWidth+12 : (lb?lb.offsetWidth:92)+30)+'px';
+    } }
 }
 function installBossStarterGuns(build){
   const half=Math.floor(build.mounts.length/2),slots=[0,1,2,3,4,5,half,half+1,half+2,half+3,half+4,half+5];
@@ -11086,6 +11143,45 @@ async function lbSushiFinish(att){
   }catch(e){ return null; }
 }
 
+// ---- signing in from inside the game ------------------------------------------------
+// The account window is the site's own (/account.js, same origin), so there is one sign-in
+// everywhere. It used to be reachable only from the home page: a captain had to leave the game,
+// sign in and come back, with nothing here showing it had noticed.
+// The site only exists around the game when it is served under /irontide/ (sushigamelab.com, and
+// tools/dev-proxy.js locally). Standalone — server/server.js, the smoke tests, a file:// copy —
+// asking for /account.js would only log a 404; the button then goes to the site instead.
+const SID_HOSTED=location.pathname.startsWith('/irontide/')&&location.hostname!=='videogametips.github.io';
+let sidReady=null;
+function sidLoad(){
+  if(sidReady) return sidReady;
+  sidReady=new Promise(res=>{
+    if(window.SushiID){ res(window.SushiID); return; }
+    if(!SID_HOSTED){ res(null); return; }
+    const css=document.createElement('link'); css.rel='stylesheet'; css.href='/account.css?v=2026-09-27a'; document.head.appendChild(css);
+    const s=document.createElement('script'); s.src='/account.js?v=2026-09-27a'; s.async=true;
+    // an older account.js (no setLang) still opens the window, just in its own language
+    s.onload=()=>{ try{ window.SushiID.setLang(isZh()?'zh':'en'); }catch(e){} res(window.SushiID||null); };
+    s.onerror=()=>res(null);
+    document.head.appendChild(s);
+  });
+  return sidReady;
+}
+function sidOpen(tab){
+  try{ sfxClick(); }catch(e){}
+  sidLoad().then(S=>{ if(S) S.open(tab||'login'); else location.href=SID_HOSTED?'/':'https://sushigamelab.com/irontide/'; });
+}
+function sidRefreshButton(){
+  const b=document.getElementById('sidBtn'); if(!b) return;
+  const u=LB.sushi&&LB.sushi.user;
+  b.textContent=u ? '🍣 '+u.displayName : T('🍣 Sign in','🍣 登录');
+  b.title=u ? T('Your Sushi Game Lab account','你的寿司游戏实验室账号') : T('Optional: keeps your name across devices and puts campaign scores on the site-wide board','可选：换设备名字还在，战役成绩还会进全站榜');
+}
+// account.js announces every sign-in, sign-out and first check. Re-read our own copy (we need
+// the CSRF token for ranked runs) and repaint what shows the name.
+window.addEventListener('sgl:authchange', ()=>{
+  lbSushiMe().then(()=>{ sidRefreshButton(); if(lbOpen) lbRender(); });
+});
+
 // Both services are same-origin, in production and in development alike: Caddy routes
 // them on the server, tools/dev-proxy.js routes them locally. This used to carry a
 // localhost special case pointing straight at the service port, which made local runs
@@ -11495,8 +11591,8 @@ function lbRenderFootIdentity(){
       T('Stored: a random id made on this device, your callsign, and battle results. No account, no email, no real name. Clearing this browser\'s data starts a new captain.',
         '存下来的东西：这台设备上随机生成的一个 id、你的呼号、战斗成绩。没有账号，没有邮箱，没有真名。清掉浏览器数据就换成一个新舰长。')+'</div>'+
     '<div style="margin-top:7px;color:#55697d">'+
-      T('Every board here works exactly like this, with no account. A <a href="/" style="color:#8fb8d8">Sushi Game Lab account</a> is optional — it keeps your name across devices and puts your campaign scores on the site-wide board too.',
-        '这里所有的榜，不登录也是这样用，功能一点不少。<a href="/" style="color:#8fb8d8">寿司游戏实验室账号</a>是可选的——换设备名字还在，战役成绩还会进全站榜。')+'</div>';
+      T('Every board here works exactly like this, with no account. A <a href="/" onclick="event.preventDefault();sidOpen(&quot;register&quot;)" style="color:#8fb8d8">Sushi Game Lab account</a> is optional — it keeps your name across devices and puts your campaign scores on the site-wide board too.',
+        '这里所有的榜，不登录也是这样用，功能一点不少。<a href="/" onclick="event.preventDefault();sidOpen(&quot;register&quot;)" style="color:#8fb8d8">寿司游戏实验室账号</a>是可选的——换设备名字还在，战役成绩还会进全站榜。')+'</div>';
   foot.querySelector('#lbRoll').onclick=()=>{ lbReroll(); sfxClick(); lbRender(); };
   foot.querySelector('#lbForget').onclick=async()=>{
     sfxClick();
@@ -11596,6 +11692,14 @@ function lbLocalBest(){
 // Runs here rather than beside loadCareer(): `LB` is a `let`, so calling lbLoad()
 // from earlier in the file would hit the temporal dead zone and throw at boot.
 lbLoad();
+sidLoad();   // shows the signed-in name on the menu button as soon as the site answers
+// Arrived from the old github.io address with progress in tow (see the top of <head>): say so once.
+try{ if(sessionStorage.getItem('ironTideCarried')){ sessionStorage.removeItem('ironTideCarried');
+  setTimeout(()=>{ const d=document.createElement('div');
+    d.textContent=T('✅ Your progress came with you from the old address.','✅ 你在旧地址（github.io）上的进度已经搬过来了。');
+    d.style.cssText='position:fixed;left:50%;top:60px;transform:translateX(-50%);z-index:9998;padding:10px 16px;border-radius:10px;'+
+      'background:#18271f;border:1px solid #416a57;color:#bcebd2;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4);';
+    document.body.appendChild(d); setTimeout(()=>d.remove(),6000); },800); } }catch(e){}
 
 function endGame(win,msg){
   if(win && trainingCourseRunning()){
